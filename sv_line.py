@@ -2,11 +2,11 @@ from heap import *
 
 
 class SvLine:
-    def __init__(self, line_id, ref_pos_start, ref_pos_end, query_pos):
+    def __init__(self, soc_id, ref_pos_start, ref_pos_end, query_pos):
         self.ref_pos_start = ref_pos_start
         self.ref_pos_end = ref_pos_end
         self.query_pos = query_pos
-        self.line_id = line_id
+        self.nuc_seq_id, self.soc_index = soc_id
 
 
 class SeedSvLine(SvLine):
@@ -27,7 +27,6 @@ class GapEndSvLine(SvLine):
 class OverlapSvLine(SvLine):
     def __init__(self, *args):
         SvLine.__init__(self, *args)
-
 
 class OpenSvLineHeaps:
     def __init__(self):
