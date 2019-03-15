@@ -2,6 +2,11 @@ import sqlite3
 from MA import *
 import heap
 
+##
+# @brief extracts SoC's from database
+# @details
+# returns them semi sorted -> by the order given by soc_start in the database
+
 
 class SoCSortedSocFromSQl(VolatileModule):
     def __init__(self, db_name, pack, fm_index, parameter_set_manager):
@@ -62,23 +67,14 @@ class SoCSortedSocFromSQl(VolatileModule):
         if self.next is None:
             self.set_finished()
 
-        return min(soc_start, filled_seeds[0].start_ref), filled_seeds
+        return min(soc_start, filled_seeds[0].start_ref), (nuc_seq_id, soc_index), filled_seeds
 
 
+##
+# @brief orders SoC's extracted by SoCSortedSocFromSQl
+# @details
+# orders the soc's by the first seeds reference position
 class SortedSocFromSQl(VolatileModule):
-    def re_fill_heap(self):
-        while not self.next_soc is None and \
-            (self.heap.empty() or
-             self.next_soc[0] - self.max_padding <= self.heap.peek()[0].start_ref):
-
-            self.heap.push(self.next_soc[1])
-            if self.helper.is_finished():
-                self.next_soc = None
-            else:
-                self.next_soc = self.helper.execute(None)
-        if self.heap.empty():
-            self.set_finished()
-
     def __init__(self, db_name, pack, fm_index, parameter_manager):
         VolatileModule.__init__(self)  # this line is crucial DON'T DELETE ME
         self.max_padding = parameter_manager.get_selected().by_name(
@@ -87,7 +83,7 @@ class SortedSocFromSQl(VolatileModule):
         self.helper = SoCSortedSocFromSQl(
             db_name, pack, fm_index, parameter_manager)
         self.heap = heap.Heap(
-            lt_comp=lambda x, y: x[0].start_ref < y[0].start_ref)
+            lt_comp=lambda x, y: x[0][0].start_ref < y[0][0].start_ref)
 
         self.next_soc = None
         if not self.helper.is_finished():
@@ -95,14 +91,70 @@ class SortedSocFromSQl(VolatileModule):
 
         self.re_fill_heap()
 
+    def re_fill_heap(self):
+        while not self.next_soc is None and \
+            (self.heap.empty() or
+             self.next_soc[0] - self.max_padding <= self.heap.peek()[0][0].start_ref):
+
+            # push the actual SoC and its id
+            self.heap.push((self.next_soc[2], self.next_soc[1]))
+            if self.helper.is_finished():
+                self.next_soc = None
+            else:
+                self.next_soc = self.helper.execute(None)
+        if self.heap.empty():
+            self.set_finished()
+
     ##
     # @brief
     # @details
     # Reimplemented from MA.aligner.Module.execute.
     def execute(self, input_vec):
-        ret = self.heap.pop()
+        soc, soc_id = self.heap.pop()
         self.re_fill_heap()
-        return ret
+        return soc, soc_id
+
+##
+# @brief returns sorted seeds given sorted soc's
+#
+
+
+class SortedSoCtoSortedSeeds(VolatileModule):
+    def __init__(self, db_name, pack, fm_index, parameter_manager):
+        VolatileModule.__init__(self)  # this line is crucial DON'T DELETE ME
+        self.heap = heap.Heap(
+            lt_comp=lambda x, y: x[0][x[2]].start_ref < y[0][y[2]].start_ref)
+
+        self.helper = SortedSocFromSQl(
+            db_name, pack, fm_index, parameter_manager)
+        self.next_soc = None
+        if not self.helper.is_finished():
+            self.next_soc = self.helper.execute(None)
+        self.re_fill_heap()
+
+    def re_fill_heap(self):
+        while not self.next_soc is None and \
+                (self.heap.empty() or
+                 self.next_soc[0][0].start_ref <= self.heap.peek()[0][self.heap.peek()[2]].start_ref):
+
+            # push the actual SoC and its id
+            self.heap.push((self.next_soc[0], self.next_soc[1], 0))
+            self.next_soc = None
+            if not self.helper.is_finished():
+                self.next_soc = self.helper.execute(None)
+        if self.heap.empty():
+            self.set_finished()
+
+    ##
+    # @brief
+    # @details
+    # Reimplemented from MA.aligner.Module.execute.
+    def execute(self, input_vec):
+        soc, soc_id, seed_index = self.heap.pop()
+        if seed_index + 1 < len(soc):
+            self.heap.push((soc, soc_id, seed_index+1))
+        self.re_fill_heap()
+        return soc[seed_index], soc_id
 
 
 if __name__ == "__main__":
@@ -111,11 +163,32 @@ if __name__ == "__main__":
     pack = Pack()
     pack.load("/MAdata/genome/human/GRCh38.p12/ma/genome")
 
+    print("testing SortedSocFromSQl...")
     x = SortedSocFromSQl("/MAdata/databases/sv_simulated",
                          pack, fm_index, ParameterSetManager())
     last = 0
+    heap_size = 0
+    num_steps = 0
     while not x.is_finished():
-        this = x.execute(None)[0].start_ref
-        print(len(x.heap), last, "->", this, sep="\t")
+        this = x.execute(None)[0][0].start_ref
+        num_steps += 1
+        heap_size += len(x.heap)
         assert this >= last
         last = this
+    print("success! Average heap size:", heap_size/num_steps)
+
+    # test 2
+
+    print("testing SortedSoCtoSortedSeeds...")
+    x = SortedSoCtoSortedSeeds("/MAdata/databases/sv_simulated",
+                         pack, fm_index, ParameterSetManager())
+    last = 0
+    heap_size = 0
+    num_steps = 0
+    while not x.is_finished():
+        this = x.execute(None)[0].start_ref
+        num_steps += 1
+        heap_size += len(x.heap)
+        assert this >= last
+        last = this
+    print("success! Average heap size:", heap_size/num_steps)
