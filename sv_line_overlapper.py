@@ -39,6 +39,15 @@ class OpenSvLineHeaps:
                 contradicting.add(sv_line.nuc_seq_id)
         return len(contradicting)
 
+    def iter_contradicting(self):
+        for sv_line in self.heaps[SeedSvLine]:
+            if sv_line.ref_pos_start <= self.peek().ref_pos_start:
+                yield sv_line
+
+    def iter_supporting(self):
+        for sv_line in self.heaps[type(self.peek())]:
+            yield sv_line
+
 
 ##
 # @brief overlaps sv lines and filters them
@@ -101,6 +110,9 @@ class SvLineFilter(VolatileModule):
             sv_line.ref_pos_start)
         sv_line.supp = sv_line.num_supporting / \
             (sv_line.num_contradicting + sv_line.num_supporting)
+        sv_line.supporting = []
+        for supporting_line in self.heap.iter_supporting():
+            sv_line.supporting.append( (supporting_line.nuc_seq_id, supporting_line.query_pos) )
 
     # extract SV lines until the first one on the heap makes it through the filtering
     def to_next_accepted_line(self):

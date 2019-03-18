@@ -108,11 +108,11 @@ class SeedsToSVLines(VolatileModule):
 
 def add_sv_line_params(parameter_manager):
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterInt(
-        "max sv line size", "maximal size of sv line", 6, "Structural Variants Caller", 25))
+        "max sv line size", "maximal size of sv line", 6, "Structural Variants Caller", 10))#25
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterInt(
         "min sv line size", "minimal size of sv line", 6, "Structural Variants Caller", 0))
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterInt(
-        "sv line fuzziness", "fuzziness of sv line", 6, "Structural Variants Caller", 3))
+        "sv line fuzziness", "fuzziness of sv line", 6, "Structural Variants Caller", 1))
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterDouble(
         "sv line size slope", "...", 6, "Structural Variants Caller", 0.5))
 

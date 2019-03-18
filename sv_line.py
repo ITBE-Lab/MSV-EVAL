@@ -11,6 +11,7 @@ class SvLine:
         self.num_supporting = None
         self.num_contradicting = None
         self.supp = None
+        self.supporting = None
 
 class SeedSvLine(SvLine):
     def __init__(self, *args):
