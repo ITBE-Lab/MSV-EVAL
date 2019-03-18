@@ -10,6 +10,7 @@ class SvLineToDb(VolatileModule):
         VolatileModule.__init__(self)  # this line is crucial DON'T DELETE ME
 
         self.sv_db = SV_DB(db_name)
+        self.sv_db.db.clear_calls_table()
         self.sv_inserter = libMA.SvInserter(self.sv_db.db, "caller_name", "desc")
 
     ##

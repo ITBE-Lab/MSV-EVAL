@@ -11,9 +11,7 @@ class Caller():
         self.parameter_set_manager.set_selected("PacBio")
 
         # compute SoC's if it hasn't been done yet
-        compute_socs(self.sv_db, self.pack, self.fm_index, self.parameter_set_manager, force=False)
-        self.sv_db = SV_DB(db_name)
-        self.sv_db.db.clear_calls_table()
+        compute_socs(SV_DB(db_name), self.pack, self.fm_index, self.parameter_set_manager, force=False)
 
         add_sv_line_params(self.parameter_set_manager)
         add_sv_overlap_params(self.parameter_set_manager)
