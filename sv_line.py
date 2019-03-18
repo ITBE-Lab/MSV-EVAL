@@ -8,6 +8,9 @@ class SvLine:
         self.query_pos = query_pos
         self.nuc_seq_id, self.soc_index = soc_id
 
+        self.num_supporting = None
+        self.num_contradicting = None
+        self.supp = None
 
 class SeedSvLine(SvLine):
     def __init__(self, *args):

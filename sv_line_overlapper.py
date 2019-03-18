@@ -1,5 +1,6 @@
 from seeds_to_sv_lines import *
 
+
 class OpenSvLineHeaps:
     def __init__(self):
         def lt_comp(x, y): return x.ref_pos_end < y.ref_pos_end
@@ -14,7 +15,7 @@ class OpenSvLineHeaps:
         self.heaps[type(sv_line)].push(sv_line)
 
     def first(self):
-        return min(self.heaps.values(), key=lambda x: x.peek().ref_pos_end)
+        return min(filter(lambda x: not x.empty(), self.heaps.values()), key=lambda x: x.peek().ref_pos_end)
 
     def peek(self):
         return self.first().peek()
@@ -22,11 +23,14 @@ class OpenSvLineHeaps:
     def pop(self):
         return self.first().pop()
 
-    def empty():
+    def empty(self):
         for x in self.heaps.values():
             if not x.empty():
                 return False
         return True
+
+    def __len__(self):
+        return sum([len(x) for x in self.heaps.values()])
 
     def num_contradicting(self, ref_pos_start):
         contradicting = set()
@@ -39,20 +43,42 @@ class OpenSvLineHeaps:
 ##
 # @brief overlaps sv lines and filters them
 #
-class SvLineOverlapper(VolatileModule):
+class SvLineFilter(VolatileModule):
     def __init__(self, db_name, pack, fm_index, parameter_manager):
         VolatileModule.__init__(self)  # this line is crucial DON'T DELETE ME
+
+        self.min_support = parameter_manager.get_selected().by_name("min sv support").get()
+        self.min_support_ratio = parameter_manager.get_selected().by_name(
+            "min sv support ratio").get()
 
         self.heap = OpenSvLineHeaps()
 
         self.helper = SeedsToSVLines(
             db_name, pack, fm_index, parameter_manager)
 
+        #
+        # define different filters -> maybe move this to individual classes?
+        #
+        def type_not_seed():
+            return not isinstance(self.heap.peek(), SeedSvLine)
+
+        def support_ratio_filter():
+            return self.heap.peek().supp >= self.min_support_ratio
+
+        def support_filter():
+            return self.heap.peek().num_supporting >= self.min_support
+
+        # create a list of filters
+        self.sv_line_filters = [
+            type_not_seed,
+            support_ratio_filter,
+            support_filter
+        ]
+
         self.next_sv_line = None
         if not self.helper.is_finished():
             self.next_sv_line = self.helper.execute(None)
-        self.re_fill_heap()
-
+        self.to_next_accepted_line()
 
     def re_fill_heap(self):
         while not self.next_sv_line is None and \
@@ -67,12 +93,143 @@ class SvLineOverlapper(VolatileModule):
         if self.heap.empty():
             self.set_finished()
 
+    def decorate_curr_sv_line(self):
+        sv_line = self.heap.peek()
+        sv_line.num_supporting = len(
+            self.heap.heaps[type(sv_line)])
+        sv_line.num_contradicting = self.heap.num_contradicting(
+            sv_line.ref_pos_start)
+        sv_line.supp = sv_line.num_supporting / \
+            (sv_line.num_contradicting + sv_line.num_supporting)
+
+    # extract SV lines until the first one on the heap makes it through the filtering
+    def to_next_accepted_line(self):
+        self.re_fill_heap()
+        while not self.is_finished():
+            self.decorate_curr_sv_line()
+            # print("to_next_accepted_line::while")
+            filter_failed = False  # no filter has failed yet...
+            for i, sv_line_filter in enumerate(self.sv_line_filters):
+                if not sv_line_filter():
+                    #print("Filter", i, "failed")
+                    filter_failed = True  # continue to extract in the outer while loop
+                    self.heap.pop()
+                    break
+            if filter_failed:
+                #print("Filter failed")
+                self.re_fill_heap()
+                continue
+            else:
+                #print("all Filters passed")
+                # if this point is reached and no filter returned False we exit the loop
+                break
+
     ##
     # @brief
     # @details
     # Reimplemented from MA.aligner.Module.execute.
+
     def execute(self, input_vec):
         sv_line = self.heap.pop()
-        # @todo continue
-        self.re_fill_heap()
+        self.to_next_accepted_line()
         return sv_line
+        
+##
+# @brief overlaps sv lines and filters them
+#
+class SvLineOverlapper(VolatileModule):
+    def __init__(self, db_name, pack, fm_index, parameter_manager):
+        VolatileModule.__init__(self)  # this line is crucial DON'T DELETE ME
+
+        self.helper = SvLineFilter(
+            db_name, pack, fm_index, parameter_manager)
+
+        self.last_sv_line = None
+        if not self.helper.is_finished():
+            self.last_sv_line = self.helper.execute(None)
+        else:
+            self.set_finished()
+
+    ##
+    # @brief
+    # @details
+    # Reimplemented from MA.aligner.Module.execute.
+
+    def execute(self, input_vec):
+        sv_line = self.last_sv_line
+        self.last_sv_line = None
+        # if the last and the second last sv line returned by helper, did not overlap,
+        # we reach this point, where there is still a line stored in last sv line
+        # in this case we need to set_finished and return this line.
+        if self.helper.is_finished():
+            self.set_finished()
+        while not self.helper.is_finished():
+            self.last_sv_line = self.helper.execute(None)
+
+            # check for non overlapping SV lines
+            if sv_line.ref_pos_end < self.last_sv_line.ref_pos_start:
+                break
+            if type(sv_line) != type(self.last_sv_line):
+                break
+
+            # if there are no more sv_lines that can be extracted from helper,
+            # and the last extracted line overlaps with the second last extracted line,
+            # then we need to set_finished, because this module does not have any sv line in the buffer anymore.
+            # (since only the last or the second last sv line can be returned)
+            if self.helper.is_finished():
+                self.set_finished()
+            # overwrite overlapping sv line if necessary
+            if self.last_sv_line.supp > sv_line.supp:
+                sv_line = self.last_sv_line
+                continue
+            if self.last_sv_line.supp == sv_line.supp and self.last_sv_line.num_supporting > sv_line.num_supporting:
+                sv_line = self.last_sv_line
+                continue
+            # extend the end position of the sv line otherwise
+            sv_line.ref_pos_end = self.last_sv_line.ref_pos_end
+            self.last_sv_line = None
+        return sv_line
+
+
+def add_sv_overlap_params(parameter_manager):
+    parameter_manager.get_selected().register_parameter(libMA.AlignerParameterInt(
+        "min sv support", "desc", 6, "Structural Variants Caller", 5))
+    parameter_manager.get_selected().register_parameter(libMA.AlignerParameterDouble(
+        "min sv support ratio", "desc", 6, "Structural Variants Caller", 1))
+
+
+def test_SvLineOverlapper(fm_index, pack):
+    print("testing SvLineOverlapper...")
+    parameter_manager = ParameterSetManager()
+    add_sv_line_params(parameter_manager)
+    add_sv_overlap_params(parameter_manager)
+
+    x = SvLineOverlapper("/MAdata/databases/sv_simulated",
+                         pack, fm_index, parameter_manager)
+
+    last = 0
+    heap_size = 0
+    num_steps = 0
+    while not x.is_finished():
+        sv_line = x.execute(None)
+        this = sv_line.ref_pos_end
+        print(sv_line.ref_pos_start, sv_line.ref_pos_end,
+              sv_line.supp, sv_line.num_supporting, type(sv_line))
+        num_steps += 1
+        heap_size += len(x.helper.heap)
+        assert this >= last
+        last = this
+    print("success! Average heap size:", heap_size/num_steps)
+
+
+if __name__ == "__main__":
+    print("loading index...")
+    fm_index = FMIndex()
+    fm_index.load("/MAdata/genome/human/GRCh38.p12/ma/genome")
+    pack = Pack()
+    pack.load("/MAdata/genome/human/GRCh38.p12/ma/genome")
+    print("done")
+
+    test_SvLineOverlapper(fm_index, pack)
+
+    print("done")
