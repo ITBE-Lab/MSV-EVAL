@@ -188,3 +188,4 @@ def filter_sv_lines(db_name):
 
     conn.commit()
     conn.close()
+

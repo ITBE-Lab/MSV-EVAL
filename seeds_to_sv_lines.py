@@ -31,6 +31,7 @@ class SeedsToSVLines(VolatileModule):
         if not self.helper.is_finished():
             self.next_seed = self.helper.execute(None)
         self.re_fill_heap()
+        self.unpacked_size = pack.unpacked_size()
 
     def dist_interval(self, a_s, a_e, b_s, b_e):
         if b_s <= a_e and a_s <= b_e:
@@ -63,7 +64,8 @@ class SeedsToSVLines(VolatileModule):
                 yield OverlapSvLine(soc_id, prev.start_ref + prev.size, prev.start_ref + prev.size + overlap_size,
                                     prev.start + prev.size)
         elif seed.start > 0:  # if the seed does not reach the beginning of the read
-            yield GapEndSvLine(soc_id, seed.start_ref - self.max_sv_line_size,
+            prev_ = libMA.Seed(0, 0, seed.start_ref, True)
+            yield GapEndSvLine(soc_id, seed.start_ref - self.sv_line_size(seed, prev_),
                                seed.start_ref + self.sv_line_fuzziness, seed.start)
 
         if index < len(soc) - 1:
@@ -78,8 +80,9 @@ class SeedsToSVLines(VolatileModule):
                                     next_.start)
 
         elif seed.start + seed.size < query_len:  # if the seed does not reach the end of the read
+            next_ = libMA.Seed(query_len, 0, seed.start_ref + seed.size, True)
             yield GapStartSvLine(soc_id, seed.start_ref + seed.size - self.sv_line_fuzziness,
-                                 seed.start_ref + seed.size + self.max_sv_line_size, seed.start + seed.size)
+                                 seed.start_ref + seed.size + self.sv_line_size(seed, next_), seed.start + seed.size)
 
     def re_fill_heap(self):
         while not self.next_seed is None and \
@@ -108,13 +111,13 @@ class SeedsToSVLines(VolatileModule):
 
 def add_sv_line_params(parameter_manager):
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterInt(
-        "max sv line size", "maximal size of sv line", 6, "Structural Variants Caller", 10))#25
+        "max sv line size", "maximal size of sv line", 6, "Structural Variants Caller", 0))#25
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterInt(
         "min sv line size", "minimal size of sv line", 6, "Structural Variants Caller", 0))
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterInt(
-        "sv line fuzziness", "fuzziness of sv line", 6, "Structural Variants Caller", 1))
+        "sv line fuzziness", "fuzziness of sv line", 6, "Structural Variants Caller", 3))
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterDouble(
-        "sv line size slope", "...", 6, "Structural Variants Caller", 0.5))
+        "sv line size slope", "...", 6, "Structural Variants Caller", 0.05))
 
 
 def test_SeedsToSVLines(fm_index, pack):

@@ -210,7 +210,7 @@ def add_sv_overlap_params(parameter_manager):
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterInt(
         "min sv support", "desc", 6, "Structural Variants Caller", 5))
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterDouble(
-        "min sv support ratio", "desc", 6, "Structural Variants Caller", 1))
+        "min sv support ratio", "desc", 6, "Structural Variants Caller", 0.9))
 
 
 def test_SvLineOverlapper(fm_index, pack):
