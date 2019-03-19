@@ -140,7 +140,6 @@ class SvLineFilter(VolatileModule):
     # @brief
     # @details
     # Reimplemented from MA.aligner.Module.execute.
-
     def execute(self, input_vec):
         sv_line = self.heap.pop()
         self.to_next_accepted_line()
