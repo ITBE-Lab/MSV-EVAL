@@ -112,7 +112,8 @@ class SvLineFilter(VolatileModule):
             (sv_line.num_contradicting + sv_line.num_supporting)
         sv_line.supporting = []
         for supporting_line in self.heap.iter_supporting():
-            sv_line.supporting.append( (supporting_line.nuc_seq_id, supporting_line.query_pos) )
+            sv_line.supporting.append( (supporting_line.nuc_seq_id, supporting_line.query_pos,
+                                        supporting_line.forw_strand) )
 
     # extract SV lines until the first one on the heap makes it through the filtering
     def to_next_accepted_line(self):

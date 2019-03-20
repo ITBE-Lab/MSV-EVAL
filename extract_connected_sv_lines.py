@@ -5,12 +5,12 @@ class SvLineConn:
     def __init__(self, soc_line_id, other_lines):
         self.soc_line_id = soc_line_id
         self.by_line_id = {}
-        for read_id, read_pos, sv_line_id in other_lines:
+        for read_id, read_pos, sv_line_id, forw_strand in other_lines:
             if sv_line_id not in self.by_line_id:
                 self.by_line_id[sv_line_id] = {}
             if read_id not in self.by_line_id[sv_line_id]:
                 self.by_line_id[sv_line_id][read_id] = []
-            self.by_line_id[sv_line_id][read_id].append(read_pos)
+            self.by_line_id[sv_line_id][read_id].append( (read_pos, forw_strand) )
 
 
 ##
@@ -38,7 +38,7 @@ class ExtractSupportedSvLines(VolatileModule):
     # Reimplemented from MA.aligner.Module.execute.
     def execute(self, input_vec):
         self.cur.execute("""
-            SELECT read_id, read_pos, sv_line_id
+            SELECT read_id, read_pos, sv_line_id, on_forward_strand
             FROM sv_line_support_table
             WHERE read_id IN (
                 SELECT read_id
@@ -89,43 +89,54 @@ class ConnectSvLines(Module):
 
         id_to = None
         to_dists = []
+        switch_strand = None
+
+        print("connecting:", sv_line_conn.soc_line_id)
 
         for potential_match in sv_line_conn.by_line_id.keys():
             if potential_match == sv_line_conn.soc_line_id:
                 continue
+            print("with", potential_match)
             dists = []
             for read_id, pos_to_s in sv_line_conn.by_line_id[potential_match].items():
                 pos_from_s = sv_line_conn.by_line_id[sv_line_conn.soc_line_id][read_id]
 
-                min_dist = abs(pos_from_s[0] - pos_to_s[0])
-                for pos_from in pos_from_s:
-                    for pos_to in pos_to_s:
-                        min_dist = min(abs(pos_from - pos_to), min_dist)
+                min_dist = abs(pos_from_s[0][0] - pos_to_s[0][0])
+                curr_switch_strand = pos_from_s[0][1] != pos_to_s[0][1]
+                for pos_from, forw_strand_from in pos_from_s:
+                    for pos_to, forw_strand_to in pos_to_s:
+                        dist = abs(pos_from - pos_to)
+                        if dist < min_dist:
+                            min_dist = dist
+                            curr_switch_strand = forw_strand_from != forw_strand_to
                 dists.append(min_dist)
             if self.is_better_distance_list(to_dists, dists):
                 print("Better")
                 id_to = potential_match
                 to_dists = dists
+                switch_strand = curr_switch_strand
             else:
                 print("Worse")
 
-        print("connecting", sv_line_conn.soc_line_id, "to", id_to)
+        print("connecting", sv_line_conn.soc_line_id, "to", id_to, "switch strand:", switch_strand)
         if not id_to is None:
             self.cur.execute("""
                 INSERT INTO sv_line_connector_table
-                VALUES (NULL, ?, ?, ?, ?)
-            """, (sv_line_conn.soc_line_id, id_to, True, ""))
+                VALUES (NULL, ?, ?, ?, ?, ?)
+            """, (sv_line_conn.soc_line_id, id_to, True, switch_strand, ""))
 
         return None
 
 def filter_sv_line_connectors(db_name):
     conn = sqlite3.connect(db_name)
     cur = conn.cursor()
+    # get all sv line connectors, that have a mate formin a two line cycle.
     sql_passing = """
         SELECT DISTINCT A.id
         FROM sv_line_table
         INNER JOIN sv_line_connector_table A ON A.soc_line_from = sv_line_table.id
         INNER JOIN sv_line_connector_table B ON B.soc_line_from = A.soc_line_to AND B.soc_line_to = sv_line_table.id
+        WHERE A.switch_strand == B.switch_strand
     """
     cur.execute(sql_passing)
     sv_line_conn_ids = cur.fetchall()
@@ -153,6 +164,8 @@ def filter_sv_line_connectors(db_name):
 def filter_sv_lines(db_name):
     conn = sqlite3.connect(db_name)
     cur = conn.cursor()
+    # get all sv lines that are the origin of at least one connector that passed all filters
+    # (since we filtered connectors before, this will mean, that there are interlaced connectors for this sv line)
     sql_passing = """
         SELECT DISTINCT id
         FROM sv_line_table

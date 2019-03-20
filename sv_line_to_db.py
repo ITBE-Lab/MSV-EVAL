@@ -28,7 +28,7 @@ class SvLineToDb(VolatileModule):
         line_context = self.sv_inserter.insert_sv_line(
             sv_line.ref_pos_start, sv_line.ref_pos_end, str(type(sv_line)).split("'")[1])
 
-        for read_id, q_pos in sv_line.supporting:
-            line_context.insert_support(read_id, q_pos)
+        for read_id, q_pos, forw_strand in sv_line.supporting:
+            line_context.insert_support(read_id, q_pos, forw_strand)
 
         return None

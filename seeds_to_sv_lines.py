@@ -51,38 +51,42 @@ class SeedsToSVLines(VolatileModule):
     def to_sv_lines(self, soc, index, soc_id, query_len):
         seed = soc[index]
         if seed.size > self.sv_line_fuzziness * 2:
-            yield SeedSvLine(soc_id, seed.start_ref + self.sv_line_fuzziness, seed.start_ref + seed.size - self.sv_line_fuzziness, None)
+            yield SeedSvLine(soc_id, seed.start_ref + self.sv_line_fuzziness, seed.start_ref + seed.size - self.sv_line_fuzziness, None, seed.on_forward_strand, query_len)
 
         if index > 0:
             prev = soc[index-1]
             yield GapEndSvLine(soc_id, seed.start_ref - self.sv_line_size(seed, prev),
-                               seed.start_ref + self.sv_line_fuzziness, seed.start)
+                               seed.start_ref + self.sv_line_fuzziness, seed.start, seed.on_forward_strand, query_len)
 
             # overlap line with previous seed...
-            if seed.start_ref < prev.start_ref + prev.size and COMPUTE_OVERLAP_LINES:
-                overlap_size = self.max_sv_line_size #@todo
+            if seed.start_ref < prev.start_ref + prev.size and seed.on_forward_strand == prev.on_forward_strand \
+                    and COMPUTE_OVERLAP_LINES:
+                overlap_size = self.max_sv_line_size  # @todo
                 yield OverlapSvLine(soc_id, prev.start_ref + prev.size, prev.start_ref + prev.size + overlap_size,
-                                    prev.start + prev.size)
+                                    prev.start + prev.size, seed.on_forward_strand, query_len)
         elif seed.start > 0:  # if the seed does not reach the beginning of the read
-            prev_ = libMA.Seed(0, 0, seed.start_ref, True)
+            prev_ = libMA.Seed(0, 0, seed.start_ref, seed.on_forward_strand)
             yield GapEndSvLine(soc_id, seed.start_ref - self.sv_line_size(seed, prev_),
-                               seed.start_ref + self.sv_line_fuzziness, seed.start)
+                               seed.start_ref + self.sv_line_fuzziness, seed.start, seed.on_forward_strand, query_len)
 
         if index < len(soc) - 1:
             next_ = soc[index+1]
             yield GapStartSvLine(soc_id, seed.start_ref + seed.size - self.sv_line_fuzziness,
-                                 seed.start_ref + seed.size + self.sv_line_size(seed, next_), seed.start + seed.size)
+                                 seed.start_ref + seed.size + self.sv_line_size(seed, next_), seed.start + seed.size,
+                                 seed.on_forward_strand, query_len)
 
             # overlap line with next seed...
-            if next_.start_ref < seed.start_ref + seed.size and COMPUTE_OVERLAP_LINES:
-                overlap_size = self.max_sv_line_size #@todo
+            if next_.start_ref < seed.start_ref + seed.size and next_.on_forward_strand == seed.on_forward_strand \
+                    and COMPUTE_OVERLAP_LINES:
+                overlap_size = self.max_sv_line_size  # @todo
                 yield OverlapSvLine(soc_id, next_.start_ref - overlap_size, next_.start_ref,
-                                    next_.start)
+                                    next_.start, seed.on_forward_strand, query_len)
 
         elif seed.start + seed.size < query_len:  # if the seed does not reach the end of the read
-            next_ = libMA.Seed(query_len, 0, seed.start_ref + seed.size, True)
+            next_ = libMA.Seed(query_len, 0, seed.start_ref + seed.size, seed.on_forward_strand)
             yield GapStartSvLine(soc_id, seed.start_ref + seed.size - self.sv_line_fuzziness,
-                                 seed.start_ref + seed.size + self.sv_line_size(seed, next_), seed.start + seed.size)
+                                 seed.start_ref + seed.size + self.sv_line_size(seed, next_), seed.start + seed.size,
+                                 seed.on_forward_strand, query_len)
 
     def re_fill_heap(self):
         while not self.next_seed is None and \
@@ -111,7 +115,7 @@ class SeedsToSVLines(VolatileModule):
 
 def add_sv_line_params(parameter_manager):
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterInt(
-        "max sv line size", "maximal size of sv line", 6, "Structural Variants Caller", 0))#25
+        "max sv line size", "maximal size of sv line", 6, "Structural Variants Caller", 0))  # 25
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterInt(
         "min sv line size", "minimal size of sv line", 6, "Structural Variants Caller", 0))
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterInt(
