@@ -112,8 +112,8 @@ class SvLineFilter(VolatileModule):
             (sv_line.num_contradicting + sv_line.num_supporting)
         sv_line.supporting = []
         for supporting_line in self.heap.iter_supporting():
-            sv_line.supporting.append( (supporting_line.nuc_seq_id, supporting_line.query_pos,
-                                        supporting_line.forw_strand) )
+            sv_line.supporting.append((supporting_line.nuc_seq_id, supporting_line.query_pos,
+                                       supporting_line.forw_strand))
 
     # extract SV lines until the first one on the heap makes it through the filtering
     def to_next_accepted_line(self):
@@ -145,10 +145,12 @@ class SvLineFilter(VolatileModule):
         sv_line = self.heap.pop()
         self.to_next_accepted_line()
         return sv_line
-        
+
 ##
 # @brief overlaps sv lines and filters them
 #
+
+
 class SvLineOverlapper(VolatileModule):
     def __init__(self, db_name, pack, fm_index, parameter_manager):
         VolatileModule.__init__(self)  # this line is crucial DON'T DELETE ME
@@ -156,55 +158,46 @@ class SvLineOverlapper(VolatileModule):
         self.helper = SvLineFilter(
             db_name, pack, fm_index, parameter_manager)
 
-        self.last_sv_line = {
-            SeedSvLine: None,
-            GapStartSvLine: None,
-            GapEndSvLine: None,
-            OverlapSvLine: None
-        }
+        self.last_sv_line = None
         if self.helper.is_finished():
             self.set_finished()
+        else:
+            self.last_sv_line = self.helper.execute(None)
 
     ##
     # @brief
     # @details
     # Reimplemented from MA.aligner.Module.execute.
-
     def execute(self, input_vec):
-        while True:
-            if self.helper.is_finished():
-                remaining_sv_lines = list(filter(lambda x: not x is None, self.last_sv_line.values()))
-                new_sv_line = remaining_sv_lines[0]
-                self.last_sv_line[type(new_sv_line)] = None
-                if len(remaining_sv_lines) == 1: # set_finished when returning the last sv line
-                    self.set_finished()
-                return new_sv_line
-            else:
-                new_sv_line = self.helper.execute(None)
+        while not self.helper.is_finished():
+            next_sv_line = self.helper.execute(None)
 
-                sv_line = self.last_sv_line[type(new_sv_line)]
+            # if the sv lines do not overlap
+            if self.last_sv_line.ref_pos_end < next_sv_line.ref_pos_start:
+                # then we must return the last sv line -> swap
+                ret = self.last_sv_line
+                self.last_sv_line = next_sv_line
+                return ret
 
-                # if this is the first sv line of this type
-                if sv_line is None:
-                    self.last_sv_line[type(new_sv_line)] = new_sv_line
-                    continue
-                # check for non overlapping SV lines
-                if sv_line.ref_pos_end < new_sv_line.ref_pos_start:
-                    self.last_sv_line[type(new_sv_line)] = new_sv_line
-                    break
+            def next_sv_line_better():
+                if next_sv_line.supp > self.last_sv_line.supp:
+                    return True
+                if next_sv_line.supp == self.last_sv_line.supp:
+                    if next_sv_line.num_supporting > self.last_sv_line.num_supporting:
+                        return True
+                return False
 
+            # if the sv lines overlap
+            if next_sv_line_better():
                 # overwrite overlapping sv line if necessary
-                if new_sv_line.supp > sv_line.supp:
-                    self.last_sv_line[type(new_sv_line)] = new_sv_line
-                    continue
-                if new_sv_line.supp == sv_line.supp and new_sv_line.num_supporting > sv_line.num_supporting:
-                    self.last_sv_line[type(new_sv_line)] = new_sv_line
-                    continue
+                self.last_sv_line = next_sv_line
+            else:
                 # extend the end position of the sv line otherwise
-                sv_line.ref_pos_end = new_sv_line.ref_pos_end
-                # write back the old sv line
-                self.last_sv_line[type(new_sv_line)] = sv_line
-        return sv_line
+                self.last_sv_line.ref_pos_end = next_sv_line.ref_pos_end
+
+        # if we reached here, the helper is finished and we will just return the last sv line...
+        self.set_finished()
+        return self.last_sv_line
 
 
 def add_sv_overlap_params(parameter_manager):
