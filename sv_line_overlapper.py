@@ -10,8 +10,18 @@ class OpenSvLineHeaps:
             GapEndSvLine: Heap(lt_comp),
             OverlapSvLine: Heap(lt_comp)
         }
+        self.open_count = {
+            SeedSvLine: {},
+            GapStartSvLine: {},
+            GapEndSvLine: {},
+            OverlapSvLine: {}
+        }
 
     def push(self, sv_line):
+        if not sv_line.nuc_seq_id in self.open_count[type(sv_line)]:
+            self.open_count[type(sv_line)][sv_line.nuc_seq_id] = 1
+        else:
+            self.open_count[type(sv_line)][sv_line.nuc_seq_id] += 1
         self.heaps[type(sv_line)].push(sv_line)
 
     def first(self):
@@ -21,7 +31,15 @@ class OpenSvLineHeaps:
         return self.first().peek()
 
     def pop(self):
-        return self.first().pop()
+        top = self.first().pop()
+        self.open_count[type(top)][top.nuc_seq_id] -= 1
+        if self.open_count[type(top)][top.nuc_seq_id] == 0:
+            del self.open_count[type(top)][top.nuc_seq_id]
+        return top
+
+    # this counts the reads that support the sv line not the indivudual seeds
+    def num_supporting(self):
+        return len(self.open_count[type(self.peek())])
 
     def empty(self):
         for x in self.heaps.values():
@@ -104,8 +122,7 @@ class SvLineFilter(VolatileModule):
 
     def decorate_curr_sv_line(self):
         sv_line = self.heap.peek()
-        sv_line.num_supporting = len(
-            self.heap.heaps[type(sv_line)])
+        sv_line.num_supporting = self.heap.num_supporting()
         sv_line.num_contradicting = self.heap.num_contradicting(
             sv_line.ref_pos_start)
         sv_line.supp = sv_line.num_supporting / \
@@ -190,10 +207,11 @@ class SvLineOverlapper(VolatileModule):
             # if the sv lines overlap
             if next_sv_line_better():
                 # overwrite overlapping sv line if necessary
+                next_sv_line.merge(self.last_sv_line)
                 self.last_sv_line = next_sv_line
             else:
                 # extend the end position of the sv line otherwise
-                self.last_sv_line.ref_pos_end = next_sv_line.ref_pos_end
+                self.last_sv_line.merge(next_sv_line)
 
         # if we reached here, the helper is finished and we will just return the last sv line...
         self.set_finished()
@@ -202,7 +220,7 @@ class SvLineOverlapper(VolatileModule):
 
 def add_sv_overlap_params(parameter_manager):
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterInt(
-        "min sv support", "desc", 6, "Structural Variants Caller", 5))
+        "min sv support", "desc", 6, "Structural Variants Caller", 7))
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterDouble(
         "min sv support ratio", "desc", 6, "Structural Variants Caller", 0.9))
 

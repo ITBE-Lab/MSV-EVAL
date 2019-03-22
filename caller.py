@@ -20,7 +20,9 @@ class Caller():
 
         self.sv_line_module = SvLineOverlapper(self.db_name,
                             self.pack, self.fm_index, self.parameter_set_manager)
-        self.sv_line_saver = SvLineToDb(self.db_name, self.parameter_set_manager)
+        self.all_soc_from_sql = AllSoCsOfRead(self.db_name,
+                            self.pack, self.fm_index, self.parameter_set_manager)
+        self.sv_line_saver = getSvLinesToDb(self.db_name, self.parameter_set_manager)
 
         self.supported_extractor = ExtractSupportedSvLines(self.db_name, self.parameter_set_manager)
         self.line_connector = ConnectSvLines(self.db_name, self.parameter_set_manager)
@@ -28,13 +30,19 @@ class Caller():
     def call(self):
         print("calling sv lines...")
         i = 1
-        while not self.sv_line_module.is_finished():
-            x = self.sv_line_module.execute(None)
-            print(i, ";", x.ref_pos_start, "-", x.ref_pos_end, ":", str(type(x)).split("'")[1])
-            i += 1
-            self.sv_line_saver.execute([x])
-        self.sv_line_saver.close()
+        with self.sv_line_saver:
+            while not self.sv_line_module.is_finished():
+                x = self.sv_line_module.execute(None)
+                print(i, ";", x.ref_pos_start, "-", x.ref_pos_end, ":", str(type(x)).split("'")[1])
+                i += 1
+                self.sv_line_saver.sv_line_to_db.execute([x])
+            #while not self.all_soc_from_sql.is_finished():
+            #    x = self.all_soc_from_sql.execute(None)
+            #    self.sv_line_saver.dummy_sv_line_to_db.execute(x)
+        del self.sv_line_module
+        del self.all_soc_from_sql
         print("done")
+
         print("connecting sv lines..")
         self.supported_extractor.load_ids()
         while not self.supported_extractor.is_finished():

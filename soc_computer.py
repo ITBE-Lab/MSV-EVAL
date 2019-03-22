@@ -6,6 +6,7 @@ def compute_socs(sv_db, pack, fm_index, parameter_set_manager=ParameterSetManage
         sv_db.clear_soc_table()
     if sv_db.has_socs():
         print("found SoC's -> will not recompute them")
+        del sv_db
         return
 
     fm_pledge = Pledge()
@@ -29,6 +30,7 @@ def compute_socs(sv_db, pack, fm_index, parameter_set_manager=ParameterSetManage
         res_vec.append(promise_me(UnLock(parameter_set_manager, query), empty))
 
     res_vec.simultaneous_get(parameter_set_manager.get_num_threads())
+    del sv_db
 
 
 

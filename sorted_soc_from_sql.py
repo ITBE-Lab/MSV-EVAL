@@ -3,11 +3,105 @@ from MA import *
 import heap
 
 ##
+# @brief extracts fm-index intervals from sql
+# @details
+class SegmentVectorsFromSQL(VolatileModule):
+    def __init__(self, db_name, fm_index, parameter_set_manager):
+        VolatileModule.__init__(self)  # this line is crucial DON'T DELETE ME
+        self.conn = sqlite3.connect(db_name)
+        self.cur = self.conn.cursor()
+        self.cur.execute("""
+            SELECT read_table.sequence, read_table.id
+            FROM read_table
+        """)
+        self.next = self.cur.fetchone()
+        if self.next is None:
+            print("No Data")
+            self.set_finished()
+
+        self.fm_index = fm_index
+        self.seeding_module = BinarySeeding(parameter_set_manager)
+
+    ##
+    # @brief
+    # @details
+    # Reimplemented from MA.aligner.Module.execute.
+    def execute(self, input_vec):
+        nuc_seq_blob, nuc_seq_id = self.next
+        nuc_seq = nuc_seq_from_bytes(nuc_seq_blob)
+
+        seeds = self.seeding_module.execute(self.fm_index, nuc_seq)
+
+        self.next = self.cur.fetchone()
+        if self.next is None:
+            self.set_finished()
+
+        return nuc_seq_id, seeds, len(nuc_seq)
+
+
+##
 # @brief extracts SoC's from database
 # @details
 # returns them semi sorted -> by the order given by soc_start in the database
+class AllSoCsOfRead(VolatileModule):
+    def __init__(self, db_name, pack, fm_index, parameter_set_manager):
+        VolatileModule.__init__(self)  # this line is crucial DON'T DELETE ME
+        self.max_padding = parameter_set_manager.get_selected().by_name(
+            "re seeding padding").get()
+        self.num_socs = parameter_set_manager.get_selected().by_name(
+            "Number of SoC's for SV calling").get()
+        print("Number of SoC's for SV calling:", self.num_socs)
+        self.conn = sqlite3.connect(db_name)
+        self.cur = self.conn.cursor()
+        self.cur.execute("""
+            SELECT read_table.sequence, read_table.id
+            FROM read_table
+        """)
+        self.next = self.cur.fetchone()
+        if self.next is None:
+            print("No Data")
+            self.set_finished()
+
+        self.pack = pack
+        self.fm_index = fm_index
+        self.seeding_module = BinarySeeding(parameter_set_manager)
+        self.soc_module = StripOfConsideration(parameter_set_manager)
+        self.fill_module = FillSeedSet(parameter_set_manager)
+
+    ##
+    # @brief
+    # @details
+    # Reimplemented from MA.aligner.Module.execute.
+    def execute(self, input_vec):
+        nuc_seq_blob, nuc_seq_id = self.next
+        nuc_seq = nuc_seq_from_bytes(nuc_seq_blob)
+
+        seeds = self.seeding_module.execute(self.fm_index, nuc_seq)
+        socs = self.soc_module.execute(
+            seeds, nuc_seq, self.pack, self.fm_index)
+
+        all_seeds = libMA.Seeds()
+        for _ in range(self.num_socs):
+            if socs.empty():
+                break
+            seeds = socs.pop()
+
+            filled_seeds = self.fill_module.execute(
+                seeds, nuc_seq, self.fm_index, self.pack)
+            all_seeds.extend(filled_seeds)
+
+        self.next = self.cur.fetchone()
+        if self.next is None:
+            self.set_finished()
+
+        return nuc_seq_id, all_seeds, len(nuc_seq)
 
 
+
+##
+# @brief extracts SoC's from database
+# @details
+# returns them semi sorted -> by the order given by soc_start in the database
 class SoCSortedSocFromSQl(VolatileModule):
     def __init__(self, db_name, pack, fm_index, parameter_set_manager):
         VolatileModule.__init__(self)  # this line is crucial DON'T DELETE ME
