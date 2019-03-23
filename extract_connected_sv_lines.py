@@ -158,7 +158,7 @@ class ConnectSvLines(Module):
                         switch += 1
                     else:
                         no_switch += 1
-                switch_strand = switch * 4 > no_switch
+                switch_strand = switch > no_switch
                 print("switch strands? ", switch_strands, "->", "yes" if switch_strand else "no")
             else:
                 print("Worse")

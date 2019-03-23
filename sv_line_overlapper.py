@@ -220,9 +220,9 @@ class SvLineOverlapper(VolatileModule):
 
 def add_sv_overlap_params(parameter_manager):
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterInt(
-        "min sv support", "desc", 6, "Structural Variants Caller", 7))
+        "min sv support", "desc", 6, "Structural Variants Caller", 7)) # 7
     parameter_manager.get_selected().register_parameter(libMA.AlignerParameterDouble(
-        "min sv support ratio", "desc", 6, "Structural Variants Caller", 0.9))
+        "min sv support ratio", "desc", 6, "Structural Variants Caller", 0.9)) # 0.9
 
 
 def test_SvLineOverlapper(fm_index, pack):
