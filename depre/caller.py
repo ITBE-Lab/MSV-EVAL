@@ -41,8 +41,6 @@ class Caller():
             #    self.sv_line_saver.dummy_sv_line_to_db.execute(x)
         del self.sv_line_module
         del self.all_soc_from_sql
-        print("done")
-        return
         print("connecting sv lines..")
         self.supported_extractor.load_ids()
         while not self.supported_extractor.is_finished():
