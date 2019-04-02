@@ -1,8 +1,13 @@
 class SvJump:
-    def __init__(self, seed, read_id):
-        self.ref_pos = seed.start_ref + seed.size
-        self.q_pos = seed.start + seed.size
+    def __init__(self, seed, read_id, q_len):
+        self.q_pos = None
         self.forw_strand = seed.on_forward_strand
+        self.q_pos = seed.start + seed.size - 1
+        self.ref_pos = None # noop
+        if self.forw_strand:
+            self.ref_pos = seed.start_ref + seed.size - 1
+        else:
+            self.ref_pos = seed.start_ref - seed.size + 1
         self.read_id = read_id
         self.destinations = []
 
@@ -13,6 +18,17 @@ class SvJump:
                 self.ref_pos = ref_pos
                 self.q_distance = q_distance
                 self.switch_strands = switch_strands
-        assert seed.start >= self.q_pos
-        self.destinations.append(Destination(self,
-            seed.start_ref, seed.start - self.q_pos, seed.on_forward_strand != self.forw_strand))
+        r_to = seed.start_ref
+        if r_to == self.ref_pos:
+            return False
+        if self.forw_strand:
+            if seed.start < self.q_pos:
+                return False
+            self.destinations.append(Destination(self,
+                r_to, seed.start - self.q_pos, seed.on_forward_strand != self.forw_strand))
+        else:
+            if seed.start > self.q_pos:
+                return False
+            self.destinations.append(Destination(self,
+                r_to, self.q_pos - seed.start, seed.on_forward_strand != self.forw_strand))
+        return True

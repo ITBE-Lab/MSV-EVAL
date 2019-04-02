@@ -22,13 +22,14 @@ class Caller():
             libMA.AlignerParameterInt("min coverage", "desc", 6, "Structural Variants Caller", 7))
 
     def close(self):
+        self.conn.commit()
         self.conn.close()
 
     def call(self):
         print("calling sv lines...")
         sv_jumps = compute_sv_jumps(self.parameter_set_manager, self.conn, self.fm_index)
         print("sweeping sv lines...")
-        accepted_sv_jumps = sweep_sv_jumps(self.parameter_set_manager, sv_jumps)
+        accepted_sv_jumps = sweep_sv_jumps(self.parameter_set_manager, self.conn, sv_jumps)
         print("done")
 
 
