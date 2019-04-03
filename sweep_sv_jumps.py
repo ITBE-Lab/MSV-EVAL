@@ -19,6 +19,7 @@ class AcceptedSvJump:
                 self.end = max(x.ref_pos for x in curr_destinations)
 
                 self.dist_list = [x.q_distance for x in curr_destinations]
+                self.case_list = [x.case for x in curr_destinations]
                 self.score = self.score_for_distance_list(self.dist_list)
                 self.supporting = len(dest_read_id_set)
                 self.switch_strands = self.switch_strands_for_destinations_list(curr_destinations)
@@ -124,10 +125,10 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_jumps):
         cursor.execute("INSERT INTO sv_jump VALUES (NULL, ?, ?, ?, ?)", 
                         (line_id, dest.start, dest.end, dest.switch_strands > 0))
 
-        print("jump from:", curr.curr_start)
+        print("\njump from:", curr.curr_start)
         print("", "to", "score", "sw_st", "dist_list", sep="\t")
         for x in sorted(curr.destinations, key=lambda x:x.score, reverse=True):
-            print("", x.start, x.score, x.switch_strands, x.dist_list, sep="\t")
+            print("", x.start, x.score, x.switch_strands, x.dist_list, x.case_list, sep="\t")
 
     # line sweep
     line_sweep_list(sv_jumps, check_sv_jump, lambda x: x.ref_pos, fuzziness)
