@@ -2,10 +2,16 @@ from sv_jump import *
 import math
 
 
+def get_fuzziness(sv_jump):
+    return min(3, math.sqrt(abs(sv_jump.ref_from - sv_jump.ref_to))/2)
+
+
 class AcceptedSvJump:
     def __init__(self, curr_jump, read_id_set):
-        self.curr_start = min(x.ref_pos for x in curr_jump)
-        self.curr_end = max(x.ref_pos for x in curr_jump)
+        self.curr_start = min(x.ref_from - get_fuzziness(x)
+                              if x.fuzziness_from_dir == "left" else x.ref_from for x in curr_jump)
+        self.curr_end = max(x.ref_from + get_fuzziness(x) if x.fuzziness_from_dir ==
+                            "right" else x.ref_from for x in curr_jump)
         self.destinations = []
 
     def overlaps(self, other):
@@ -16,8 +22,10 @@ class AcceptedSvJump:
     def add_destination(self, curr_destinations, dest_read_id_set):
         class Destination:
             def __init__(self, curr_destinations, dest_read_id_set):
-                self.start = min(x.ref_pos for x in curr_destinations)
-                self.end = max(x.ref_pos for x in curr_destinations)
+                self.start = min(x.ref_to - get_fuzziness(x) if x.fuzziness_to_dir ==
+                                 "left" else x.ref_to for x in curr_destinations)
+                self.end = max(x.ref_to + get_fuzziness(x) if x.fuzziness_to_dir ==
+                               "right" else x.ref_to for x in curr_destinations)
 
                 self.dist_list = [x.q_distance for x in curr_destinations]
                 self.case_list = [x.case for x in curr_destinations]
@@ -63,6 +71,7 @@ def line_sweep_list(sorted_list, do_functor, get_start, get_end):
 def sweep_sv_jumps(parameter_set_manager, conn, sv_jumps):
     accepted_sv_jumps = []
     fuzziness = parameter_set_manager.get_selected().by_name("fuzziness").get()
+
     min_coverage = parameter_set_manager.get_selected().by_name("min coverage").get()
     cursor = conn.cursor()
     cursor.execute("DROP TABLE IF EXISTS sv_line")
@@ -86,10 +95,6 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_jumps):
             read_id_set.add(curr_jump.read_id)
         if len(read_id_set) < min_coverage:
             return
-        # extract all destinations
-        dest_list = []
-        for curr_jump in curr_jumps:
-            dest_list.extend(curr_jump.destinations)
 
         curr = AcceptedSvJump(curr_jumps, read_id_set)
 
@@ -101,15 +106,17 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_jumps):
         def accept_functor(curr_destinations):
             dest_read_id_set = set()
             for curr_dest in curr_destinations:
-                dest_read_id_set.add(curr_dest.parent.read_id)
+                dest_read_id_set.add(curr_dest.read_id)
             if len(dest_read_id_set) < min_coverage:
                 return
 
             curr.add_destination(curr_destinations, dest_read_id_set)
-        line_sweep_list(dest_list,
+        line_sweep_list(curr_jumps,
                         accept_functor,
-                        lambda x: (1 if x.switch_strands else 0, x.ref_pos),
-                        lambda x: (1 if x.switch_strands else 0, x.ref_pos + fuzziness))
+                        lambda x: (1 if x.switch_strands else 0,
+                                   x.ref_to - get_fuzziness(x) if x.fuzziness_to_dir == "left" else x.ref_to),
+                        lambda x: (1 if x.switch_strands else 0,
+                                   x.ref_to + get_fuzziness(x) if x.fuzziness_to_dir == "right" else x.ref_to))
 
         if len(curr.destinations) == 0:
             return
@@ -139,27 +146,32 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_jumps):
                   x.dist_list, x.case_list, sep="\t")
 
     # line sweep
-    line_sweep_list(sv_jumps, check_sv_jump, lambda x: x.ref_pos, lambda x: x.ref_pos + fuzziness)
+    line_sweep_list(sv_jumps,
+                    check_sv_jump,
+                    lambda x: x.ref_from - get_fuzziness(x) if x.fuzziness_from_dir == "left" else x.ref_from,
+                    lambda x: x.ref_from + get_fuzziness(x) if x.fuzziness_from_dir == "right" else x.ref_from)
 
     return accepted_sv_jumps
 
 
 def sv_jumps_to_dict(sv_jumps, accepted_sv_jumps):
-    fuzziness = 3
     forw_boxes_data = []
     sw_boxes_data = []
     accepted_boxes_data = []
     for jump in sv_jumps:
-        for destination in jump.destinations:
-            alpha = 0.08 / math.log(destination.q_distance + 1.5)
-            x = [jump.ref_pos - fuzziness, destination.ref_pos -
-                 fuzziness, fuzziness*2, fuzziness*2, alpha]
-            if destination.switch_strands:
-                sw_boxes_data.append(x)
-            else:
-                forw_boxes_data.append(x)
+        alpha = 0.08 / math.log(jump.q_distance + 1.5)
+        f = get_fuzziness(jump)
+        x = [jump.ref_from - f if jump.fuzziness_from_dir == "left" else jump.ref_from,
+             jump.ref_to - f if jump.fuzziness_to_dir == "left" else jump.ref_to,
+             f,
+             f,
+             alpha]
+        if jump.switch_strands:
+            sw_boxes_data.append(x)
+        else:
+            forw_boxes_data.append(x)
     for jump in accepted_sv_jumps:
-        accepted_boxes_data.append([jump.curr_start, jump.get_best_destination().start, 
+        accepted_boxes_data.append([jump.curr_start, jump.get_best_destination().start,
                                     jump.curr_end - jump.curr_start,
                                     jump.get_best_destination().end - jump.get_best_destination().start, 0])
     out_dict = {

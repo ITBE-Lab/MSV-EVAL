@@ -31,22 +31,20 @@ def compute_sv_jumps(parameter_set_manager, conn, fm_index):
 
         # compute sv jumps for all seeds
         for i, seed in enumerate(seeds):
-            # create the jump from the start of the seed
+            # create the jump from the start of the seed (temporary generator object)
             from_start_jump = SvJump(seed, nuc_seq_id, len(nuc_seq), True)
-            # as well as the one from the end of the seed
+            # as well as the one from the end of the seed (temporary generator object)
             from_end_jump = SvJump(seed, nuc_seq_id, len(nuc_seq), False)
 
             # fill in at most "num_destinations" destination seeds (previous seeds on query)
             if i >= 1:
                 for dest_seed in seeds[max(i-num_destinations-1, 0):i]:
-                    from_start_jump.add_destination(dest_seed)
+                    d = from_start_jump.add_destination(dest_seed)
+                    if not d is None:
+                        sv_jumps.append(d)
             # fill in at most "num_destinations" destination seeds (next seeds on query)
             for dest_seed in seeds[i+1:i+num_destinations+1]:
-                from_end_jump.add_destination(dest_seed)
-
-            # append both jumps if there have been any destinations found...
-            if len(from_start_jump.destinations) > 0:
-                sv_jumps.append(from_start_jump)
-            if len(from_end_jump.destinations) > 0:
-                sv_jumps.append(from_end_jump)
+                d = from_end_jump.add_destination(dest_seed)
+                if not d is None:
+                    sv_jumps.append(d)
     return sv_jumps
