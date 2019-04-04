@@ -10,11 +10,7 @@ def render_from_dict(json_dict, start, end):
         for i in range(max(len(x) if isinstance(x, list) else 1 for x in args)):
             yield (x[i%len(x)] if isinstance(x, list) else x for x in args)
 
-    # first add x_offset to all x values (to keep python code simple)
     x_offset = json_dict["x_offset"]
-    for panel in json_dict["panels"]:
-        for item in panel["items"]:
-            item["x"] = [x + x_offset for x in item["x"]]
 
     plots = []
     for panel in json_dict["panels"]:
@@ -36,7 +32,8 @@ def render_from_dict(json_dict, start, end):
                     't': [],
                     'b': [],
                 }
-                for x, y, w, h in zip_longest_scalar(item["x"], item["y"], item["w"], item["h"]):
+                for x, y, w, h in item["data"]:
+                    x += x_offset
                     cds["l"].append(x)
                     cds["r"].append(x + w)
                     cds["b"].append(y)
@@ -54,7 +51,8 @@ def render_from_dict(json_dict, start, end):
                     "x": [],
                     "y": []
                 }
-                for x, y, w, h in zip_longest_scalar(item["x"], item["y"], item["w"], item["h"]):
+                for x, y, w, h in item["data"]:
+                    x += x_offset
                     cds["x"].append([x, x+w])
                     cds["y"].append([y, y+h])
                 plot.multi_line(
@@ -64,7 +62,8 @@ def render_from_dict(json_dict, start, end):
                     color=item['color'],
                     source=ColumnDataSource(cds))
             elif item["type"] == "arrow":
-                for x, y, w, h in zip_longest_scalar(item["x"], item["y"], item["w"], item["h"]):
+                for x, y, w, h in item["data"]:
+                    x += x_offset
                     plot.add_layout(Arrow(end=VeeHead(size=10, fill_color=None, line_color=item["color"]),
                                                     x_start=x, y_start=y, x_end=x + w, y_end=y + h,
                                                     line_dash=[1, 2], line_width=3, line_color=item["color"]))

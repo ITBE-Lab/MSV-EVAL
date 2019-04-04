@@ -3,8 +3,10 @@ import json
 import sqlite3
 NUM_THREADS = 32
 
+
 def for_seed_sections(segments, fm_index, nuc_seq_len):
-    seeds = [x for x in segments.extract_seeds(fm_index, 100, 0, nuc_seq_len, True)]
+    seeds = [x for x in segments.extract_seeds(
+        fm_index, 100, 0, nuc_seq_len, True)]
     seeds.sort(key=lambda x: x.start_ref)
     start_idx = 0
     end_idx = 1
@@ -17,6 +19,7 @@ def for_seed_sections(segments, fm_index, nuc_seq_len):
         yield seeds[start_idx:end_idx]
         start_idx = end_idx
         end_idx += 1
+
 
 def create_json_from_db(db_name, pack_path):
     parameter_manager = ParameterSetManager()
@@ -64,77 +67,22 @@ def create_json_from_db(db_name, pack_path):
     del database
 
     # setup output dictionary structure
-    read_background_item = {
-        "type": "box",
-        "color": "#cccccc",
-        "group": "read_background",
-        "y": [],
-        "x": [],
-        "w": [],
-        "h": 1
-    }
-    read_foreground_item = {
-        "type": "box",
-        "color": "#595959",
-        "group": "read_foreground",
-        "y": [],
-        "x": [],
-        "w": [],
-        "h": 1
-    }
-    seed_lines_forward_item = {
-        "type": "line",
-        "color": "blue",
-        "group": "seed_lines_forward",
-        "y": [],
-        "x": [],
-        "w": [],
-        "h": []
-    }
-    seed_lines_reverse_complement_item = {
-        "type": "line",
-        "color": "orange",
-        "group": "seed_lines_reverse_complement",
-        "y": [],
-        "x": [],
-        "w": [],
-        "h": []
-    }
-    sv_line_item = {
-        "type": "box",
-        "color": "purple",
-        "group": "sv_line",
-        "y": 0,
-        "x": [],
-        "w": [],
-        "h": 0
-    }
-    sv_arrow_item = {
-        "type": "arrow",
-        "color": "black",
-        "group": "sv_arrow",
-        "y": [],
-        "x": [],
-        "w": [],
-        "h": 0
-    }
-    sv_inversion_arrow_item = {
-        "type": "arrow",
-        "color": "green",
-        "group": "sv_arrow",
-        "y": [],
-        "x": [],
-        "w": [],
-        "h": 0
-    }
+    read_background_data = []
+    read_foreground_data = []
+    seed_lines_forward_data = []
+    seed_lines_reverse_complement_data = []
+    sv_line_data = []
+    sv_arrow_data = []
+    sv_inversion_arrow_data = []
 
     section_list = []
     # get all sections that we have to render
     for nuc_seq, segments in collector.cpp_module.collection:
         for seeds in for_seed_sections(segments, fm_index, len(nuc_seq)):
             # compute very first position of section
-            start_ref = min(x.start_ref if x.on_forward_strand else x.start_ref - x.size for x in seeds)
-            section_list.append( (start_ref, seeds, nuc_seq) )
+            start_ref = min(
+                x.start_ref if x.on_forward_strand else x.start_ref - x.size for x in seeds)
+            section_list.append((start_ref, seeds, nuc_seq))
     # sort sections by start position on reference
     section_list.sort(key=lambda x: x[0])
 
@@ -145,7 +93,8 @@ def create_json_from_db(db_name, pack_path):
     end_list = []
     for start_ref, seeds, nuc_seq in section_list:
         # compute very last position of section
-        end_ref = max(x.start_ref + x.size if x.on_forward_strand else x.start_ref for x in seeds)
+        end_ref = max(
+            x.start_ref + x.size if x.on_forward_strand else x.start_ref for x in seeds)
         # compute the row id for the current sections so that there are no overlaps
         idx = len(end_list)
         for index, end_pos in enumerate(end_list):
@@ -159,41 +108,31 @@ def create_json_from_db(db_name, pack_path):
         end_list[idx] = end_ref
 
         # add background panel for seed section
-        read_background_item["x"].append(start_ref - x_offset)
-        read_background_item["y"].append(idx)
-        read_background_item["w"].append(end_ref - start_ref)
+        read_background_data.append(
+            [start_ref - x_offset, idx, end_ref - start_ref, 1])
 
         # add foreground panels for seeds and seeds themselves
         for seed in seeds:
+            x = None
             if seed.on_forward_strand:
-                read_foreground_item["x"].append(seed.start_ref - x_offset)
+                x = seed.start_ref - x_offset
             else:
-                read_foreground_item["x"].append(seed.start_ref - x_offset - seed.size)
-            read_foreground_item["w"].append(seed.size)
-            read_foreground_item["y"].append(idx)
+                x = seed.start_ref - x_offset - seed.size
+            read_foreground_data.append([x, idx, seed.size, 1])
 
             if seed.on_forward_strand:
-                seed_lines_forward_item["x"].append(seed.start_ref - x_offset)
-                seed_lines_forward_item["y"].append(seed.start / len(nuc_seq) + idx)
-                seed_lines_forward_item["w"].append(seed.size)
-                seed_lines_forward_item["h"].append(seed.size / len(nuc_seq))
+                seed_lines_forward_data.append([seed.start_ref - x_offset,
+                                                seed.start / len(nuc_seq) + idx, seed.size, seed.size / len(nuc_seq)])
             else:
-                seed_lines_reverse_complement_item["x"].append(seed.start_ref - x_offset)
-                seed_lines_reverse_complement_item["y"].append(seed.start / len(nuc_seq) + idx)
-                seed_lines_reverse_complement_item["w"].append(-seed.size)
-                seed_lines_reverse_complement_item["h"].append(seed.size / len(nuc_seq))
+                seed_lines_reverse_complement_data.append([
+                    seed.start_ref - x_offset,
+                    seed.start / len(nuc_seq) + idx,
+                    -seed.size,
+                    seed.size / len(nuc_seq)
+                ])
 
     conn = sqlite3.connect(db_name)
     cur = conn.cursor()
-    # show SV lines
-    cur.execute(
-        """ SELECT id, start, end
-            FROM sv_line
-    """)
-
-    for idx, start_on_ref, end_on_ref in cur.fetchall():
-        sv_line_item['x'].append(start_on_ref - x_offset)
-        sv_line_item['w'].append(end_on_ref - start_on_ref + 1)
     # get all the sv jumps we have to render
     cur.execute(
         """ SELECT sv_line.start, sv_line.end, sv_jump.start, sv_jump.end, sv_jump.switch_strand
@@ -209,15 +148,21 @@ def create_json_from_db(db_name, pack_path):
             ref_from = a_end
             ref_to = b_start
         if switch_strand:
-            sv_inversion_arrow_item["x"].append(ref_from - x_offset)
-            sv_inversion_arrow_item["w"].append(ref_to - ref_from)
-            sv_inversion_arrow_item["y"].append(y)
+            sv_inversion_arrow_data.append(
+                [ref_from - x_offset, y, ref_to - ref_from, 0])
         else:
-            sv_arrow_item["x"].append(ref_from - x_offset)
-            sv_arrow_item["w"].append(ref_to - ref_from)
-            sv_arrow_item["y"].append(y)
+            sv_arrow_data.append(
+                [ref_from - x_offset, y, ref_to - ref_from, 0])
         y -= 1
-    sv_line_item['h'] = y
+    # show SV lines
+    cur.execute(
+        """ SELECT id, start, end
+            FROM sv_line
+    """)
+
+    for idx, start_on_ref, end_on_ref in cur.fetchall():
+        sv_line_data.append([start_on_ref - x_offset, 0,
+                             end_on_ref - start_on_ref + 1, y])
     conn.close()
 
     # combine to single dictionary
@@ -226,18 +171,53 @@ def create_json_from_db(db_name, pack_path):
         "panels": [
             {
                 "items": [
-                    read_background_item,
-                    read_foreground_item,
-                    seed_lines_forward_item,
-                    seed_lines_reverse_complement_item
+                    {
+                        "type": "box",
+                        "color": "#cccccc",
+                        "group": "read_background",
+                        "data": read_background_data
+                    },
+                    {
+                        "type": "box",
+                        "color": "#595959",
+                        "group": "read_foreground",
+                        "data": read_foreground_data
+                    },
+                    {
+                        "type": "line",
+                        "color": "blue",
+                        "group": "seed_lines_forward",
+                        "data": seed_lines_forward_data
+                    },
+                    {
+                        "type": "line",
+                        "color": "orange",
+                        "group": "seed_lines_reverse_complement",
+                        "data": seed_lines_reverse_complement_data
+                    }
                 ],
                 "h": 700
             },
             {
                 "items": [
-                    sv_line_item,
-                    sv_arrow_item,
-                    sv_inversion_arrow_item
+                    {
+                        "type": "box",
+                        "color": "purple",
+                        "group": "sv_line",
+                        "data": sv_line_data
+                    },
+                    {
+                        "type": "arrow",
+                        "color": "black",
+                        "group": "sv_arrow",
+                        "data": sv_arrow_data
+                    },
+                    {
+                        "type": "arrow",
+                        "color": "green",
+                        "group": "sv_arrow",
+                        "data": sv_inversion_arrow_data
+                    }
                 ],
                 "h": 300
             }
@@ -246,10 +226,9 @@ def create_json_from_db(db_name, pack_path):
     return out_dict
 
 
-
 if __name__ == "__main__":
     out_dict = create_json_from_db("/MAdata/databases/sv_simulated",
-                        "/MAdata/genome/human/GRCh38.p12/ma/genome")
+                                   "/MAdata/genome/human/GRCh38.p12/ma/genome")
     with open("/MAdata/tmp/sv_diagramm.json", "w") as json_out:
         json.dump(out_dict, json_out)
     #render_from_json("/MAdata/tmp/sv_diagramm.json", 7500000, 7550000)
