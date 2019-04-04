@@ -37,7 +37,7 @@ class AcceptedSvJump:
         for x in self.destinations:
             if x.start <= dest.end and x.end >= dest.start:
                 return
-        if dest.score < 10: # @todo make parameter
+        if dest.score < 10:  # @todo make parameter
             return
         self.destinations.append(dest)
 
@@ -54,7 +54,7 @@ def line_sweep_list(sorted_list, do_functor, key, fuzziness):
     def is_closer(a, b, d):
         if isinstance(a, tuple) and isinstance(a, tuple) and isinstance(d, tuple):
             assert len(a) == len(b) == len(d)
-            for a_i, b_i, d_i in zip(a,b,d):
+            for a_i, b_i, d_i in zip(a, b, d):
                 if b_i - d_i < a_i:
                     return True
                 elif b_i - d_i > a_i:
@@ -154,3 +154,58 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_jumps):
     line_sweep_list(sv_jumps, check_sv_jump, lambda x: x.ref_pos, fuzziness)
 
     return accepted_sv_jumps
+
+
+def sv_jumps_to_dict(sv_jumps, accepted_sv_jumps):
+    fuzziness = 3
+    forw_boxes_data = []
+    sw_boxes_data = []
+    accepted_boxes_data = []
+    for jump in sv_jumps:
+        for destination in jump.destinations:
+            alpha = 0.08 / math.log(destination.q_distance + 1.5)
+            x = [jump.ref_pos - fuzziness, destination.ref_pos -
+                 fuzziness, fuzziness*2, fuzziness*2, alpha]
+            if destination.switch_strands:
+                sw_boxes_data.append(x)
+            else:
+                forw_boxes_data.append(x)
+    for jump in accepted_sv_jumps:
+        accepted_boxes_data.append([jump.curr_start, jump.get_best_destination().start, 
+                                    jump.curr_end - jump.curr_start,
+                                    jump.get_best_destination().end - jump.get_best_destination().start, 0])
+    out_dict = {
+        "x_offset": 0,
+        "panels": [
+            {
+                "items": [
+                    {
+                        "type": "box-alpha",
+                        "color": "blue",
+                        "line_color": None,
+                        "line_width": 0,
+                        "group": "all_jumps",
+                        "data": forw_boxes_data
+                    },
+                    {
+                        "type": "box-alpha",
+                        "color": "orange",
+                        "line_color": None,
+                        "line_width": 0,
+                        "group": "all_jumps",
+                        "data": sw_boxes_data
+                    },
+                    {
+                        "type": "box-alpha",
+                        "color": "#595959",
+                        "line_color": "green",
+                        "line_width": 3,
+                        "group": "accepted_jumps",
+                        "data": accepted_boxes_data
+                    }
+                ],
+                "h": 700
+            }
+        ]
+    }
+    return out_dict

@@ -4,7 +4,7 @@ from bokeh.models import Arrow, VeeHead
 from create_json import create_json_from_db
 import json
 
-def render_from_dict(json_dict, start, end, on_y_aswell):
+def render_from_dict(json_dict, start, end, on_y_aswell=False):
     # zip that just loops through the all shorter items, including scalars
     def zip_longest_scalar(*args):
         for i in range(max(len(x) if isinstance(x, list) else 1 for x in args)):
@@ -70,7 +70,7 @@ def render_from_dict(json_dict, start, end, on_y_aswell):
                     top='t',
                     bottom='b',
                     fill_alpha="a",
-                    line_width=3,
+                    line_width=item['line_width'],
                     fill_color=item['color'],
                     line_color=item['line_color'],
                     source=ColumnDataSource(cds))
