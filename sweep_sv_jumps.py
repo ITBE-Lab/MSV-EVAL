@@ -3,7 +3,7 @@ import math
 
 
 def get_fuzziness(sv_jump):
-    return min(3, math.sqrt(abs(sv_jump.ref_from - sv_jump.ref_to))/2)
+    return max(3, math.sqrt(abs(sv_jump.ref_from - sv_jump.ref_to))/2)
 
 
 class AcceptedSvJump:
@@ -40,7 +40,7 @@ class AcceptedSvJump:
                 return score
 
         dest = Destination(curr_destinations, dest_read_id_set)
-        if dest.end + 3 >= self.curr_start and dest.start <= self.curr_end + 3:
+        if dest.end >= self.curr_start and dest.start <= self.curr_end:
             return
         for x in self.destinations:
             if x.start <= dest.end and x.end >= dest.start:
