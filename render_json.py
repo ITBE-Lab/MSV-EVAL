@@ -1,6 +1,7 @@
 from bokeh.layouts import column
 from bokeh.plotting import figure, show, reset_output, ColumnDataSource
 from bokeh.models import Arrow, VeeHead
+import json
 
 def render_from_json(json_file_name, start, end):
     # zip that just loops through the all shorter items, including scalars
@@ -88,6 +89,6 @@ def render_from_json(json_file_name, start, end):
         plot.yaxis.visible = False
         plots.append(plot)
 
-        plots[-1].xaxis.visible = True
-        reset_output()
-        show(column(plots))
+    plots[-1].xaxis.visible = True
+    reset_output()
+    show(column(plots))
