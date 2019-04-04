@@ -4,7 +4,7 @@ from bokeh.models import Arrow, VeeHead
 from create_json import create_json_from_db
 import json
 
-def render_from_dict(json_dict, start, end):
+def render_from_dict(json_dict, start, end, on_y_aswell):
     # zip that just loops through the all shorter items, including scalars
     def zip_longest_scalar(*args):
         for i in range(max(len(x) if isinstance(x, list) else 1 for x in args)):
@@ -24,6 +24,9 @@ def render_from_dict(json_dict, start, end):
             ],
             active_drag="xpan",
             active_scroll="xwheel_zoom")
+        if on_y_aswell:
+            plot.y_range.start = start
+            plot.y_range.end = end
         for item in panel["items"]:
             if item["type"] == "box":
                 cds = {
@@ -45,6 +48,31 @@ def render_from_dict(json_dict, start, end):
                     bottom='b',
                     line_width=0,
                     color=item['color'],
+                    source=ColumnDataSource(cds))
+            elif item["type"] == "box-alpha":
+                cds = {
+                    'l': [],
+                    'r': [],
+                    't': [],
+                    'b': [],
+                    'a': [],
+                }
+                for x, y, w, h, a in item["data"]:
+                    x += x_offset
+                    cds["l"].append(x)
+                    cds["r"].append(x + w)
+                    cds["b"].append(y)
+                    cds["t"].append(y + h)
+                    cds["a"].append(a)
+                plot.quad(
+                    left='l',
+                    right='r',
+                    top='t',
+                    bottom='b',
+                    fill_alpha="a",
+                    line_width=3,
+                    fill_color=item['color'],
+                    line_color=item['line_color'],
                     source=ColumnDataSource(cds))
             elif item["type"] == "line":
                 cds = {
@@ -68,14 +96,13 @@ def render_from_dict(json_dict, start, end):
                                                     x_start=x, y_start=y, x_end=x + w, y_end=y + h,
                                                     line_dash=[1, 2], line_width=3, line_color=item["color"]))
         plot.xaxis.visible = False
-        plot.yaxis.visible = False
         plots.append(plot)
 
     plots[-1].xaxis.visible = True
     reset_output()
     show(column(plots))
 
-def render_from_json(json_file_name, start, end):
+def render_from_json(json_file_name, start, end, on_y_aswell=False):
     # decode hook for the json that decodes lists dicts and floats properly
     def _decode(o):
         if isinstance(o, str):
@@ -93,7 +120,7 @@ def render_from_json(json_file_name, start, end):
     json_dict = None # noop
     with open(json_file_name, "r") as json_file:
         json_dict = json.loads(json_file.read(), object_hook=_decode)
-    render_from_dict(json_dict, start, end)
+    render_from_dict(json_dict, start, end, on_y_aswell)
 
 if __name__ == "__main__":
     out_dict = create_json_from_db("/MAdata/databases/sv_simulated",

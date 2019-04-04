@@ -27,9 +27,12 @@ class Caller():
         self.conn.commit()
         self.conn.close()
 
+    def get_jumps(self):
+        return compute_sv_jumps(self.parameter_set_manager, self.conn, self.fm_index)
+
     def call(self):
         print("calling sv lines...")
-        sv_jumps = compute_sv_jumps(self.parameter_set_manager, self.conn, self.fm_index)
+        sv_jumps = self.get_jumps()
         print("sweeping sv lines...")
         accepted_sv_jumps = sweep_sv_jumps(self.parameter_set_manager, self.conn, sv_jumps)
         print("done")
@@ -42,6 +45,12 @@ if __name__ == "__main__":
     pack.load("/MAdata/genome/human/GRCh38.p12/ma/genome")
 
     caller = Caller("/MAdata/databases/sv_simulated", pack, fm_index)
+
+    out_dict = sv_jumps_to_dict(caller.get_jumps())
+    render_from_dict(out_dict, 7500000, 7550000, True)
+    caller.close()
+    exit()
+
     caller.call()
     caller.close()
     
