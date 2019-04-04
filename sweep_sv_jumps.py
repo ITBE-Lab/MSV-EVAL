@@ -48,25 +48,13 @@ class AcceptedSvJump:
         return self.get_best_destination().score
 
 
-def line_sweep_list(sorted_list, do_functor, key, fuzziness):
-    # returns whether a and b are closer than d
-    # works on tuples...
-    def is_closer(a, b, d):
-        if isinstance(a, tuple) and isinstance(a, tuple) and isinstance(d, tuple):
-            assert len(a) == len(b) == len(d)
-            for a_i, b_i, d_i in zip(a, b, d):
-                if b_i - d_i < a_i:
-                    return True
-                elif b_i - d_i > a_i:
-                    return False
-            return True
-        return b - d <= a
-    sorted_list.sort(key=lambda x: key(x))
+def line_sweep_list(sorted_list, do_functor, get_start, get_end):
+    sorted_list.sort(key=lambda x: get_start(x))
     start_it = 0
     end_it = 0
 
     while start_it < len(sorted_list):
-        while end_it < len(sorted_list) and is_closer(key(sorted_list[start_it]), key(sorted_list[end_it]), fuzziness):
+        while end_it < len(sorted_list) and get_end(sorted_list[start_it]) >= get_start(sorted_list[end_it]):
             end_it += 1
         do_functor(sorted_list[start_it:end_it])
         start_it += 1
@@ -121,7 +109,7 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_jumps):
         line_sweep_list(dest_list,
                         accept_functor,
                         lambda x: (1 if x.switch_strands else 0, x.ref_pos),
-                        (0, fuzziness))
+                        lambda x: (1 if x.switch_strands else 0, x.ref_pos + fuzziness))
 
         if len(curr.destinations) == 0:
             return
@@ -151,7 +139,7 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_jumps):
                   x.dist_list, x.case_list, sep="\t")
 
     # line sweep
-    line_sweep_list(sv_jumps, check_sv_jump, lambda x: x.ref_pos, fuzziness)
+    line_sweep_list(sv_jumps, check_sv_jump, lambda x: x.ref_pos, lambda x: x.ref_pos + fuzziness)
 
     return accepted_sv_jumps
 
