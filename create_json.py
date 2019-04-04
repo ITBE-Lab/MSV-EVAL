@@ -1,7 +1,6 @@
 from MA import *
 import json
 import sqlite3
-from render_json import render_from_json
 NUM_THREADS = 32
 
 def for_seed_sections(segments, fm_index, nuc_seq_len):
@@ -19,7 +18,7 @@ def for_seed_sections(segments, fm_index, nuc_seq_len):
         start_idx = end_idx
         end_idx += 1
 
-def create_json_from_db(db_name, pack_path, out_file_name):
+def create_json_from_db(db_name, pack_path):
     parameter_manager = ParameterSetManager()
     parameter_manager.set_selected("PacBio")
     fm_index = FMIndex()
@@ -62,6 +61,7 @@ def create_json_from_db(db_name, pack_path, out_file_name):
             UnLock(parameter_manager, query_paired), empty))
     # compute all seeds
     res_vec.simultaneous_get(NUM_THREADS)
+    del database
 
     # setup output dictionary structure
     read_background_item = {
@@ -243,13 +243,13 @@ def create_json_from_db(db_name, pack_path, out_file_name):
             }
         ]
     }
-    with open(out_file_name, "w") as json_out:
-        json.dump(out_dict, json_out)
+    return out_dict
 
 
 
 if __name__ == "__main__":
-    create_json_from_db("/MAdata/databases/sv_simulated",
-                        "/MAdata/genome/human/GRCh38.p12/ma/genome",
-                        "/MAdata/tmp/sv_diagramm.json")
-    render_from_json("/MAdata/tmp/sv_diagramm.json", 7500000, 7550000)
+    out_dict = create_json_from_db("/MAdata/databases/sv_simulated",
+                        "/MAdata/genome/human/GRCh38.p12/ma/genome")
+    with open("/MAdata/tmp/sv_diagramm.json", "w") as json_out:
+        json.dump(out_dict, json_out)
+    #render_from_json("/MAdata/tmp/sv_diagramm.json", 7500000, 7550000)

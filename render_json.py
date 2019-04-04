@@ -1,31 +1,14 @@
 from bokeh.layouts import column
 from bokeh.plotting import figure, show, reset_output, ColumnDataSource
 from bokeh.models import Arrow, VeeHead
+from create_json import create_json_from_db
 import json
 
-def render_from_json(json_file_name, start, end):
+def render_from_dict(json_dict, start, end):
     # zip that just loops through the all shorter items, including scalars
     def zip_longest_scalar(*args):
         for i in range(max(len(x) if isinstance(x, list) else 1 for x in args)):
             yield (x[i%len(x)] if isinstance(x, list) else x for x in args)
-    # decode hook for the json that decodes lists dicts and floats properly
-    def _decode(o):
-        if isinstance(o, str):
-            try:
-                return float(o)
-            except ValueError:
-                return o
-        elif isinstance(o, dict):
-            return {_decode(k): _decode(v) for k, v in o.items()}
-        elif isinstance(o, list):
-            return [_decode(v) for v in o]
-        else:
-            return o
-
-    #actually open and load the file
-    json_dict = None # noop
-    with open(json_file_name, "r") as json_file:
-        json_dict = json.loads(json_file.read(), object_hook=_decode)
 
     # first add x_offset to all x values (to keep python code simple)
     x_offset = json_dict["x_offset"]
@@ -92,3 +75,28 @@ def render_from_json(json_file_name, start, end):
     plots[-1].xaxis.visible = True
     reset_output()
     show(column(plots))
+
+def render_from_json(json_file_name, start, end):
+    # decode hook for the json that decodes lists dicts and floats properly
+    def _decode(o):
+        if isinstance(o, str):
+            try:
+                return float(o)
+            except ValueError:
+                return o
+        elif isinstance(o, dict):
+            return {_decode(k): _decode(v) for k, v in o.items()}
+        elif isinstance(o, list):
+            return [_decode(v) for v in o]
+        else:
+            return o
+    #actually open and load the file
+    json_dict = None # noop
+    with open(json_file_name, "r") as json_file:
+        json_dict = json.loads(json_file.read(), object_hook=_decode)
+    render_from_dict(json_dict, start, end)
+
+if __name__ == "__main__":
+    out_dict = create_json_from_db("/MAdata/databases/sv_simulated",
+                    "/MAdata/genome/human/GRCh38.p12/ma/genome")
+    render_from_dict(out_dict, 7500000, 7550000)

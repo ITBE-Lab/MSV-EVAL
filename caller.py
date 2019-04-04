@@ -1,6 +1,8 @@
 from MA import *
 from compute_sv_jumps import *
 from sweep_sv_jumps import *
+from render_json import render_from_dict
+from create_json import create_json_from_db
 import sqlite3
 
 class Caller():
@@ -42,3 +44,8 @@ if __name__ == "__main__":
     caller = Caller("/MAdata/databases/sv_simulated", pack, fm_index)
     caller.call()
     caller.close()
+    
+    # display the result
+    out_dict = create_json_from_db("/MAdata/databases/sv_simulated",
+                    "/MAdata/genome/human/GRCh38.p12/ma/genome")
+    render_from_dict(out_dict, 7500000, 7550000)
