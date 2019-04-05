@@ -109,9 +109,10 @@ def create_json_from_db(db_name, pack_path):
 
         # add background panel for seed section
         read_background_data.append(
-            [start_ref - x_offset, idx, end_ref - start_ref, 1])
+            [start_ref - x_offset, idx, end_ref - start_ref, 1, 1, str(nuc_seq.id)])
 
         # add foreground panels for seeds and seeds themselves
+        seeds.sort(key=lambda x: x.start) # this is so that we have the seeds indexed according to query positions
         for seed in seeds:
             x = None
             if seed.on_forward_strand:
@@ -172,8 +173,10 @@ def create_json_from_db(db_name, pack_path):
             {
                 "items": [
                     {
-                        "type": "box",
+                        "type": "box-alpha",
                         "color": "#cccccc",
+                        "line_color": None,
+                        "line_width": 0,
                         "group": "read_background",
                         "data": read_background_data
                     },

@@ -16,8 +16,8 @@ class SvJump:
                 self.ref_pos = seed.start_ref + seed.size - 1
             else:
                 self.q_pos = seed.start + seed.size - 1
-                self.ref_pos = seed.start_ref - seed.size + \
-                    1  # @note direction mirrored on reference
+                # @note direction mirrored on reference
+                self.ref_pos = seed.start_ref - seed.size + 1
 
     def add_destination(self, seed):
         class Destination:
@@ -36,7 +36,7 @@ class SvJump:
         case = None
         fuzziness_from_dir = "right" if self.forw_strand else "left"
         fuzziness_to_dir = "left" if seed.on_forward_strand else "right"
-        if seed.on_forward_strand != self.forw_strand:  # == switch strands
+        if seed.on_forward_strand != self.forw_strand: # == switch strands
             fuzziness_to_dir = fuzziness_from_dir
         # cases (0,2) and (0,3) in ppt matrix
         if self.jump_from_start and not seed.on_forward_strand:

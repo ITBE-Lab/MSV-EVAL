@@ -22,7 +22,7 @@ def compute_sv_jumps(parameter_set_manager, conn, fm_index):
         segments = seeding_module.execute(fm_index, nuc_seq)
         # extract seeds & convert to python list
         seeds = [x for x in segments.extract_seeds(
-            fm_index, 100, 0, len(nuc_seq), False)]
+            fm_index, 100, 19, len(nuc_seq), False)]
         # sort by query positions
         seeds.sort(key=lambda x: x.start)
         # if nuc_seq_id == 13:

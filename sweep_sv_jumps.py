@@ -3,7 +3,7 @@ import math
 
 
 def get_fuzziness(sv_jump):
-    return max(3, math.sqrt(abs(sv_jump.ref_from - sv_jump.ref_to))/2)
+    return min(int(math.pow(abs(sv_jump.ref_from - sv_jump.ref_to) + 1, 0.6)), 1000)
 
 
 class AcceptedSvJump:
@@ -159,13 +159,19 @@ def sv_jumps_to_dict(sv_jumps, accepted_sv_jumps):
     sw_boxes_data = []
     accepted_boxes_data = []
     for jump in sv_jumps:
+        
+        if jump.read_id in [8, 98, 16]:
+            print(jump.read_id)
+            if jump.ref_from >= 7509800 and jump.ref_from <= 7510200 and jump.ref_to >= 7510300 and jump.ref_to <= 7510700:
+                print(jump.ref_from, jump.ref_to, jump.q_distance)
         alpha = 0.08 / math.log(jump.q_distance + 1.5)
         f = get_fuzziness(jump)
         x = [jump.ref_from - f if jump.fuzziness_from_dir == "left" else jump.ref_from,
              jump.ref_to - f if jump.fuzziness_to_dir == "left" else jump.ref_to,
              f,
              f,
-             alpha]
+             alpha,
+             str(jump.read_id)]
         if jump.switch_strands:
             sw_boxes_data.append(x)
         else:
@@ -173,7 +179,9 @@ def sv_jumps_to_dict(sv_jumps, accepted_sv_jumps):
     for jump in accepted_sv_jumps:
         accepted_boxes_data.append([jump.curr_start, jump.get_best_destination().start,
                                     jump.curr_end - jump.curr_start,
-                                    jump.get_best_destination().end - jump.get_best_destination().start, 0])
+                                    jump.get_best_destination().end - jump.get_best_destination().start,
+                                    0,
+                                    str(jump.score())])
     out_dict = {
         "x_offset": 0,
         "panels": [
@@ -182,16 +190,16 @@ def sv_jumps_to_dict(sv_jumps, accepted_sv_jumps):
                     {
                         "type": "box-alpha",
                         "color": "blue",
-                        "line_color": None,
-                        "line_width": 0,
+                        "line_color": "blue",
+                        "line_width": 3,
                         "group": "all_jumps",
                         "data": forw_boxes_data
                     },
                     {
                         "type": "box-alpha",
                         "color": "orange",
-                        "line_color": None,
-                        "line_width": 0,
+                        "line_color": "orange",
+                        "line_width": 3,
                         "group": "all_jumps",
                         "data": sw_boxes_data
                     },

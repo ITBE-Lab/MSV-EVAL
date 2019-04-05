@@ -18,9 +18,10 @@ def render_from_dict(json_dict, start, end, on_y_aswell=False):
             width=1700,
             height=panel["h"],
             x_range=[start, end] if len(plots) == 0 else plots[0].x_range,
+            tooltips="@i",
             tools=[
                 "pan", "xpan", "wheel_zoom", "xwheel_zoom", "box_zoom", "save",
-                "reset"
+                "reset", "hover"
             ],
             active_drag="xpan",
             active_scroll="xwheel_zoom")
@@ -56,14 +57,16 @@ def render_from_dict(json_dict, start, end, on_y_aswell=False):
                     't': [],
                     'b': [],
                     'a': [],
+                    'i': []
                 }
-                for x, y, w, h, a in item["data"]:
+                for x, y, w, h, a, i in item["data"]:
                     x += x_offset
                     cds["l"].append(x)
                     cds["r"].append(x + w)
                     cds["b"].append(y)
                     cds["t"].append(y + h)
                     cds["a"].append(a)
+                    cds["i"].append(i)
                 plot.quad(
                     left='l',
                     right='r',
@@ -77,12 +80,14 @@ def render_from_dict(json_dict, start, end, on_y_aswell=False):
             elif item["type"] == "line":
                 cds = {
                     "x": [],
-                    "y": []
+                    "y": [],
+                    'i': []
                 }
-                for x, y, w, h in item["data"]:
+                for i, (x, y, w, h) in enumerate(item["data"]):
                     x += x_offset
                     cds["x"].append([x, x+w])
                     cds["y"].append([y, y+h])
+                    cds["i"].append(str(i))
                 plot.multi_line(
                     xs='x',
                     ys='y',
