@@ -3,7 +3,7 @@ import math
 
 
 def get_fuzziness(sv_jump):
-    return min(int(math.pow(abs(sv_jump.ref_from - sv_jump.ref_to) + 1, 0.6)), 1000)
+    return min(int(math.pow(abs(sv_jump.ref_from - sv_jump.ref_to) + 1, 0.75)/5), 500)
 
 
 class AcceptedSvJump:
@@ -159,11 +159,6 @@ def sv_jumps_to_dict(sv_jumps, accepted_sv_jumps):
     sw_boxes_data = []
     accepted_boxes_data = []
     for jump in sv_jumps:
-        
-        if jump.read_id in [8, 98, 16]:
-            print(jump.read_id)
-            if jump.ref_from >= 7509800 and jump.ref_from <= 7510200 and jump.ref_to >= 7510300 and jump.ref_to <= 7510700:
-                print(jump.ref_from, jump.ref_to, jump.q_distance)
         alpha = 0.08 / math.log(jump.q_distance + 1.5)
         f = get_fuzziness(jump)
         x = [jump.ref_from - f if jump.fuzziness_from_dir == "left" else jump.ref_from,
