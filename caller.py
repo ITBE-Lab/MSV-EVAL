@@ -31,9 +31,8 @@ class Caller():
         print("calling sv lines...")
         sv_jumps = compute_sv_jumps(self.parameter_set_manager, self.conn, self.fm_index)
         print("called", len(sv_jumps), "lines.")
-        print("sweeping sv lines...")
-        #accepted_sv_jumps = sweep_sv_jumps(self.parameter_set_manager, self.conn, sv_jumps)
-        accepted_sv_jumps = []
+        print("clustering sv lines...")
+        accepted_sv_jumps = sweep_sv_jumps(self.parameter_set_manager, self.conn, sv_jumps, self.pack.unpacked_size_single_strand)
         print("done")
         return sv_jumps, accepted_sv_jumps
 
