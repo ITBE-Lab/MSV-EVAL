@@ -19,29 +19,41 @@ class SvJumpCluster:
         self.l_down = []
         self.l_left = []
         if jump.fuzziness_from_dir == "left":
-            self.l_left.append(jump.x)
+            self.l_left.append( (jump.x, jump.q_distance) )
         elif jump.fuzziness_from_dir == "right":
-            self.l_right.append(jump.x)
+            self.l_right.append( (jump.x, jump.q_distance) )
         if jump.fuzziness_to_dir == "up":
-            self.l_up.append(jump.y)
+            self.l_up.append( (jump.y, jump.q_distance) )
         elif jump.fuzziness_to_dir == "down":
-            self.l_down.append(jump.y)
+            self.l_down.append( (jump.y, jump.q_distance) )
+
+    def max_dist_list(self, l):
+        max_d = max(y for x,y in l)
+        ret = []
+        for x, y in l:
+            if max_d / 10 < y:
+                ret.append(x)
+        return ret
 
     def right(self):
-        self.l_right.sort(reverse=True)
-        return self.l_right[int(len(self.l_right)/20)]
+        l_right = self.max_dist_list(self.l_right)
+        l_right.sort(reverse=True)
+        return l_right[int(len(l_right)/50)]
 
     def left(self):
-        self.l_left.sort()
-        return self.l_left[int(len(self.l_left)/20)]
+        l_left = self.max_dist_list(self.l_left)
+        l_left.sort()
+        return l_left[int(len(l_left)/50)]
 
     def up(self):
-        self.l_up.sort(reverse=True)
-        return self.l_up[int(len(self.l_up)/20)]
+        l_up = self.max_dist_list(self.l_up)
+        l_up.sort(reverse=True)
+        return l_up[int(len(l_up)/50)]
 
     def down(self):
-        self.l_down.sort()
-        return self.l_down[int(len(self.l_down)/20)]
+        l_down = self.max_dist_list(self.l_down)
+        l_down.sort()
+        return l_down[int(len(l_down)/50)]
 
     def join(self, other):
         if not self.switch_strand == other.switch_strand:

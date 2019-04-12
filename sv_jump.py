@@ -50,6 +50,7 @@ class SvJump:
                 self.fuzziness_to_dir = fuzziness_to_dir
                 self.case = case
                 self.score = 0.08 / math.log(q_distance + 1.5)
+                self.q_distance = q_distance
 
             def __str__(self):
                 return str(self.x) + ", " + str(self.y) + ", " + str(self.score) + ", " + str(self.case)
