@@ -5,7 +5,7 @@ import sqlite3
 
 
 class SvJumpCluster:
-    def __init__(self, switch_strand, from_pos, to_start, to_end, score):
+    def __init__(self, switch_strand, from_pos, to_start, to_end, score, jump):
         self.switch_strand = switch_strand
         self.from_start = from_pos
         self.to_end = to_end
@@ -14,6 +14,34 @@ class SvJumpCluster:
         self.score = score
         self.from_end = None
         self.to_start = to_start
+        self.l_right = []
+        self.l_up = []
+        self.l_down = []
+        self.l_left = []
+        if jump.fuzziness_from_dir == "left":
+            self.l_left.append(jump.x)
+        elif jump.fuzziness_from_dir == "right":
+            self.l_right.append(jump.x)
+        if jump.fuzziness_to_dir == "up":
+            self.l_up.append(jump.y)
+        elif jump.fuzziness_to_dir == "down":
+            self.l_down.append(jump.y)
+
+    def right(self):
+        self.l_right.sort(reverse=True)
+        return self.l_right[int(len(self.l_right)/20)]
+
+    def left(self):
+        self.l_left.sort()
+        return self.l_left[int(len(self.l_left)/20)]
+
+    def up(self):
+        self.l_up.sort(reverse=True)
+        return self.l_up[int(len(self.l_up)/20)]
+
+    def down(self):
+        self.l_down.sort()
+        return self.l_down[int(len(self.l_down)/20)]
 
     def join(self, other):
         if not self.switch_strand == other.switch_strand:
@@ -25,6 +53,10 @@ class SvJumpCluster:
         self.count += other.count
         self.max_count += other.max_count
         self.score += other.score
+        self.l_down.extend(other.l_down)
+        self.l_up.extend(other.l_up)
+        self.l_right.extend(other.l_right)
+        self.l_left.extend(other.l_left)
 
     def __len__(self):
         return self.count
@@ -157,9 +189,9 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_jumps, ref_size):
     for sv_jump in sv_jumps:
         assert sv_jump.ref_to_start < sv_jump.ref_to_end
         line_sweep_list.append(
-            (sv_jump.switch_strands, sv_jump.ref_from_start, sv_jump.ref_to_start, sv_jump.ref_to_end, False, sv_jump.score, sv_jump.ref_from_start))
+            (sv_jump.switch_strands, sv_jump.ref_from_start, sv_jump.ref_to_start, sv_jump.ref_to_end, False, sv_jump.score, sv_jump))
         line_sweep_list.append(
-            (sv_jump.switch_strands, sv_jump.ref_from_end, sv_jump.ref_to_start, sv_jump.ref_to_end, True, sv_jump.score, sv_jump.ref_from_start))
+            (sv_jump.switch_strands, sv_jump.ref_from_end, sv_jump.ref_to_start, sv_jump.ref_to_end, True, sv_jump.score, sv_jump))
     print("done creating list")
     print("sweeping...")
     line_sweep_list.sort()
@@ -168,20 +200,19 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_jumps, ref_size):
     y_range_tree = WarpedBitVector(ref_size)
     cluster_dict = {}
     print("sweeping...")
-    for switch_strand, from_pos, to_start, to_end, is_end, score, from_start in line_sweep_list:
+    for switch_strand, from_pos, to_start, to_end, is_end, score, jmp in line_sweep_list:
         #print("sweeping", switch_strand, from_pos,
         #      to_start, to_end, is_end, score)
         if not is_end:
             cluster = SvJumpCluster(
-                switch_strand, from_pos, to_start, to_end, score)
+                switch_strand, from_pos, to_start, to_end, score, jmp)
             cluster_keys = [
                 x for x, _ in y_range_tree.get_one_intervals_upwards(to_start, to_end, from_pos)]
             #print("cluster_keys", cluster_keys)
             for key in cluster_keys:
                 if key not in cluster_dict:
                     print("CRITICAL:", key, "not in dict")
-                    print(
-                        "bitvec:", y_range_tree.bit_vec.bit_vec[key-10:key+10])
+                    print("bitvec:", y_range_tree.bit_vec.bit_vec[key-10:key+10])
                     assert False
                 cluster.join(cluster_dict[key])
                 #print("del", key, cluster_dict[key])
@@ -197,11 +228,11 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_jumps, ref_size):
                       new_key)
                 assert False
         else:
-            key = y_range_tree.find_zero(to_start, from_start)
+            key = y_range_tree.find_zero(to_start, jmp.ref_from_start)
             if key not in cluster_dict:
                 print("CRITICAL:", key, "not in dict")
                 print("searched from", y_range_tree.to_new_coord_system_c(
-                    to_start, from_start))
+                    to_start, jmp.ref_from_start))
                 print(
                     "bitvec:", y_range_tree.bit_vec.bit_vec[key-10:key+10])
                 assert False
@@ -224,6 +255,7 @@ def sv_jumps_to_dict(sv_jumps, accepted_sv_jumps, db_name):
     forw_boxes_data = []
     sw_boxes_data = []
     accepted_boxes_data = []
+    accepted_lines_data = []
     plus_data = []
     patch_data = []
     for jump in sv_jumps:
@@ -258,6 +290,26 @@ def sv_jumps_to_dict(sv_jumps, accepted_sv_jumps, db_name):
                                     jump.to_end - jump.to_start + 1,
                                     0,
                                     str(jump.score)])
+        if len(jump.l_right) > 0:
+            accepted_lines_data.append([
+                jump.right() - 0.5, jump.to_start - 0.5,
+                0, jump.to_end - jump.to_start + 1
+            ])
+        if len(jump.l_left) > 0:
+            accepted_lines_data.append([
+                jump.left() - 0.5, jump.to_start - 0.5,
+                0, jump.to_end - jump.to_start + 1
+            ])
+        if len(jump.l_up) > 0:
+            accepted_lines_data.append([
+                jump.from_start - 0.5, jump.up() - 0.5,
+                jump.from_end - jump.from_start + 1, 0
+            ])
+        if len(jump.l_down) > 0:
+            accepted_lines_data.append([
+                jump.from_start - 0.5, jump.down() - 0.5,
+                jump.from_end - jump.from_start + 1, 0
+            ])
     conn = sqlite3.connect(db_name)
     cur = conn.cursor()
     # show actual SV crosses
@@ -297,6 +349,12 @@ def sv_jumps_to_dict(sv_jumps, accepted_sv_jumps, db_name):
                         "line_width": 3,
                         "group": "accepted_jumps",
                         "data": accepted_boxes_data
+                    },
+                    {
+                        "type": "line",
+                        "color": "green",
+                        "group": "accepted_jumps",
+                        "data": accepted_lines_data
                     },
                     {
                         "type": "patch",

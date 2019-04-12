@@ -54,6 +54,10 @@ class SvJump:
             def __str__(self):
                 return str(self.x) + ", " + str(self.y) + ", " + str(self.score) + ", " + str(self.case)
 
+            # required for sorting but actually irrelevant
+            def __lt__(self, other):
+                return False
+
         r_to = None
         q_to = None
         case = None
