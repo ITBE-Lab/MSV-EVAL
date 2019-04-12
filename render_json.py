@@ -50,6 +50,20 @@ def render_from_dict(json_dict, start, end, on_y_aswell=False):
                     line_width=0,
                     color=item['color'],
                     source=ColumnDataSource(cds))
+            if item["type"] == "patch":
+                cds = {
+                    'xs': [],
+                    'ys': []
+                }
+                for xs, ys in item["data"]:
+                    cds["xs"].append([x + x_offset for x in xs])
+                    cds["ys"].append(ys)
+                plot.patches(
+                    xs='xs',
+                    ys='ys',
+                    line_width=1,
+                    color=item['color'],
+                    source=ColumnDataSource(cds))
             elif item["type"] == "box-alpha":
                 cds = {
                     'l': [],
@@ -91,6 +105,22 @@ def render_from_dict(json_dict, start, end, on_y_aswell=False):
                 plot.multi_line(
                     xs='x',
                     ys='y',
+                    line_width=3,
+                    color=item['color'],
+                    source=ColumnDataSource(cds))
+            elif item["type"] == "plus":
+                cds = {
+                    "x": [],
+                    "y": []
+                }
+                for x, y in item["data"]:
+                    x += x_offset
+                    cds["x"].append(x)
+                    cds["y"].append(y)
+                plot.cross(
+                    x='x',
+                    y='y',
+                    size=20,
                     line_width=3,
                     color=item['color'],
                     source=ColumnDataSource(cds))

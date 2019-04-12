@@ -15,7 +15,7 @@ class Caller():
         self.parameter_set_manager.set_selected("PacBio")
         self.parameter_set_manager.get_selected().register_parameter(
             # name, description, group_id, group_name, value
-            libMA.AlignerParameterInt("num destinations", "desc", 6, "Structural Variants Caller", 5))
+            libMA.AlignerParameterInt("num destinations", "desc", 6, "Structural Variants Caller", 2))
         self.parameter_set_manager.get_selected().register_parameter(
             # name, description, group_id, group_name, value
             libMA.AlignerParameterInt("fuzziness", "desc", 6, "Structural Variants Caller", 3))
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     sv_jumps, accepted_sv_jumps = caller.call()
     caller.close()
     
-    render_from_dict(sv_jumps_to_dict(sv_jumps, accepted_sv_jumps), 7500000, 7550000, True)
+    render_from_dict(sv_jumps_to_dict(sv_jumps, accepted_sv_jumps, "/MAdata/databases/sv_simulated"), 7500000, 7550000, True)
     
     # display the result
     out_dict = create_json_from_db("/MAdata/databases/sv_simulated",

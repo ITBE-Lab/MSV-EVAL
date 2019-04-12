@@ -25,9 +25,11 @@ def compute_sv_jumps(parameter_set_manager, conn, fm_index):
             fm_index, 100, 18, len(nuc_seq), True)]
         # sort by query positions
         seeds.sort(key=lambda x: x.start)
-        # if nuc_seq_id == 13:
+        #if nuc_seq_id == 2:
+        #    print("seeds:")
         #    for seed in seeds:
-        #        print(seed.start, seed.start + seed.size, seed.start_ref, seed.start_ref + seed.size, seed.on_forward_strand)
+        #       print(seed.start, seed.start + seed.size, seed.start_ref, seed.start_ref + seed.size, seed.on_forward_strand, seed.size)
+        #    print("jumps:")
 
         # compute sv jumps for all seeds
         for i, seed in enumerate(seeds):
@@ -38,13 +40,33 @@ def compute_sv_jumps(parameter_set_manager, conn, fm_index):
 
             # fill in at most "num_destinations" destination seeds (previous seeds on query)
             if i >= 1:
-                for dest_seed in seeds[max(i-num_destinations-1, 0):i]:
+                jumps = [num_destinations, num_destinations]
+                for dest_seed in seeds[i-1::-1]:
+                    if max(jumps) <= 0:
+                        break
+                    if dest_seed.size >= 30:
+                        jumps[1] -= 1
+                    elif jumps[0] <= 0:
+                        continue
+                    jumps[0] -= 1
                     d = from_start_jump.add_destination(dest_seed)
                     if not d is None:
+                        #if nuc_seq_id == 2:
+                        #    print(d)
                         sv_jumps.append(d)
             # fill in at most "num_destinations" destination seeds (next seeds on query)
-            for dest_seed in seeds[i+1:i+num_destinations+1]:
+            jumps = [num_destinations, num_destinations]
+            for dest_seed in seeds[i+1:]:
+                if max(jumps) <= 0:
+                    break
+                if dest_seed.size >= 30:
+                    jumps[1] -= 1
+                elif jumps[0] <= 0:
+                    continue
+                jumps[0] -= 1
                 d = from_end_jump.add_destination(dest_seed)
                 if not d is None:
+                    #if nuc_seq_id == 2:
+                    #    print(d)
                     sv_jumps.append(d)
     return sv_jumps

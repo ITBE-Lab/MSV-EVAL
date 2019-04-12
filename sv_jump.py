@@ -25,30 +25,53 @@ class SvJump:
         class Destination:
             def __init__(self, parent, ref_pos, q_distance, switch_strands, case, fuzziness_from_dir, fuzziness_to_dir):
                 self.read_id = parent.read_id
+                self.x = parent.ref_pos
+                self.y = ref_pos
                 self.ref_from_start = parent.ref_pos
                 self.ref_from_end = parent.ref_pos
                 self.ref_to_start = ref_pos
                 self.ref_to_end = ref_pos
-                f = max(min(int(math.pow(abs(parent.ref_pos - ref_pos) + 1, 0.75)/4), 500), 1)
+                f_1 = 1
+                f = min(int(math.pow(max(abs(parent.ref_pos - ref_pos), q_distance), 1.5)/1000) + 1, 1000)
                 if fuzziness_from_dir == "left":
                     self.ref_from_start -= f
+                    self.ref_from_end += f_1
                 else:
                     self.ref_from_end += f
-                if fuzziness_to_dir == "left":
+                    self.ref_from_start -= f_1
+                if fuzziness_to_dir == "down":
                     self.ref_to_start -= f
+                    self.ref_to_end += f_1
                 else:
                     self.ref_to_end += f
+                    self.ref_to_start -= f_1
                 self.switch_strands = switch_strands
+                self.fuzziness_from_dir = fuzziness_from_dir
+                self.fuzziness_to_dir = fuzziness_to_dir
                 self.case = case
                 self.score = 0.08 / math.log(q_distance + 1.5)
+
+            def __str__(self):
+                return str(self.x) + ", " + str(self.y) + ", " + str(self.score) + ", " + str(self.case)
 
         r_to = None
         q_to = None
         case = None
-        fuzziness_from_dir = "right" if self.forw_strand else "left"
-        fuzziness_to_dir = "left" if seed.on_forward_strand else "right"
-        if seed.on_forward_strand != self.forw_strand: # == switch strands
-            fuzziness_to_dir = fuzziness_from_dir
+        #fuzziness_from_dir = "right" if self.forw_strand else "left"
+        #fuzziness_to_dir = "down" if seed.on_forward_strand else "up"
+        #if seed.on_forward_strand != self.forw_strand: # == switch strands
+        #    fuzziness_to_dir = fuzziness_from_dir
+        fuzziness_from_dir = "right"
+        fuzziness_to_dir = "down"
+        if seed.on_forward_strand != self.forw_strand:
+            if self.forw_strand and self.jump_from_start:
+                fuzziness_from_dir = "left"
+            if not self.forw_strand and not self.jump_from_start:
+                fuzziness_from_dir = "left"
+            if seed.on_forward_strand and self.jump_from_start:
+                fuzziness_to_dir = "up"
+            if not seed.on_forward_strand and not self.jump_from_start:
+                fuzziness_to_dir = "up"
         # cases (0,2) and (0,3) in ppt matrix
         if self.jump_from_start and not seed.on_forward_strand:
             q_to = seed.start + seed.size - 1

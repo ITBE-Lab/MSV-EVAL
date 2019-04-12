@@ -201,29 +201,29 @@ def create_json_from_db(db_name, pack_path):
                 ],
                 "h": 700
             },
-            {
-                "items": [
-                    {
-                        "type": "box",
-                        "color": "purple",
-                        "group": "sv_line",
-                        "data": sv_line_data
-                    },
-                    {
-                        "type": "arrow",
-                        "color": "black",
-                        "group": "sv_arrow",
-                        "data": sv_arrow_data
-                    },
-                    {
-                        "type": "arrow",
-                        "color": "green",
-                        "group": "sv_arrow",
-                        "data": sv_inversion_arrow_data
-                    }
-                ],
-                "h": 300
-            }
+            #{
+            #    "items": [
+            #        {
+            #            "type": "box",
+            #            "color": "purple",
+            #            "group": "sv_line",
+            #            "data": sv_line_data
+            #        },
+            #        {
+            #            "type": "arrow",
+            #            "color": "black",
+            #            "group": "sv_arrow",
+            #            "data": sv_arrow_data
+            #        },
+            #        {
+            #            "type": "arrow",
+            #            "color": "green",
+            #            "group": "sv_arrow",
+            #            "data": sv_inversion_arrow_data
+            #        }
+            #    ],
+            #    "h": 300
+            #}
         ]
     }
     return out_dict
