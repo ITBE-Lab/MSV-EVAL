@@ -1,6 +1,6 @@
 import math
 
-class SvJump:
+class PySvJump:
     def __init__(self, seed, read_id, q_len, jump_from_start):
         self.forw_strand = seed.on_forward_strand
         self.jump_from_start = jump_from_start
@@ -31,7 +31,7 @@ class SvJump:
                 self.ref_from_end = parent.ref_pos
                 self.ref_to_start = ref_pos
                 self.ref_to_end = ref_pos
-                f_1 = 1
+                f_1 = 3
                 f = min(int(math.pow(max(abs(parent.ref_pos - ref_pos), q_distance), 1.5)/1000) + 1, 1000)
                 if fuzziness_from_dir == "left":
                     self.ref_from_start -= f
