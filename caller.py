@@ -30,7 +30,7 @@ class Caller():
     def call(self):
         print("calling sv lines...")
         sv_db = SV_DB("/MAdata/databases/sv_tmp", "create")
-        sv_jumps = compute_sv_jumps(self.parameter_set_manager, self.conn, self.fm_index, sv_db)
+        sv_jumps = compute_sv_jumps(self.parameter_set_manager, self.conn, self.fm_index, self.pack, sv_db)
         print("called", len(sv_jumps), "lines.")
         print("clustering sv lines...")
         accepted_sv_jumps = sweep_sv_jumps(self.parameter_set_manager, self.conn, sv_jumps, self.pack.unpacked_size_single_strand)

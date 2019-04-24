@@ -4,94 +4,55 @@ import sqlite3
 import math
 
 
-def compute_sv_jumps(parameter_set_manager, conn, fm_index, sv_db):
+def compute_sv_jumps(parameter_set_manager, conn, fm_index, pack, sv_db):
     cur = conn.cursor()
-    seeding_module = BinarySeeding(parameter_set_manager)
 
     num_destinations = parameter_set_manager.get_selected().by_name(
         "num destinations").get()
     ## fuzziness = parameter_set_manager.get_selected().by_name("fuzziness").get()
 
     sv_jumps = []
-    jump_inserter = SvJumpInserter(sv_db, "MA-SV", "python implementation of MA-SV")
 
     # iterate over all queries
-    cur.execute("SELECT read_table.sequence, read_table.id FROM read_table")
-    for nuc_seq_blob, nuc_seq_id in cur:
+    cur.execute(""" SELECT read_table.sequence, read_table.name 
+                    FROM read_table 
+                    WHERE read_table.id NOT IN ( 
+                       SELECT paired_read_table.first_read FROM paired_read_table  
+                       UNION SELECT paired_read_table.second_read FROM paired_read_table
+                    ) """)
+    nucSeqVec = ContainerVectorNucSeq()
+    for nuc_seq_blob, name in cur:
         # extract seeds for query
         nuc_seq = nuc_seq_from_bytes(nuc_seq_blob)
-        read_context = jump_inserter.insert_read(nuc_seq)
-        segments = seeding_module.execute(fm_index, nuc_seq)
-        # extract seeds & convert to python list
-        seeds = [x for x in segments.extract_seeds(
-            fm_index, 100, 18, len(nuc_seq), True)]
-        # sort by query positions
-        seeds.sort(key=lambda x: x.start)
+        nuc_seq.name = name
+        nucSeqVec.append(nuc_seq)
 
-        # compute sv jumps for all seeds
-        for i, seed in enumerate(seeds):
-            # create the jump from the start of the seed (temporary generator object)
-            from_start_jump = PySvJump(seed, nuc_seq_id, len(nuc_seq), True)
-            # as well as the one from the end of the seed (temporary generator object)
-            from_end_jump = PySvJump(seed, nuc_seq_id, len(nuc_seq), False)
+    conn.close()
 
-            # fill in at most "num_destinations" destination seeds (previous seeds on query)
-            if i >= 1:
-                jumps = [num_destinations, num_destinations]
-                for dest_seed in seeds[i-1::-1]:
-                    if max(jumps) <= 0:
-                        break
-                    if dest_seed.size >= 30:
-                        jumps[1] -= 1
-                    elif jumps[0] <= 0:
-                        continue
-                    jumps[0] -= 1
-                    d = from_start_jump.add_destination(dest_seed)
-                    if not d is None:
-                        #if nuc_seq_id == 2:
-                        #    print(d)
-                        sv_jumps.append(d)
-                        sv_jump_cpp = SvJump(seed, dest_seed, True)
-                        if sv_jump_cpp.from_pos != d.x:
-                            print(sv_jump_cpp.from_start, "!=", d.x)
-                            assert False
-                        if sv_jump_cpp.to_pos != d.y:
-                            print(sv_jump_cpp.from_start, "!=", d.y)
-                            assert False
-                        if sv_jump_cpp.from_fuzziness_is_rightwards() != (d.fuzziness_from_dir == "right"):
-                            print(sv_jump_cpp.from_fuzziness_is_rightwards(), "!=", d.fuzziness_from_dir)
-                            assert False
-                        if sv_jump_cpp.to_fuzziness_is_downwards() != (d.fuzziness_to_dir == "down"):
-                            print(sv_jump_cpp.to_fuzziness_is_downwards(), "!=", d.fuzziness_to_dir)
-                            assert False
-                        read_context.insert_jump(sv_jump_cpp)
-            # fill in at most "num_destinations" destination seeds (next seeds on query)
-            jumps = [num_destinations, num_destinations]
-            for dest_seed in seeds[i+1:]:
-                if max(jumps) <= 0:
-                    break
-                if dest_seed.size >= 30:
-                    jumps[1] -= 1
-                elif jumps[0] <= 0:
-                    continue
-                jumps[0] -= 1
-                d = from_end_jump.add_destination(dest_seed)
-                if not d is None:
-                    #if nuc_seq_id == 2:
-                    #    print(d)
-                    sv_jumps.append(d)
-                    sv_jump_cpp = SvJump(seed, dest_seed, False)
-                    if sv_jump_cpp.from_pos != d.x:
-                        print(sv_jump_cpp.from_start, "!=", d.x)
-                        assert False
-                    if sv_jump_cpp.to_pos != d.y:
-                        print(sv_jump_cpp.from_start, "!=", d.y)
-                        assert False
-                    if sv_jump_cpp.from_fuzziness_is_rightwards() != (d.fuzziness_from_dir == "right"):
-                        print(sv_jump_cpp.from_fuzziness_is_rightwards(), "!=", d.fuzziness_from_dir)
-                        assert False
-                    if sv_jump_cpp.to_fuzziness_is_downwards() != (d.fuzziness_to_dir == "down"):
-                        print(sv_jump_cpp.to_fuzziness_is_downwards(), "!=", d.fuzziness_to_dir)
-                        assert False
-                    read_context.insert_jump(sv_jump_cpp)
-    return sv_jumps
+    splitter_module = NucSeqSplitter(parameter_set_manager)
+    lock_module = Lock(parameter_set_manager)
+    seeding_module = BinarySeeding(parameter_set_manager)
+    jumps_from_seeds = SvJumpsFromSeeds(parameter_set_manager)
+    jumps_to_db = SvDbInserter(parameter_set_manager, sv_db, "python built compt graph")
+
+    nucSeqVec_pledge = Pledge()
+    nucSeqVec_pledge.set(nucSeqVec)
+    fm_pledge = Pledge()
+    fm_pledge.set(fm_index)
+    pack_pledge = Pledge()
+    pack_pledge.set(pack)
+
+    
+    res = VectorPledge()
+    for _ in range(parameter_set_manager.get_num_threads()):
+        queries_pledge = promise_me(lock_module, promise_me(splitter_module, nucSeqVec_pledge))
+        unlock_module = UnLock(parameter_set_manager, queries_pledge)
+        segments_pledge = promise_me(seeding_module, fm_pledge, queries_pledge)
+        jumps_pledge = promise_me(jumps_from_seeds, segments_pledge, pack_pledge, fm_pledge)
+        write_to_db_pledge = promise_me(jumps_to_db, jumps_pledge, queries_pledge)
+        unlock_pledge = promise_me(unlock_module, write_to_db_pledge)
+        res.append(unlock_pledge)
+    res.simultaneous_get(parameter_set_manager.get_num_threads())
+
+    exit(0)
+
