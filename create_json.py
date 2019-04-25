@@ -21,7 +21,7 @@ def for_seed_sections(segments, fm_index, nuc_seq_len):
         end_idx += 1
 
 
-def create_json_from_db(db_name, pack_path):
+def create_json_from_db(database, pack_path):
     parameter_manager = ParameterSetManager()
     parameter_manager.set_selected("PacBio")
     fm_index = FMIndex()
@@ -30,7 +30,6 @@ def create_json_from_db(db_name, pack_path):
     fm_pledge.set(fm_index)
 
     # set up all modules
-    database = SV_DB(db_name, "open")
     sql = NucSeqFromSql(parameter_manager, database)
     lock = Lock(parameter_manager)
     paired_sql = PairedNucSeqFromSql(parameter_manager, database)
@@ -132,39 +131,6 @@ def create_json_from_db(db_name, pack_path):
                     seed.size / len(nuc_seq)
                 ])
 
-    conn = sqlite3.connect(db_name)
-    cur = conn.cursor()
-    # get all the sv jumps we have to render
-    cur.execute(
-        """ SELECT sv_line.start, sv_line.end, sv_jump.start, sv_jump.end, sv_jump.switch_strand
-            FROM sv_jump
-            JOIN sv_line ON sv_line.id = sv_jump.sv_line_id
-    """)
-    y = 0
-    for a_start, a_end, b_start, b_end, switch_strand in cur.fetchall():
-        print(a_start, a_end, b_start, b_end, switch_strand)
-        ref_from = a_end
-        ref_to = b_start
-        if b_start < a_end:
-            ref_from = a_end
-            ref_to = b_start
-        if switch_strand:
-            sv_inversion_arrow_data.append(
-                [ref_from - x_offset, y, ref_to - ref_from, 0])
-        else:
-            sv_arrow_data.append(
-                [ref_from - x_offset, y, ref_to - ref_from, 0])
-        y -= 1
-    # show SV lines
-    cur.execute(
-        """ SELECT id, start, end
-            FROM sv_line
-    """)
-
-    for idx, start_on_ref, end_on_ref in cur.fetchall():
-        sv_line_data.append([start_on_ref - x_offset, 0,
-                             end_on_ref - start_on_ref + 1, y])
-    conn.close()
 
     # combine to single dictionary
     out_dict = {
@@ -201,29 +167,6 @@ def create_json_from_db(db_name, pack_path):
                 ],
                 "h": 700
             },
-            #{
-            #    "items": [
-            #        {
-            #            "type": "box",
-            #            "color": "purple",
-            #            "group": "sv_line",
-            #            "data": sv_line_data
-            #        },
-            #        {
-            #            "type": "arrow",
-            #            "color": "black",
-            #            "group": "sv_arrow",
-            #            "data": sv_arrow_data
-            #        },
-            #        {
-            #            "type": "arrow",
-            #            "color": "green",
-            #            "group": "sv_arrow",
-            #            "data": sv_inversion_arrow_data
-            #        }
-            #    ],
-            #    "h": 300
-            #}
         ]
     }
     return out_dict

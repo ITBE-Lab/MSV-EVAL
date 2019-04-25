@@ -2,6 +2,7 @@ from sv_jump import *
 import math
 from BitVector import BitVector
 import sqlite3
+from MA import *
 
 
 class SvJumpCluster:
@@ -18,14 +19,14 @@ class SvJumpCluster:
         self.l_up = []
         self.l_down = []
         self.l_left = []
-        if jump.fuzziness_from_dir == "left":
-            self.l_left.append( (jump.x, jump.q_distance) )
-        elif jump.fuzziness_from_dir == "right":
-            self.l_right.append( (jump.x, jump.q_distance) )
-        if jump.fuzziness_to_dir == "up":
-            self.l_up.append( (jump.y, jump.q_distance) )
-        elif jump.fuzziness_to_dir == "down":
-            self.l_down.append( (jump.y, jump.q_distance) )
+        if not jump.from_fuzziness_is_rightwards():
+            self.l_left.append( (jump.from_pos, jump.query_distance()) )
+        else:
+            self.l_right.append( (jump.from_pos, jump.query_distance()) )
+        if not jump.to_fuzziness_is_downwards():
+            self.l_up.append( (jump.to_pos, jump.query_distance()) )
+        else:
+            self.l_down.append( (jump.to_pos, jump.query_distance()) )
 
     def max_dist_list(self, l):
         max_d = max(y for x,y in l)
@@ -193,108 +194,117 @@ class WarpedBitVector:
                                                       self.to_new_coord_system_c(end, x_value))
 
 
-def sweep_sv_jumps(parameter_set_manager, conn, sv_jumps, ref_size):
+def sweep_sv_jumps(parameter_set_manager, conn, sv_db, ref_size):
     accepted_sv_jumps = []
 
-    line_sweep_list = []
+    sweeper = SortedSvJumpFromSql(sv_db, 1) #@todo get id as parameter
     print("creating sweep list...")
-    for sv_jump in sv_jumps:
-        assert sv_jump.ref_to_start < sv_jump.ref_to_end
-        line_sweep_list.append(
-            (sv_jump.switch_strands, sv_jump.ref_from_start, sv_jump.ref_to_start, sv_jump.ref_to_end, False, sv_jump.score, sv_jump))
-        line_sweep_list.append(
-            (sv_jump.switch_strands, sv_jump.ref_from_end, sv_jump.ref_to_start, sv_jump.ref_to_end, True, sv_jump.score, sv_jump))
-    print("done creating list")
-    print("sweeping...")
-    line_sweep_list.sort()
-    print("done sorting")
 
     y_range_tree = WarpedBitVector(ref_size)
     cluster_dict = {}
     print("sweeping...")
-    for switch_strand, from_pos, to_start, to_end, is_end, score, jmp in line_sweep_list:
-        #print("sweeping", switch_strand, from_pos,
-        #      to_start, to_end, is_end, score)
-        if not is_end:
-            cluster = SvJumpCluster(
-                switch_strand, from_pos, to_start, to_end, score, jmp)
-            cluster_keys = [
-                x for x, _ in y_range_tree.get_one_intervals_upwards(to_start, to_end, from_pos)]
-            #print("cluster_keys", cluster_keys)
-            for key in cluster_keys:
-                if key not in cluster_dict:
-                    print("CRITICAL:", key, "not in dict")
-                    print("bitvec:", y_range_tree.bit_vec.bit_vec[key-10:key+10])
-                    assert False
-                cluster.join(cluster_dict[key])
-                #print("del", key, cluster_dict[key])
-                del cluster_dict[key]
-            new_key = max(y_range_tree.set_to(to_start, to_end, 1, from_pos) - 1, 0)
-            if len(cluster_keys) > 0:
-                new_key = min(new_key, min(cluster_keys))
-            #print("insert", new_key, cluster)
-            cluster_dict[new_key] = cluster
-            if y_range_tree.bit_vec.find_zero(y_range_tree.to_new_coord_system_c(to_end, from_pos) - 1) != new_key:
-                print("inserted and found key do not match", 
-                      y_range_tree.bit_vec.find_zero(y_range_tree.to_new_coord_system_c(to_end, from_pos) - 1),
-                      new_key)
-                assert False
-        else:
-            key = y_range_tree.find_zero(to_start, jmp.ref_from_start)
+    #for switch_strand, from_pos, to_start, to_end, is_end, score, jmp in line_sweep_list:
+    def sweep_sv_start(sv_jmp):
+        cluster = SvJumpCluster( sv_jmp.does_switch_strand(), sv_jmp.from_start_same_strand(), sv_jmp.to_start(),
+                                 sv_jmp.to_end(), sv_jmp.score(), sv_jmp)
+        cluster_keys = [ x for x, _ in y_range_tree.get_one_intervals_upwards(sv_jmp.to_start(), sv_jmp.to_end(),
+                                                                              sv_jmp.from_start_same_strand())]
+        #print("cluster_keys", cluster_keys)
+        for key in cluster_keys:
             if key not in cluster_dict:
                 print("CRITICAL:", key, "not in dict")
-                print("searched from", y_range_tree.to_new_coord_system_c(
-                    to_start, jmp.ref_from_start))
-                print(
-                    "bitvec:", y_range_tree.bit_vec.bit_vec[key-10:key+10])
+                print("bitvec:", y_range_tree.bit_vec.bit_vec[key-10:key+10])
                 assert False
-            cluster_dict[key].count -= 1
-            if len(cluster_dict[key]) <= 0:
-                # check for acceptance:
-                if cluster_dict[key].score >= 0.3 and cluster_dict[key].max_count >= 10:
-                    cluster_dict[key].from_end = from_pos
-                    print("accepting", str(cluster_dict[key]))
-                    accepted_sv_jumps.append(cluster_dict[key])
-                y_range_tree.clear_downwards(key + 1)
-                #print("del", key, cluster_dict[key])
-                del cluster_dict[key]
+            cluster.join(cluster_dict[key])
+            #print("del", key, cluster_dict[key])
+            del cluster_dict[key]
+        new_key = max(y_range_tree.set_to(sv_jmp.to_start(), sv_jmp.to_end(), 1, sv_jmp.from_start_same_strand()) - 1, 0)
+        if len(cluster_keys) > 0:
+            new_key = min(new_key, min(cluster_keys))
+        #print("insert", new_key, cluster)
+        cluster_dict[new_key] = cluster
+        if y_range_tree.bit_vec.find_zero(y_range_tree.to_new_coord_system_c(sv_jmp.to_end(), 
+                                                                             sv_jmp.from_start_same_strand()) - 1) != new_key:
+            print("inserted and found key do not match", 
+                  y_range_tree.bit_vec.find_zero(y_range_tree.to_new_coord_system_c(sv_jmp.to_end(),
+                                                                                    sv_jmp.from_start_same_strand()) - 1),
+                  new_key)
+            assert False
+    def sweep_sv_end(sv_jmp):
+        key = y_range_tree.find_zero(sv_jmp.to_start(), sv_jmp.from_start_same_strand())
+        if key not in cluster_dict:
+            print("CRITICAL:", key, "not in dict")
+            print("searched from", y_range_tree.to_new_coord_system_c(
+                sv_jmp.to_start(), sv_jmp.from_start_same_strand()))
+            print(
+                "bitvec:", y_range_tree.bit_vec.bit_vec[key-10:key+10])
+            assert False
+        cluster_dict[key].count -= 1
+        if len(cluster_dict[key]) <= 0:
+            # check for acceptance:
+            if cluster_dict[key].score >= 0.3 and cluster_dict[key].max_count >= 10:
+                cluster_dict[key].from_end = from_pos
+                print("accepting", str(cluster_dict[key]))
+                accepted_sv_jumps.append(cluster_dict[key])
+            y_range_tree.clear_downwards(key + 1)
+            #print("del", key, cluster_dict[key])
+            del cluster_dict[key]
+
+    while not sweeper.has_next_start() and not sweeper.has_next_end():
+        if sweeper.next_start_is_smaller():
+            sweep_sv_start(sweeper.get_next_start())
+        else:
+            sweep_sv_end(sweeper.get_next_end())
+    while not sweeper.has_next_start():
+        print("something is wierd... (this line should never be reached)")
+        sweep_sv_start(sweeper.get_next_start())
+    while not sweeper.has_next_end():
+        sweep_sv_end(sweeper.get_next_end())
     print("done sweeping")
 
     return accepted_sv_jumps
 
 
-def sv_jumps_to_dict(sv_jumps, accepted_sv_jumps, db_name):
+def sv_jumps_to_dict(sv_db, accepted_sv_jumps, db_name):
     forw_boxes_data = []
     sw_boxes_data = []
     accepted_boxes_data = []
     accepted_lines_data = []
     plus_data = []
     patch_data = []
-    for jump in sv_jumps:
-        x = [jump.ref_from_start - 0.5,
-             jump.ref_to_start - 0.5,
-             jump.ref_from_end - jump.ref_from_start + 1,
-             jump.ref_to_end - jump.ref_to_start + 1,
-             jump.score,
-             str(jump.read_id)]
-        if jump.switch_strands:
+    
+    sweeper = SortedSvJumpFromSql(sv_db, 1) #@todo get id as parameter
+    while sweeper.has_next_start():
+        jump = sweeper.get_next_start()
+        x = [jump.from_start_same_strand() - 0.5,
+             jump.to_start() - 0.5,
+             jump.from_size() + 1,
+             jump.to_size() + 1,
+             jump.score(),
+             ""]
+        if jump.does_switch_strand():
             sw_boxes_data.append(x)
         else:
             forw_boxes_data.append(x)
-        if jump.fuzziness_from_dir == "left":
-            if jump.fuzziness_to_dir == "up":
+        if not jump.from_fuzziness_is_rightwards():
+            if not jump.to_fuzziness_is_downwards():
                 patch_data.append(
-                    [[jump.x - 2.5, jump.x + .5, jump.x + .5], [jump.y - .5, jump.y + 2.5, jump.y - .5]])
-            if jump.fuzziness_to_dir == "down":
+                    [[jump.from_pos - 2.5, jump.from_pos + .5, jump.from_pos + .5],
+                     [jump.to_pos - .5, jump.to_pos + 2.5, jump.to_pos - .5]])
+            else:
                 patch_data.append(
-                    [[jump.x - 2.5, jump.x + .5, jump.x + .5], [jump.y + .5, jump.y - 2.5, jump.y + .5]])
+                    [[jump.from_pos - 2.5, jump.from_pos + .5, jump.from_pos + .5],
+                     [jump.to_pos + .5, jump.to_pos - 2.5, jump.to_pos + .5]])
         else:
-            if jump.fuzziness_to_dir == "up":
+            if not jump.to_fuzziness_is_downwards():
                 patch_data.append(
-                    [[jump.x + 2.5, jump.x - .5, jump.x - .5], [jump.y - .5, jump.y + 2.5, jump.y - .5]])
-            if jump.fuzziness_to_dir == "down":
+                    [[jump.from_pos + 2.5, jump.from_pos - .5, jump.from_pos - .5],
+                     [jump.to_pos - .5, jump.to_pos + 2.5, jump.to_pos - .5]])
+            else:
                 patch_data.append(
-                    [[jump.x + 2.5, jump.x - .5, jump.x - .5], [jump.y + .5, jump.y - 2.5, jump.y + .5]])
+                    [[jump.from_pos + 2.5, jump.from_pos - .5, jump.from_pos - .5],
+                     [jump.to_pos + .5, jump.to_pos - 2.5, jump.to_pos + .5]])
+
     for jump in accepted_sv_jumps:
         accepted_boxes_data.append([jump.from_start - 0.5,
                                     jump.to_start - 0.5,
