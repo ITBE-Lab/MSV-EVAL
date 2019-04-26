@@ -115,6 +115,7 @@ class YRangeTree:
 
     def get_one_intervals_upwards(self, start, end):
         assert end > start
+        assert start < len(self.bit_vec)
         ret = []
 
         if self.none( max(start-1, 0), min(end+1, len(self.bit_vec))):
@@ -136,15 +137,17 @@ class YRangeTree:
 
 
 class WarpedBitVector:
-    def __init__(self, size, warp_factor=5000, center_strip_up=5000, center_strip_down=100):
-        self.physical_size = int(
-            (size*2 - (center_strip_up + center_strip_down)) / warp_factor) + (center_strip_up + center_strip_down)
+    def __init__(self, size, warp_factor=5000, center_strip_up=5000, center_strip_down=1000):
+        self.physical_size = int((size - center_strip_up) / warp_factor + (size - center_strip_down) / warp_factor)
+        self.physical_size += center_strip_up + center_strip_down + 1
         print("physical size:", self.physical_size / (8*10**9), "gb")
         self.bit_vec = YRangeTree(self.physical_size)
         self.warp_factor = warp_factor
         self.center_strip_up = center_strip_up
         self.center_strip_down = center_strip_down
         self.size = size
+        assert self.to_new_coord_system_f(self.size - 1, 0) < self.physical_size
+        assert self.to_new_coord_system_c(0, self.size - 1) >= 0
 
     def to_new_coord_system(self, y, x):
         #print("to_new_coord_system", y, x, self.physical_size/2)
@@ -153,7 +156,8 @@ class WarpedBitVector:
             y = (y - self.center_strip_up) / self.warp_factor + self.center_strip_up
         if y < -self.center_strip_down:
             y = (y + self.center_strip_down) / self.warp_factor - self.center_strip_down
-        y += self.physical_size / 2
+        # increment by the logical center
+        y += self.center_strip_down + int( (self.size - self.center_strip_down) / self.warp_factor)
         #print(y)
         return y
 
@@ -190,6 +194,7 @@ class WarpedBitVector:
         #print("get_one_intervals_upwards", self.to_new_coord_system_f(
         #    start, x_value), self.to_new_coord_system_c(end, x_value))
         assert end > start
+        assert start < self.size
         return self.bit_vec.get_one_intervals_upwards(self.to_new_coord_system_f(start, x_value),
                                                       self.to_new_coord_system_c(end, x_value))
 
@@ -207,8 +212,8 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_db, ref_size):
     def sweep_sv_start(sv_jmp):
         cluster = SvJumpCluster( sv_jmp.does_switch_strand(), sv_jmp.from_start_same_strand(), sv_jmp.to_start(),
                                  sv_jmp.to_end(), sv_jmp.score(), sv_jmp)
-        cluster_keys = [ x for x, _ in y_range_tree.get_one_intervals_upwards(sv_jmp.to_start(), sv_jmp.to_end(),
-                                                                              sv_jmp.from_start_same_strand())]
+        cluster_keys = [x for x, _ in y_range_tree.get_one_intervals_upwards(sv_jmp.to_start(), sv_jmp.to_end(),
+                                                                             sv_jmp.from_start_same_strand())]
         #print("cluster_keys", cluster_keys)
         for key in cluster_keys:
             if key not in cluster_dict:
@@ -223,11 +228,11 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_db, ref_size):
             new_key = min(new_key, min(cluster_keys))
         #print("insert", new_key, cluster)
         cluster_dict[new_key] = cluster
-        if y_range_tree.bit_vec.find_zero(y_range_tree.to_new_coord_system_c(sv_jmp.to_end(), 
-                                                                             sv_jmp.from_start_same_strand()) - 1) != new_key:
-            print("inserted and found key do not match", 
-                  y_range_tree.bit_vec.find_zero(y_range_tree.to_new_coord_system_c(sv_jmp.to_end(),
-                                                                                    sv_jmp.from_start_same_strand()) - 1),
+        if y_range_tree.bit_vec.find_zero(
+                y_range_tree.to_new_coord_system_c(sv_jmp.to_end(), sv_jmp.from_start_same_strand()) - 1) != new_key:
+            print("inserted and found key do not match",
+                  y_range_tree.bit_vec.find_zero(
+                      y_range_tree.to_new_coord_system_c(sv_jmp.to_end(), sv_jmp.from_start_same_strand() ) - 1),
                   new_key)
             assert False
     def sweep_sv_end(sv_jmp):
@@ -243,22 +248,22 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_db, ref_size):
         if len(cluster_dict[key]) <= 0:
             # check for acceptance:
             if cluster_dict[key].score >= 0.3 and cluster_dict[key].max_count >= 10:
-                cluster_dict[key].from_end = from_pos
+                cluster_dict[key].from_end = sv_jmp.from_start_same_strand() + sv_jmp.from_size()
                 print("accepting", str(cluster_dict[key]))
                 accepted_sv_jumps.append(cluster_dict[key])
             y_range_tree.clear_downwards(key + 1)
             #print("del", key, cluster_dict[key])
             del cluster_dict[key]
 
-    while not sweeper.has_next_start() and not sweeper.has_next_end():
+    while sweeper.has_next_start() and sweeper.has_next_end():
         if sweeper.next_start_is_smaller():
             sweep_sv_start(sweeper.get_next_start())
         else:
             sweep_sv_end(sweeper.get_next_end())
-    while not sweeper.has_next_start():
+    while sweeper.has_next_start():
         print("something is wierd... (this line should never be reached)")
         sweep_sv_start(sweeper.get_next_start())
-    while not sweeper.has_next_end():
+    while sweeper.has_next_end():
         sweep_sv_end(sweeper.get_next_end())
     print("done sweeping")
 
