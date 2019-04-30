@@ -5,16 +5,11 @@ import sqlite3
 from MA import *
 
 
-class SvJumpCluster:
-    def __init__(self, switch_strand, from_pos, to_start, to_end, score, jump):
-        self.switch_strand = switch_strand
-        self.from_start = from_pos
-        self.to_end = to_end
+class SvCallPy:
+    def __init__(self, jump):
+        self.call = SvCall(jump)
         self.count = 1
-        self.max_count = 1
-        self.score = score
-        self.from_end = None
-        self.to_start = to_start
+        self.score = jump.score()
         self.l_right = []
         self.l_up = []
         self.l_down = []
@@ -57,14 +52,8 @@ class SvJumpCluster:
         return l_down[int(len(l_down)/50)]
 
     def join(self, other):
-        if not self.switch_strand == other.switch_strand:
-            print("CRITICAL CANNOT JOIN...")
-            return
-        self.from_start = min(self.from_start, other.from_start)
-        self.to_end = max(self.to_end, other.to_end)
-        self.to_start = min(self.to_start, other.to_start)
+        self.call.join(other.call)
         self.count += other.count
-        self.max_count += other.max_count
         self.score += other.score
         self.l_down.extend(other.l_down)
         self.l_up.extend(other.l_up)
@@ -75,7 +64,7 @@ class SvJumpCluster:
         return self.count
 
     def __str__(self):
-        return "from " + str(self.from_start) + "~" + str(self.from_end) + " to " + str(self.to_start) + "~" + str(self.to_end) + (" switch_strand" if self.switch_strand else "") + " score " + str(self.score) + " cnt " + str(self.max_count)
+        return "from " + str(self.call.from_start) + "~" + str(self.call.from_size + self.call.from_start) + " to " + str(self.call.to_start) + "~" + str(self.call.to_size + self.call.to_start) + (" switch_strand" if self.call.switch_strand else "") + " score " + str(self.score) + " cnt " + str(len(self.call.supporing_jump_ids))
 
 
 class YRangeTree:
@@ -210,8 +199,7 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_db, ref_size):
     print("sweeping...")
     #for switch_strand, from_pos, to_start, to_end, is_end, score, jmp in line_sweep_list:
     def sweep_sv_start(sv_jmp):
-        cluster = SvJumpCluster( sv_jmp.does_switch_strand(), sv_jmp.from_start_same_strand(), sv_jmp.to_start(),
-                                 sv_jmp.to_end(), sv_jmp.score(), sv_jmp)
+        cluster = SvCallPy(sv_jmp)
         cluster_keys = [x for x, _ in y_range_tree.get_one_intervals_upwards(sv_jmp.to_start(), sv_jmp.to_end(),
                                                                              sv_jmp.from_start_same_strand())]
         #print("cluster_keys", cluster_keys)
@@ -247,8 +235,7 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_db, ref_size):
         cluster_dict[key].count -= 1
         if len(cluster_dict[key]) <= 0:
             # check for acceptance:
-            if cluster_dict[key].score >= 0.3 and cluster_dict[key].max_count >= 10:
-                cluster_dict[key].from_end = sv_jmp.from_start_same_strand() + sv_jmp.from_size()
+            if cluster_dict[key].score >= 0.3 and len(cluster_dict[key].call.supporing_jump_ids) >= 10:
                 print("accepting", str(cluster_dict[key]))
                 accepted_sv_jumps.append(cluster_dict[key])
             y_range_tree.clear_downwards(key + 1)
@@ -311,31 +298,31 @@ def sv_jumps_to_dict(sv_db, accepted_sv_jumps, db_name):
                      [jump.to_pos + .5, jump.to_pos - 2.5, jump.to_pos + .5]])
 
     for jump in accepted_sv_jumps:
-        accepted_boxes_data.append([jump.from_start - 0.5,
-                                    jump.to_start - 0.5,
-                                    jump.from_end - jump.from_start + 1,
-                                    jump.to_end - jump.to_start + 1,
+        accepted_boxes_data.append([jump.call.from_start - 0.5,
+                                    jump.call.to_start - 0.5,
+                                    jump.call.from_size + 1,
+                                    jump.call.to_size + 1,
                                     0,
                                     str(jump.score)])
         if len(jump.l_right) > 0:
             accepted_lines_data.append([
-                jump.right() - 0.5, jump.to_start - 0.5,
-                0, jump.to_end - jump.to_start + 1
+                jump.right() - 0.5, jump.call.to_start - 0.5,
+                0, jump.call.to_size + 1
             ])
         if len(jump.l_left) > 0:
             accepted_lines_data.append([
-                jump.left() - 0.5, jump.to_start - 0.5,
-                0, jump.to_end - jump.to_start + 1
+                jump.left() - 0.5, jump.call.to_start - 0.5,
+                0, jump.call.to_size + 1
             ])
         if len(jump.l_up) > 0:
             accepted_lines_data.append([
-                jump.from_start - 0.5, jump.up() - 0.5,
-                jump.from_end - jump.from_start + 1, 0
+                jump.call.from_start - 0.5, jump.up() - 0.5,
+                jump.call.from_size + 1, 0
             ])
         if len(jump.l_down) > 0:
             accepted_lines_data.append([
-                jump.from_start - 0.5, jump.down() - 0.5,
-                jump.from_end - jump.from_start + 1, 0
+                jump.call.from_start - 0.5, jump.down() - 0.5,
+                jump.call.from_size + 1, 0
             ])
     conn = sqlite3.connect(db_name)
     cur = conn.cursor()
