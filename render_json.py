@@ -3,6 +3,8 @@ from bokeh.plotting import figure, show, reset_output, ColumnDataSource
 from bokeh.models import Arrow, VeeHead
 from create_json import create_json_from_db
 import json
+from MA import SV_DB
+from sweep_sv_jumps import sv_jumps_to_dict
 
 def render_from_dict(json_dict, start, end, on_y_aswell=False):
     # zip that just loops through the all shorter items, including scalars
@@ -111,12 +113,14 @@ def render_from_dict(json_dict, start, end, on_y_aswell=False):
             elif item["type"] == "plus":
                 cds = {
                     "x": [],
-                    "y": []
+                    "y": [],
+                    "i": []
                 }
-                for x, y in item["data"]:
+                for x, y, i in item["data"]:
                     x += x_offset
                     cds["x"].append(x)
                     cds["y"].append(y)
+                    cds["i"].append(i)
                 plot.cross(
                     x='x',
                     y='y',
@@ -158,6 +162,7 @@ def render_from_json(json_file_name, start, end, on_y_aswell=False):
     render_from_dict(json_dict, start, end, on_y_aswell)
 
 if __name__ == "__main__":
-    out_dict = create_json_from_db("/MAdata/databases/sv_simulated",
-                    "/MAdata/genome/human/GRCh38.p12/ma/genome")
-    render_from_dict(out_dict, 7500000, 7550000)
+    sv_db = SV_DB("/MAdata/databases/sv_simulated", "open")
+    #out_dict = create_json_from_db(sv_db, "/MAdata/genome/human/GRCh38.p12/ma/genome")
+    out_dict = sv_jumps_to_dict(sv_db, 0)
+    render_from_dict(out_dict, 7500000, 7550000, True)

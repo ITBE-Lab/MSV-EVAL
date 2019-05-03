@@ -321,6 +321,12 @@ def sv_jumps_to_dict(sv_db, run_id):
                         "data": accepted_lines_data
                     },
                     {
+                        "type": "line",
+                        "color": "black",
+                        "group": "diagonal",
+                        "data": [[0, 0, 3*10**9, 3*10**9]]
+                    },
+                    {
                         "type": "patch",
                         "color": "black",
                         "group": "all_jumps",
@@ -343,7 +349,8 @@ def sv_jumps_to_dict(sv_db, run_id):
             jump = calls_from_db.next()
             if jump.from_size == 1 and jump.to_size == 1:
                 accepted_plus_data.append([jump.from_start,
-                                            jump.to_start])
+                                            jump.to_start,
+                                            name + " " + str(jump.score)])
             else:
                 accepted_boxes_data.append([jump.from_start - 0.5,
                                             jump.to_start - 0.5,
@@ -372,17 +379,18 @@ def sv_jumps_to_dict(sv_db, run_id):
             #        jump.call.from_start - 0.5, jump.down() - 0.5,
             #        jump.call.from_size + 1, 0
             #    ])
+        c_list = ["green", "purple", "red", "magenta", "brown", "yellow"]
         sv_call_dict = {
                         "type": "box-alpha",
                         "color": "#595959",
-                        "line_color": ["green", "purple", "red"][cnt],
+                        "line_color": c_list[cnt],
                         "line_width": 3,
                         "group": "sv_calls",
                         "data": accepted_boxes_data
                     }
         sv_plus_dict = {
                         "type": "plus",
-                        "color": ["green", "purple", "red"][cnt],
+                        "color": c_list[cnt],
                         "group": "sv_calls",
                         "data": accepted_plus_data
                     }
