@@ -188,10 +188,9 @@ class WarpedBitVector:
                                                       self.to_new_coord_system_c(end, x_value))
 
 
-def sweep_sv_jumps(parameter_set_manager, conn, sv_db, ref_size):
-    accepted_sv_jumps = []
-
-    sweeper = SortedSvJumpFromSql(sv_db, 1) #@todo get id as parameter
+def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size):
+    sweeper = SortedSvJumpFromSql(sv_db, run_id)
+    call_inserter = SvCallInserter(sv_db, run_id)
     print("creating sweep list...")
 
     y_range_tree = WarpedBitVector(ref_size)
@@ -237,7 +236,7 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_db, ref_size):
             # check for acceptance:
             if cluster_dict[key].score >= 0.3 and len(cluster_dict[key].call.supporing_jump_ids) >= 10:
                 print("accepting", str(cluster_dict[key]))
-                accepted_sv_jumps.append(cluster_dict[key])
+                call_inserter.insert_call(cluster_dict[key].call)
             y_range_tree.clear_downwards(key + 1)
             #print("del", key, cluster_dict[key])
             del cluster_dict[key]
@@ -254,18 +253,15 @@ def sweep_sv_jumps(parameter_set_manager, conn, sv_db, ref_size):
         sweep_sv_end(sweeper.get_next_end())
     print("done sweeping")
 
-    return accepted_sv_jumps
 
-
-def sv_jumps_to_dict(sv_db, accepted_sv_jumps, db_name):
+def sv_jumps_to_dict(sv_db, run_id):
     forw_boxes_data = []
     sw_boxes_data = []
-    accepted_boxes_data = []
     accepted_lines_data = []
     plus_data = []
     patch_data = []
     
-    sweeper = SortedSvJumpFromSql(sv_db, 1) #@todo get id as parameter
+    sweeper = SortedSvJumpFromSql(sv_db, run_id)
     while sweeper.has_next_start():
         jump = sweeper.get_next_start()
         x = [jump.from_start_same_strand() - 0.5,
@@ -273,7 +269,7 @@ def sv_jumps_to_dict(sv_db, accepted_sv_jumps, db_name):
              jump.from_size() + 1,
              jump.to_size() + 1,
              jump.score(),
-             ""]
+             str(jump.id) + " " + str(jump.score())]
         if jump.does_switch_strand():
             sw_boxes_data.append(x)
         else:
@@ -297,44 +293,6 @@ def sv_jumps_to_dict(sv_db, accepted_sv_jumps, db_name):
                     [[jump.from_pos + 2.5, jump.from_pos - .5, jump.from_pos - .5],
                      [jump.to_pos + .5, jump.to_pos - 2.5, jump.to_pos + .5]])
 
-    for jump in accepted_sv_jumps:
-        accepted_boxes_data.append([jump.call.from_start - 0.5,
-                                    jump.call.to_start - 0.5,
-                                    jump.call.from_size + 1,
-                                    jump.call.to_size + 1,
-                                    0,
-                                    str(jump.score)])
-        if len(jump.l_right) > 0:
-            accepted_lines_data.append([
-                jump.right() - 0.5, jump.call.to_start - 0.5,
-                0, jump.call.to_size + 1
-            ])
-        if len(jump.l_left) > 0:
-            accepted_lines_data.append([
-                jump.left() - 0.5, jump.call.to_start - 0.5,
-                0, jump.call.to_size + 1
-            ])
-        if len(jump.l_up) > 0:
-            accepted_lines_data.append([
-                jump.call.from_start - 0.5, jump.up() - 0.5,
-                jump.call.from_size + 1, 0
-            ])
-        if len(jump.l_down) > 0:
-            accepted_lines_data.append([
-                jump.call.from_start - 0.5, jump.down() - 0.5,
-                jump.call.from_size + 1, 0
-            ])
-    conn = sqlite3.connect(db_name)
-    cur = conn.cursor()
-    # show actual SV crosses
-    cur.execute(
-        """ SELECT start, end
-            FROM generated_sv
-    """)
-    for start, end in cur.fetchall():
-        plus_data.append([start + 0.5, end + 0.5])
-    conn.close()
-
     out_dict = {
         "x_offset": 0,
         "panels": [
@@ -357,14 +315,6 @@ def sv_jumps_to_dict(sv_db, accepted_sv_jumps, db_name):
                         "data": sw_boxes_data
                     },
                     {
-                        "type": "box-alpha",
-                        "color": "#595959",
-                        "line_color": "green",
-                        "line_width": 3,
-                        "group": "accepted_jumps",
-                        "data": accepted_boxes_data
-                    },
-                    {
                         "type": "line",
                         "color": "green",
                         "group": "accepted_jumps",
@@ -375,16 +325,83 @@ def sv_jumps_to_dict(sv_db, accepted_sv_jumps, db_name):
                         "color": "black",
                         "group": "all_jumps",
                         "data": patch_data
-                    },
-                    {
-                        "type": "plus",
-                        "color": "red",
-                        "group": "actual_sv",
-                        "data": plus_data
                     }
                 ],
                 "h": 900
             }
         ]
     }
+
+    runs_from_db = SvCallerRunsFromDb(sv_db)
+    cnt = 0
+    while not runs_from_db.eof():
+        name = runs_from_db.name()
+        calls_from_db = SvCallsFromDb(sv_db, runs_from_db.id())
+        accepted_boxes_data = []
+        accepted_plus_data = []
+        while calls_from_db.hasNext():
+            jump = calls_from_db.next()
+            if jump.from_size == 1 and jump.to_size == 1:
+                accepted_plus_data.append([jump.from_start,
+                                            jump.to_start])
+            else:
+                accepted_boxes_data.append([jump.from_start - 0.5,
+                                            jump.to_start - 0.5,
+                                            jump.from_size + 1,
+                                            jump.to_size + 1,
+                                            0,
+                                            name + " " + str(jump.score) + " (" +
+                                            str(len(jump.supporing_jump_ids)) + ")"])
+            #if len(jump.l_right) > 0:
+            #    accepted_lines_data.append([
+            #        jump.right() - 0.5, jump.call.to_start - 0.5,
+            #        0, jump.call.to_size + 1
+            #    ])
+            #if len(jump.l_left) > 0:
+            #    accepted_lines_data.append([
+            #        jump.left() - 0.5, jump.call.to_start - 0.5,
+            #        0, jump.call.to_size + 1
+            #    ])
+            #if len(jump.l_up) > 0:
+            #    accepted_lines_data.append([
+            #        jump.call.from_start - 0.5, jump.up() - 0.5,
+            #        jump.call.from_size + 1, 0
+            #    ])
+            #if len(jump.l_down) > 0:
+            #    accepted_lines_data.append([
+            #        jump.call.from_start - 0.5, jump.down() - 0.5,
+            #        jump.call.from_size + 1, 0
+            #    ])
+        sv_call_dict = {
+                        "type": "box-alpha",
+                        "color": "#595959",
+                        "line_color": ["green", "purple", "red"][cnt],
+                        "line_width": 3,
+                        "group": "sv_calls",
+                        "data": accepted_boxes_data
+                    }
+        sv_plus_dict = {
+                        "type": "plus",
+                        "color": ["green", "purple", "red"][cnt],
+                        "group": "sv_calls",
+                        "data": accepted_plus_data
+                    }
+        cnt += 1
+        if len(accepted_boxes_data) > 0:
+            out_dict["panels"][0]["items"].append(sv_call_dict)
+        if len(accepted_plus_data) > 0:
+            out_dict["panels"][0]["items"].append(sv_plus_dict)
+        runs_from_db.next()
+
+    #conn = sqlite3.connect(db_name)
+    #cur = conn.cursor()
+    ## show actual SV crosses
+    #cur.execute(
+    #    """ SELECT start, end
+    #        FROM generated_sv
+    #""")
+    #for start, end in cur.fetchall():
+    #    plus_data.append([start + 0.5, end + 0.5])
+    #conn.close()
+
     return out_dict
