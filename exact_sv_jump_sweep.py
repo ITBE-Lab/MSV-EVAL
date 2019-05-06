@@ -1,7 +1,7 @@
 from MA import *
 from svCallPy import *
 
-def sweep_sv_jumps(sv_jmps):
+def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
     if len(sv_jmps) == 0: # sanity check
         return
     # squash sv_jump indices
@@ -82,6 +82,13 @@ def sweep_sv_jumps(sv_jmps):
         # if the cluster still fulfills the required criteria
         # @note these parameters are hardcoded in two locations @todo
         if cluster.score >= 0.3 and len(cluster.call.supporing_jump_ids) >= 5:
+            if re_estimate_cluster_size:
+                right = cluster.right()
+                up = cluster.up()
+                cluster.call.from_start = cluster.left()
+                cluster.call.to_start = cluster.down()
+                cluster.call.from_size = right - cluster.call.from_start
+                cluster.call.to_size = up - cluster.call.to_start
             ret.append(cluster)
 
     def helper_end(sv_jmp):
@@ -91,24 +98,21 @@ def sweep_sv_jumps(sv_jmps):
         # decrease the amount ef elements in the cluster
         sweep_vec[i][1].count -= 1
         # if the count hits zero check if the cluster is worth keeping
-        try:
-            if len(sweep_vec[i][1]) == 0:
+        if len(sweep_vec[i][1]) == 0:
+            try:
                 check_cluster(sweep_vec[i][1])
-        except:
-            print(pos_dict.items(), i)
-            print("x", sv_jmp.from_start(), sv_jmp.from_end(), sv_jmp.to_start(), sv_jmp.to_end())
-            for sv_jmp in sv_jmps:
-                print(sv_jmp.from_start(), sv_jmp.from_end(), sv_jmp.to_start(), sv_jmp.to_end())
-            for idx, sv_jmp in sweep_vec:
-                print(idx, sv_jmp)
-            assert False
+            except:
+                print(pos_dict.items(), i)
+                print("x", sv_jmp.from_start(), sv_jmp.from_end(), sv_jmp.to_start(), sv_jmp.to_end())
+                for sv_jmp in sv_jmps:
+                    print(sv_jmp.from_start(), sv_jmp.from_end(), sv_jmp.to_start(), sv_jmp.to_end())
+                for idx, sv_jmp in sweep_vec:
+                    print(idx, sv_jmp)
+                assert False
         # decrement the sv_jump counter
         i = pos_dict[sv_jmp.to_start()]
         while i <= pos_dict[sv_jmp.to_end()]:
             sweep_vec[i][0] -= 1
-            # @note next two lines should have no effect at all
-            if sweep_vec[i][0] == 0:
-                sweep_vec[i][1] = None
             i += 1
 
     # do the actual sweep:

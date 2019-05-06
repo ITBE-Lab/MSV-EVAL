@@ -21,6 +21,7 @@ def compare_caller(sv_db, id_a, id_b, min_score):
     rel_call_area_b = call_area_b/num_calls_b
     num_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_a, id_b, min_score, 0) # true positives
     num_almost_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_a, id_b, min_score, 100) # true positives
+    num_almost_overlaps_a_to_b -= num_overlaps_a_to_b
     num_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, 0) # how many of the sv's are detected?
     num_errors = num_calls_b - num_overlaps_b_to_a # how many of the sv's are NOT detected?
     return (num_calls_a, num_overlaps_a_to_b, num_almost_overlaps_a_to_b, num_errors, rel_call_area_a)

@@ -9,42 +9,40 @@ class SvCallPy:
         self.l_up = []
         self.l_down = []
         self.l_left = []
-        if not jump.from_fuzziness_is_rightwards():
-            self.l_left.append( (jump.from_pos, jump.query_distance()) )
+        if jump.from_fuzziness_is_rightwards():
+            # if fuzziness is rightswards, this jump indicates the left border...
+            self.l_left.append( jump.from_pos )
         else:
-            self.l_right.append( (jump.from_pos, jump.query_distance()) )
-        if not jump.to_fuzziness_is_downwards():
-            self.l_up.append( (jump.to_pos, jump.query_distance()) )
+            self.l_right.append( jump.from_pos )
+        if jump.to_fuzziness_is_downwards():
+            self.l_up.append( jump.to_pos )
         else:
-            self.l_down.append( (jump.to_pos, jump.query_distance()) )
-
-    def max_dist_list(self, l):
-        max_d = max(y for x,y in l)
-        ret = []
-        for x, y in l:
-            if max_d / 10 < y:
-                ret.append(x)
-        return ret
+            self.l_down.append( jump.to_pos )
+        self.t = 5 # confidence in clustersize optimization
 
     def right(self):
-        l_right = self.max_dist_list(self.l_right)
-        l_right.sort(reverse=True)
-        return l_right[int(len(l_right)/50)]
+        if len(self.l_right) < 3:
+            return self.call.from_size + self.call.from_start
+        self.l_right.sort()
+        return self.l_right[int(len(self.l_right)/self.t)] + 5
 
     def left(self):
-        l_left = self.max_dist_list(self.l_left)
-        l_left.sort()
-        return l_left[int(len(l_left)/50)]
+        if len(self.l_left) < 3:
+            return self.call.from_start
+        self.l_left.sort(reverse=True)
+        return self.l_left[int(len(self.l_left)/self.t)] - 5
 
     def up(self):
-        l_up = self.max_dist_list(self.l_up)
-        l_up.sort(reverse=True)
-        return l_up[int(len(l_up)/50)]
+        if len(self.l_left) < 3:
+            return self.call.to_size + self.call.to_start
+        self.l_up.sort()
+        return self.l_up[int(len(self.l_up)/self.t)] + 5
 
     def down(self):
-        l_down = self.max_dist_list(self.l_down)
-        l_down.sort()
-        return l_down[int(len(l_down)/50)]
+        if len(self.l_down) < 3:
+            return self.call.to_start
+        self.l_down.sort(reverse=True)
+        return self.l_down[int(len(self.l_down)/self.t)] - 5
 
     def join(self, other):
         self.call.join(other.call)
