@@ -1,4 +1,5 @@
 from MA import *
+import math
 
 def print_columns(data):
     col_width = [max([len(data[j][i]) for j in range(len(data))]) for i in range(len(data[0]))]
@@ -14,7 +15,7 @@ def compare_caller(sv_db, id_a, id_b, min_score):
     num_calls_b = sv_db.get_num_calls(id_b, min_score) # num actual calls
     call_area_a = sv_db.get_call_area(id_a, min_score)
     if num_calls_a > 0:
-        rel_call_area_a = call_area_a/num_calls_a
+        rel_call_area_a = math.sqrt(call_area_a/num_calls_a) # get the edge length
     else:
         rel_call_area_a = 0
     call_area_b = sv_db.get_call_area(id_b, min_score)
@@ -30,7 +31,7 @@ def compare_callers(db_name, names_a, names_b=["simulated sv"], min_scores=[0]):
     sv_db = SV_DB(db_name, "open")
     #print("sensitivity = true positive rate = recall")
     #print("missing rate = how many calls are missing")
-    print("test set", "ground truth", "min score", "#calls", "#found", "#almost", "#missed", "call-area", sep="\t")
+    print("test set", "ground truth", "min score", "#calls", "#found", "#almost", "#missed", "fuzziness", sep="\t")
     for name_a, name_b in zip(names_a, names_b):
         id_a = sv_db.get_run_id(name_a)
         id_b = sv_db.get_run_id(name_b)
@@ -47,7 +48,7 @@ def compare_all_callers_against(db_name, name_b="simulated sv", min_scores=[0]):
     #print("sensitivity = true positive rate = recall")
     #print("missing rate = how many calls are missing")
     print("ground truth is: ", name_b, "-", date_b)
-    out = [["test set", "time", "t", "#calls", "#found", "#almost", "#missed", "call-area"]]
+    out = [["test set", "time", "t", "#calls", "#found", "#almost", "#missed", "fuzziness"]]
     id_a = 0
     keep_looping = sv_db.get_num_runs()
     while keep_looping > 1:
@@ -69,4 +70,4 @@ def compare_all_callers_against(db_name, name_b="simulated sv", min_scores=[0]):
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    compare_all_callers_against("/MAdata/databases/sv_simulated", min_scores=[10])
+    compare_all_callers_against("/MAdata/databases/sv_simulated", min_scores=[0])

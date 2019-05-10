@@ -20,11 +20,11 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db):
     for _ in range(parameter_set_manager.get_num_threads()):
         queries_pledge = promise_me(lock_module, promise_me(nuc_seq_getter))
         segments_pledge = promise_me(seeding_module, fm_pledge, queries_pledge)
-        jumps_pledge = promise_me(jumps_from_seeds, segments_pledge, pack_pledge, fm_pledge)
+        jumps_pledge = promise_me(jumps_from_seeds, segments_pledge, pack_pledge, fm_pledge, queries_pledge)
         write_to_db_pledge = promise_me(jumps_to_db, jumps_pledge, queries_pledge)
         unlock_pledge = promise_me(UnLock(parameter_set_manager, queries_pledge), write_to_db_pledge)
         res.append(unlock_pledge)
-    res.simultaneous_get(1 )#parameter_set_manager.get_num_threads()) @todo check for parallel bug...
+    res.simultaneous_get( 1 )#parameter_set_manager.get_num_threads()) @todo check for parallel bug...
     sv_db.create_caller_indices()
 
     # return the run_id

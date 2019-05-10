@@ -9,38 +9,43 @@ class SvCallPy:
         self.l_up = []
         self.l_down = []
         self.l_left = []
+        self.del_to_ins_ratio = 1
         if jump.from_fuzziness_is_rightwards():
             # if fuzziness is rightswards, this jump indicates the left border...
             self.l_left.append( jump.from_pos )
+            x = jump.from_pos + int(min( jump.ref_distance() / self.del_to_ins_ratio,
+                                     jump.query_distance() * self.del_to_ins_ratio ))
+            self.l_right.append( x )
         else:
             self.l_right.append( jump.from_pos )
+            x = jump.from_pos - int(min( jump.ref_distance() / self.del_to_ins_ratio,
+                                     jump.query_distance() * self.del_to_ins_ratio ))
+            self.l_left.append( x )
         if jump.to_fuzziness_is_downwards():
             self.l_up.append( jump.to_pos )
+            x = jump.to_pos - int(min( jump.ref_distance() / self.del_to_ins_ratio,
+                                     jump.query_distance() * self.del_to_ins_ratio ))
+            self.l_down.append( x )
         else:
             self.l_down.append( jump.to_pos )
+            x = jump.to_pos + int(min( jump.ref_distance() / self.del_to_ins_ratio,
+                                     jump.query_distance() * self.del_to_ins_ratio ))
+            self.l_up.append( x )
         self.t = 5 # confidence in clustersize optimization
 
     def right(self):
-        if len(self.l_right) < 3:
-            return self.call.from_size + self.call.from_start
         self.l_right.sort()
         return self.l_right[int(len(self.l_right)/self.t)] + 5
 
     def left(self):
-        if len(self.l_left) < 3:
-            return self.call.from_start
         self.l_left.sort(reverse=True)
         return self.l_left[int(len(self.l_left)/self.t)] - 5
 
     def up(self):
-        if len(self.l_left) < 3:
-            return self.call.to_size + self.call.to_start
         self.l_up.sort()
         return self.l_up[int(len(self.l_up)/self.t)] + 5
 
     def down(self):
-        if len(self.l_down) < 3:
-            return self.call.to_start
         self.l_down.sort(reverse=True)
         return self.l_down[int(len(self.l_down)/self.t)] - 5
 

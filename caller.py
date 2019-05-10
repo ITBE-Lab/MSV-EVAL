@@ -5,6 +5,7 @@ from render_json import render_from_dict
 from create_json import create_json_from_db
 import sqlite3
 import os
+import json
 
 class Caller():
     def __init__(self, db_name, pack, fm_index, parameter_set_manager=ParameterSetManager()):
@@ -48,7 +49,10 @@ if __name__ == "__main__":
     caller = Caller("/MAdata/databases/sv_simulated", pack, fm_index)
     sv_db, run_id = caller.call()
     
-    render_from_dict(sv_jumps_to_dict(sv_db, run_id), 7500000, 7550000, True)
+    out_dict = sv_jumps_to_dict(sv_db, run_id)
+    #with open("/MAdata/tmp/sv_diagramm.json", "w") as json_out:
+    #    json.dump(out_dict, json_out)
+    render_from_dict(out_dict, 7500000, 7550000, True)
     
     # display the result
     out_dict = create_json_from_db(sv_db, "/MAdata/genome/human/GRCh38.p12/ma/genome")
