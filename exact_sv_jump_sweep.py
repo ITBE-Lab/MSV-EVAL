@@ -2,13 +2,16 @@ from MA import *
 from svCallPy import *
 
 def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
+    def to_end(sv_jmp):
+        return sv_jmp.to_end() if sv_jmp.switch_strand_known() else sv_jmp.to_start() + sv_jmp.from_size()
+
     if len(sv_jmps) == 0: # sanity check
         return
     # squash sv_jump indices
     pos_list = []
     for sv_jmp in sv_jmps:
         pos_list.append(sv_jmp.to_start())
-        pos_list.append(sv_jmp.to_end())
+        pos_list.append(to_end(sv_jmp))
     pos_list.sort()
     pos_dict = {}
     idx = 0
@@ -37,9 +40,11 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
     # define linesweep helpers
     def helper_start(sv_jmp):
         cluster = SvCallPy(sv_jmp)
+        if not sv_jmp.switch_strand_known():
+            cluster.call.to_size = sv_jmp.from_size() + 1
         # join with all overlapping clusters
         i = pos_dict[sv_jmp.to_start()]
-        while i <= pos_dict[sv_jmp.to_end()]:
+        while i <= pos_dict[to_end(sv_jmp)]:
             if sweep_vec[i][0] > 0:
                 cluster.join(sweep_vec[i][1])
                 # we can jump to the end of the discovered cluster immediately
@@ -51,15 +56,15 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
             if sweep_vec[i][1] == sweep_vec[pos_dict[sv_jmp.to_start()]][1]:
                 sweep_vec[i][1] = cluster
             i += 1
-        i = pos_dict[sv_jmp.to_end()] + 1
+        i = pos_dict[to_end(sv_jmp)] + 1
         while i <= pos_dict[cluster.call.to_size + cluster.call.to_start - 1]:
-            if sweep_vec[i][1] == sweep_vec[pos_dict[sv_jmp.to_end()]][1]:
+            if sweep_vec[i][1] == sweep_vec[pos_dict[to_end(sv_jmp)]][1]:
                 sweep_vec[i][1] = cluster
             i += 1
 
         # increment the sv_jump counter and insert the cluster overlapping with the current
         i = pos_dict[sv_jmp.to_start()]
-        while i <= pos_dict[sv_jmp.to_end()]:
+        while i <= pos_dict[to_end(sv_jmp)]:
             sweep_vec[i][0] += 1
             sweep_vec[i][1] = cluster
             i += 1
@@ -81,14 +86,14 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
 
         # if the cluster still fulfills the required criteria
         # @note these parameters are hardcoded in two locations @todo
-        if cluster.score >= 0.3 and len(cluster.call.supporing_jump_ids) >= 5:
+        if cluster.score >= 5 and len(cluster.call.supporing_jump_ids) >= 5:
             if re_estimate_cluster_size:
                 right = cluster.right()
                 up = cluster.up()
                 cluster.call.from_start = cluster.left()
                 cluster.call.to_start = cluster.down()
-                cluster.call.from_size = right - cluster.call.from_start
-                cluster.call.to_size = up - cluster.call.to_start
+                cluster.call.from_size = max(right - cluster.call.from_start, 1)
+                cluster.call.to_size = max(1, up - cluster.call.to_start)
             ret.append(cluster)
 
     def helper_end(sv_jmp):
@@ -103,15 +108,15 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
                 check_cluster(sweep_vec[i][1])
             except:
                 print(pos_dict.items(), i)
-                print("x", sv_jmp.from_start(), sv_jmp.from_end(), sv_jmp.to_start(), sv_jmp.to_end())
+                print("x", sv_jmp.from_start(), sv_jmp.from_end(), sv_jmp.to_start(), to_end(sv_jmp))
                 for sv_jmp in sv_jmps:
-                    print(sv_jmp.from_start(), sv_jmp.from_end(), sv_jmp.to_start(), sv_jmp.to_end())
+                    print(sv_jmp.from_start(), sv_jmp.from_end(), sv_jmp.to_start(), to_end(sv_jmp))
                 for idx, sv_jmp in sweep_vec:
                     print(idx, sv_jmp)
                 assert False
         # decrement the sv_jump counter
         i = pos_dict[sv_jmp.to_start()]
-        while i <= pos_dict[sv_jmp.to_end()]:
+        while i <= pos_dict[to_end(sv_jmp)]:
             sweep_vec[i][0] -= 1
             i += 1
 
@@ -135,10 +140,15 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
 
     return ret
 
+#
+# @todo problem: illumina reads have a insert ratio '> remaining query distance'
+# this should mean that they get added to each cluster that matches that
+# -> implement that
 def sweep_sv_call(sv_call):
     # single linkage clustering for jump distances
     # we call sweep_sv_jumps for all insert_ratio clusters with a max dist of max_insert_ratio_diff
     max_insert_ratio_diff = 500
+    max_q_len = 200
 
     sv_jmps = [sv_call.call.get_jump(x) for x in range(len(sv_call.call.supporing_jump_ids))]
     sv_jmps.sort(key=lambda x: x.insert_ratio())

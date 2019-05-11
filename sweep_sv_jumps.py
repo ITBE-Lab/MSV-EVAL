@@ -137,8 +137,8 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size):
     print("sweeping...")
     #for switch_strand, from_pos, to_start, to_end, is_end, score, jmp in line_sweep_list:
     def sweep_sv_start(sv_jmp):
-        if not sv_jmp.switch_strand_known():
-            return # @todo
+        #if not sv_jmp.switch_strand_known():
+        #    return # @todo
         cluster = SvCallPy(sv_jmp)
         cluster_keys = [x for x, _ in y_range_tree.get_one_intervals_upwards(sv_jmp.to_start(), sv_jmp.to_end(),
                                                                              sv_jmp.from_start_same_strand())]
@@ -164,8 +164,8 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size):
                   new_key)
             assert False
     def sweep_sv_end(sv_jmp):
-        if not sv_jmp.switch_strand_known():
-            return # @todo
+        #if not sv_jmp.switch_strand_known():
+        #    return # @todo
         key = y_range_tree.find_zero(sv_jmp.to_start(), sv_jmp.from_start_same_strand())
         if key not in cluster_dict:
             print("CRITICAL:", key, "not in dict")
@@ -201,7 +201,8 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size):
 
 def sv_jumps_to_dict(sv_db, run_id):
     forw_boxes_data = []
-    unknown_boxes_data = []
+    unknown_boxes_data_a = []
+    unknown_boxes_data_b = []
     sw_boxes_data = []
     accepted_lines_data = []
     plus_data = []
@@ -210,35 +211,22 @@ def sv_jumps_to_dict(sv_db, run_id):
     sweeper = SortedSvJumpFromSql(sv_db, run_id)
     while sweeper.has_next_start():
         jump = sweeper.get_next_start()
+        x = [jump.from_start_same_strand() - 0.5,
+                jump.to_start() - 0.5,
+                jump.from_size() + 1,
+                jump.to_size() + 1,
+                jump.score(),
+                str(jump.id) + " " + str(jump.score())]
         if jump.switch_strand_known():
-            x = [jump.from_start_same_strand() - 0.5,
-                 jump.to_start() - 0.5,
-                 jump.from_size() + 1,
-                 jump.to_size() + 1,
-                 jump.score(),
-                 str(jump.id) + " " + str(jump.score())]
             if jump.does_switch_strand():
                 sw_boxes_data.append(x)
             else:
                 forw_boxes_data.append(x)
         else:
             if jump.from_known():
-                x = [jump.from_start_same_strand() - 0.5,
-                     jump.from_start_same_strand() - 0.5,
-                     jump.query_distance() + 1,
-                     jump.query_distance() + 1,
-                     jump.score(),
-                     str(jump.id) + " " + str(jump.score())]
-            elif jump.to_known():
-                x = [jump.to_start() - 0.5,
-                     jump.to_start() - 0.5,
-                     jump.query_distance() + 1,
-                     jump.query_distance() + 1,
-                     jump.score(),
-                     str(jump.id) + " " + str(jump.score())]
+                unknown_boxes_data_a.append(x)
             else:
-                assert False
-            unknown_boxes_data.append(x)
+                unknown_boxes_data_b.append(x)
         f = jump.from_pos
         t = jump.to_pos
         if not jump.from_known():
@@ -283,7 +271,15 @@ def sv_jumps_to_dict(sv_db, run_id):
                         "line_color": "grey",
                         "line_width": 3,
                         "group": "all_jumps",
-                        "data": unknown_boxes_data
+                        "data": unknown_boxes_data_a
+                    },
+                    {
+                        "type": "box-alpha",
+                        "color": "yellow",
+                        "line_color": "yellow",
+                        "line_width": 3,
+                        "group": "all_jumps",
+                        "data": unknown_boxes_data_b
                     },
                     {
                         "type": "box-alpha",

@@ -10,25 +10,31 @@ class SvCallPy:
         self.l_down = []
         self.l_left = []
         self.del_to_ins_ratio = 1
+        f = jump.from_pos
+        t = jump.to_pos
+        if not jump.from_known():
+            f = t
+        if not jump.to_known():
+            t = f
         if jump.from_fuzziness_is_rightwards():
             # if fuzziness is rightswards, this jump indicates the left border...
-            self.l_left.append( jump.from_pos )
-            x = jump.from_pos + int(min( jump.ref_distance() / self.del_to_ins_ratio,
+            self.l_left.append( f )
+            x = f + int(min( jump.ref_distance() / self.del_to_ins_ratio,
                                      jump.query_distance() * self.del_to_ins_ratio ))
             self.l_right.append( x )
         else:
-            self.l_right.append( jump.from_pos )
-            x = jump.from_pos - int(min( jump.ref_distance() / self.del_to_ins_ratio,
+            self.l_right.append( f )
+            x = f - int(min( jump.ref_distance() / self.del_to_ins_ratio,
                                      jump.query_distance() * self.del_to_ins_ratio ))
             self.l_left.append( x )
         if jump.to_fuzziness_is_downwards():
-            self.l_up.append( jump.to_pos )
-            x = jump.to_pos - int(min( jump.ref_distance() / self.del_to_ins_ratio,
+            self.l_up.append( t )
+            x = t - int(min( jump.ref_distance() / self.del_to_ins_ratio,
                                      jump.query_distance() * self.del_to_ins_ratio ))
             self.l_down.append( x )
         else:
-            self.l_down.append( jump.to_pos )
-            x = jump.to_pos + int(min( jump.ref_distance() / self.del_to_ins_ratio,
+            self.l_down.append( t )
+            x = t + int(min( jump.ref_distance() / self.del_to_ins_ratio,
                                      jump.query_distance() * self.del_to_ins_ratio ))
             self.l_up.append( x )
         self.t = 5 # confidence in clustersize optimization
