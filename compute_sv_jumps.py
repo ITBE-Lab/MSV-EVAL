@@ -4,8 +4,13 @@ import sqlite3
 import math
 
 def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db):
+    parameter_set_manager.by_name("Mean Distance of Paired Reads").set(50) # @todo sample this...
     sv_db.drop_caller_indices()
-    nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db)
+    nuc_seq_getter = None
+    if parameter_set_manager.by_name("Do Mate Jumps").get():
+        nuc_seq_getter = NucSeqFromSql(parameter_set_manager, sv_db)
+    else:
+        nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db)
     lock_module = Lock(parameter_set_manager)
     seeding_module = BinarySeeding(parameter_set_manager)
     jumps_from_seeds = SvJumpsFromSeeds(parameter_set_manager)
@@ -17,6 +22,7 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db):
     pack_pledge.set(pack)
 
     res = VectorPledge()
+    # graph for single reads
     for _ in range(parameter_set_manager.get_num_threads()):
         queries_pledge = promise_me(lock_module, promise_me(nuc_seq_getter))
         segments_pledge = promise_me(seeding_module, fm_pledge, queries_pledge)
@@ -24,6 +30,26 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db):
         write_to_db_pledge = promise_me(jumps_to_db, jumps_pledge, queries_pledge)
         unlock_pledge = promise_me(UnLock(parameter_set_manager, queries_pledge), write_to_db_pledge)
         res.append(unlock_pledge)
+    
+    # graph for paired reads
+    if parameter_set_manager.by_name("Do Mate Jumps").get():
+        paired_nuc_seq_getter = PairedNucSeqFromSql(parameter_set_manager, sv_db)
+        paired_jumps_from_seeds = SvJumpsFromSeedsPaired(parameter_set_manager)
+        module_get_first = GetFirstQuery(parameter_set_manager)
+        module_get_second = GetSecondQuery(parameter_set_manager)
+        for _ in range(parameter_set_manager.get_num_threads()):
+            queries_pledge = promise_me(lock_module, promise_me(paired_nuc_seq_getter))
+            query_a_pledge = promise_me(module_get_first, queries_pledge)
+            query_b_pledge = promise_me(module_get_second, queries_pledge)
+            segments_a_pledge = promise_me(seeding_module, fm_pledge, query_a_pledge)
+            segments_b_pledge = promise_me(seeding_module, fm_pledge, query_b_pledge)
+            jumps_pledge = promise_me(paired_jumps_from_seeds, segments_a_pledge, segments_b_pledge, pack_pledge, 
+                                    fm_pledge, query_a_pledge, query_b_pledge)
+            write_to_db_pledge = promise_me(jumps_to_db, jumps_pledge, query_a_pledge) # @todo atm paired read jumps just get assigned to the first one...
+            unlock_pledge = promise_me(UnLock(parameter_set_manager, queries_pledge), write_to_db_pledge)
+            res.append(unlock_pledge)
+
+    # drain all sources
     res.simultaneous_get( 1 )#parameter_set_manager.get_num_threads()) @todo check for parallel bug...
     sv_db.create_caller_indices()
 
