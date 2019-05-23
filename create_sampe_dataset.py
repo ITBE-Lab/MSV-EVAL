@@ -7,14 +7,16 @@ import json
 def create_illumina_reads_dwgsim(sequenced_genome_pack, sequenced_genome_path, database, reads_folder, json_info_file,
                                  coverage, name, read_length):
     json_info_file["read_length"] = read_length
+    reads1 = reads_folder + name + ".bwa.read1.fastq.gz"
+    reads2 = reads_folder + name + ".bwa.read2.fastq.gz"
+    json_info_file["fasta_file"] = reads1
+    json_info_file["fasta_file_mate"] = reads2
 
     dwgsim = "~/workspace/DWGSIM/dwgsim"
     command = dwgsim + " -1 " + str(read_length) + " -2 " + str(read_length) + \
         " -C " + str(coverage) + " " + sequenced_genome_path + " " + reads_folder + name
-    os.system(command)
+    os.system(command + " >/dev/null 2>&1")
     
-    reads1 = reads_folder + name + ".bwa.read1.fastq.gz"
-    reads2 = reads_folder + name + ".bwa.read2.fastq.gz"
     reader = PairedFileReader(ParameterSetManager(), [libMA.path(reads1)], [libMA.path(reads2)])
 
     counter = 0
@@ -27,16 +29,18 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, sequenced_genome_path, d
         counter += 1
 
 def create_reads_survivor(sequenced_genome_pack, sequenced_genome_path, database, reads_folder, json_info_file,
-                          coverage, name, error_profile):
+                          coverage, name, error_profile, technology):
     json_info_file["error_profile"] = error_profile
+    json_info_file["technology"] = technology
+    reads1 = reads_folder + name + ".fasta"
+    json_info_file["fasta_file"] = reads1
 
     survivor = "~/workspace/SURVIVOR/Debug/SURVIVOR simreads "
     command = survivor + sequenced_genome_path + " " + error_profile + " " + str(coverage) + " " \
-              + reads_folder + name + ".fasta"
+              + reads1
 
-    os.system(command)
+    os.system(command + " >/dev/null 2>&1")
     
-    reads1 = reads_folder + name + ".fasta"
     reader = FileReader(ParameterSetManager(), libMA.path(reads1))
 
     counter = 0
@@ -100,14 +104,15 @@ def create_separate_svs(pack, database, json_info_file, sv_func, sv_size, sv_mar
 #       def create_reads_func(sequenced_genome_pack, sequenced_genome_path, database, reads_folder,
 #                             json_info_file, coverage, name)
 #
-def create_dataset(reference_pack_path, reference_fasta_path, dataset_name, create_svs_func,
+def create_dataset(reference_path, dataset_name, create_svs_func,
                    create_reads_funcs, coverages):
     os.mkdir("/MAdata/sv_datasets/" + dataset_name) # this throws an error if the dataset already exists
     os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/reads")
+    os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/alignments")
+    os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/calls")
 
     json_info_file = {
-        "reference_pack_path": reference_pack_path,
-        "reference_fasta_path": reference_fasta_path,
+        "reference_path": reference_path,
         "create_svs_func": create_svs_func[0].__name__,
         "create_reads_funcs": [],
         "version": 1
@@ -119,7 +124,7 @@ def create_dataset(reference_pack_path, reference_fasta_path, dataset_name, crea
     # create the sv_db
     database = SV_DB("/MAdata/sv_datasets/" + dataset_name + "/svs.db", "create")
     ref_pack = Pack()
-    ref_pack.load(reference_pack_path)
+    ref_pack.load(reference_path + "/ma/genome")
 
     # create the svs
     caller_id = create_svs_func[0](ref_pack, database, json_info_file, *create_svs_func[1])
@@ -149,6 +154,7 @@ def create_dataset(reference_pack_path, reference_fasta_path, dataset_name, crea
     for create_reads_func, name, create_reads_args in create_reads_funcs:
         for coverage in coverages:
             name_c = name + "-" + str(coverage) + "x"
+            print(name_c, "...")
             json_info_file_sub = {
                 "func_name": create_reads_func.__name__,
                 "name": name_c,
@@ -171,12 +177,11 @@ def create_dataset(reference_pack_path, reference_fasta_path, dataset_name, crea
 if __name__ == "__main__":
     survivor_error_profile_pac_b = "~/workspace/SURVIVOR/HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
-    create_dataset("/MAdata/genome/random/ma/genome",
-                   "/MAdata/genome/random/fasta/genome.fna",
+    create_dataset("/MAdata/genome/random",
                    "small_test_1",
-                   ( create_separate_svs, ( (sv_deletion, tuple()), 1000, 100 ) ),
+                   ( create_separate_svs, ( (sv_deletion, tuple()), 100, 1000 ) ),
                    [(create_illumina_reads_dwgsim, "illumina-150nt", (150,)),
                     (create_illumina_reads_dwgsim, "illumina-250nt", (250,)),
-                    (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b,)),
-                    (create_reads_survivor, "ont", (survivor_error_profile_ont,))],
+                    #(create_reads_survivor, "ont", (survivor_error_profile_ont, "ont")),
+                    (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
                    [5, 10, 25, 50])
