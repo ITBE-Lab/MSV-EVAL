@@ -2,9 +2,10 @@ from MA import *
 import math
 import os
 import json
+import compute_sv_jumps
+import sweep_sv_jumps
 
-
-def create_alignments_if_necessary(dataset_name, json_dict):
+def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index):
     def bwa_paired(read_set, sam_file_path):
         index_str = json_dict["reference_path"] + "/bwa/genome"
         os.system("~/workspace/bwa/bwa mem -t 32 " + index_str + " " + read_set["fasta_file"] + " "
@@ -32,7 +33,6 @@ def create_alignments_if_necessary(dataset_name, json_dict):
         os.system("~/workspace/ngmlr/bin/ngmlr-0.2.8/ngmlr -r " + index_str + " -q "
                   + read_set["fasta_file"] + " -t 32 -x " + presetting + " > " + sam_file_path + " 2> /dev/null")
 
-
     alignment_calls = {
         "create_reads_survivor": [minimap2, ngmlr],
         "create_illumina_reads_dwgsim": [bwa_paired]
@@ -41,6 +41,12 @@ def create_alignments_if_necessary(dataset_name, json_dict):
     for read_set in json_dict["create_reads_funcs"]:
         if not "alignments" in read_set:
             read_set["alignments"] = []
+        if not "jump_id" in read_set:
+            print("computing jumps for MA-SV on", read_set["name"])
+            db.drop_jump_indices() # @todo should work with partial indices here
+
+            read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(ParameterSetManager(), fm_index, pack, db, 
+                                                                    read_set["seq_id"])
         for alignment_call in alignment_calls[read_set["func_name"]]:
             sam_file_path = "/MAdata/sv_datasets/" + dataset_name + "/alignments/" \
                           + read_set["name"] + "." + alignment_call.__name__
@@ -61,6 +67,7 @@ def create_alignments_if_necessary(dataset_name, json_dict):
             os.system(sort_cmd + " 2> /dev/null")
             index_cmd = sam_tools_pref + "index " + sam_file_path + ".sorted.bam > " + sam_file_path + ".sorted.bam.bai"
             os.system(index_cmd)
+    db.create_jump_indices() # @todo should work with partial indices here
 
 def vcf_parser(file_name):
     with open(file_name, "r") as vcf_file:
@@ -89,8 +96,7 @@ def vcf_parser(file_name):
 
 def vcf_to_db(name, sv_db, file_name, pack):
     sv_db.clear_calls_table_for_caller(name)
-    run_id = SvJumpInserter(sv_db, name, "no desc").sv_caller_run_id
-    call_inserter = SvCallInserter(sv_db, run_id)
+    call_inserter = SvCallInserter(sv_db, name, "no desc")
     num_calls = 0
     for call in vcf_parser(file_name):
         num_calls += 1
@@ -101,8 +107,8 @@ def vcf_to_db(name, sv_db, file_name, pack):
             call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, float('inf')))
         elif call["ALT"] == "<DEL>" and "IMPRECISE" in call["INFO"]:
             #print(call)
-            std_from = int(float(call["INFO"]["STD_quant_start"]))
-            std_to = int(float(call["INFO"]["STD_quant_stop"]))
+            std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
+            std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
             to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
             call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, float('inf')))
@@ -143,6 +149,14 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
         for sv_call in sv_calls:
             if not sv_call.__name__ in read_set["calls"]:
                 read_set["calls"].append(sv_call.__name__)
+            
+            # MA-SV
+            if not "MA_SV" in read_set["calls"]:
+                read_set["calls"].append("MA_SV")
+            print("creating calls for", read_set["name"], "MA_SV")
+            sweep_sv_jumps.sweep_sv_jumps(ParameterSetManager(), db, read_set["jump_id"], 
+                                          pack.unpacked_size_single_strand, read_set["name"] + "." + "MA_SV")
+
             for alignment in read_set["alignments"]:
                 vcf_file_path = "/MAdata/sv_datasets/" + dataset_name + "/calls/" \
                         + read_set["name"] + "." + alignment + "." + sv_call.__name__ + ".vcf"
@@ -204,12 +218,7 @@ def compare_all_callers_against(sv_db, name_b="simulated sv", min_scores=[0]):
     #print("missing rate = how many calls are missing")
     print("ground truth is: ", name_b, "-", date_b)
     out = [["test set", "time", "t", "#calls", "#found", "#almost", "#missed", "fuzziness"]]
-    id_a = 0
-    keep_looping = sv_db.get_num_runs()
-    while keep_looping > 1:
-        id_a += 1
-        if not sv_db.run_exists(id_a):
-            continue
+    for id_a in sv_db.newest_unique_runs(3):
         if id_a == id_b:
             continue
         name_a = sv_db.get_run_name(id_a)
@@ -217,7 +226,6 @@ def compare_all_callers_against(sv_db, name_b="simulated sv", min_scores=[0]):
         for min_score in min_scores:
             out.append([name_a, date_a, str(min_score), 
                         *(str(x) for x in compare_caller(sv_db, id_a, id_b, min_score))])
-        keep_looping -= 1
     print_columns(out)
 
 
@@ -240,22 +248,23 @@ def analyze_sample_dataset(dataset_name):
     with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "r") as json_file:
         json_info_file = json.loads(json_file.read(), object_hook=_decode)
 
+    # create the calls
+    db = SV_DB("/MAdata/sv_datasets/" + dataset_name + "/svs.db", "open")
+    pack = Pack()
+    pack.load(json_info_file["reference_path"] + "/ma/genome")
+    fm_index = FMIndex()
+    fm_index.load(json_info_file["reference_path"] + "/ma/genome")
+
     # create alignment files if they do not exist
-    create_alignments_if_necessary(dataset_name, json_info_file)
+    create_alignments_if_necessary(dataset_name, json_info_file, db, pack, fm_index)
     # save the info.json file
     print(json_info_file)
     with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "w") as json_out:
         json.dump(json_info_file, json_out)
 
 
-    # create the calls
-    db = SV_DB("/MAdata/sv_datasets/" + dataset_name + "/svs.db", "open")
-    pack = Pack()
-    pack.load(json_info_file["reference_path"] + "/ma/genome")
 
     run_callers_if_necessary(dataset_name, json_info_file, db, pack)
-
-    db.create_caller_indices()
 
     # save the info.json file
     print(json_info_file)

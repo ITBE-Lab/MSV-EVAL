@@ -3,15 +3,15 @@ from MA import *
 import sqlite3
 import math
 
-def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db):
+def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0):
     parameter_set_manager.by_name("Mean Distance of Paired Reads").set(500) # @todo sample this...
-    parameter_set_manager.by_name("Do Mate Jumps").set(True)
+    parameter_set_manager.by_name("Do Mate Jumps").set(False)
     sv_db.drop_caller_indices()
     nuc_seq_getter = None
     if parameter_set_manager.by_name("Do Mate Jumps").get():
-        nuc_seq_getter = NucSeqFromSql(parameter_set_manager, sv_db)
+        nuc_seq_getter = NucSeqFromSql(parameter_set_manager, sv_db, seq_id)
     else:
-        nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db)
+        nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db, seq_id)
     lock_module = Lock(parameter_set_manager)
     seeding_module = BinarySeeding(parameter_set_manager)
     jumps_from_seeds = SvJumpsFromSeeds(parameter_set_manager)
@@ -35,7 +35,8 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db):
     
     # graph for paired reads
     if parameter_set_manager.by_name("Do Mate Jumps").get():
-        paired_nuc_seq_getter = PairedNucSeqFromSql(parameter_set_manager, sv_db)
+        print("WARNING: doing paired read jumps")
+        paired_nuc_seq_getter = PairedNucSeqFromSql(parameter_set_manager, sv_db, seq_id)
         paired_jumps_from_seeds = SvJumpsFromSeedsPaired(parameter_set_manager)
         module_get_first = GetFirstQuery(parameter_set_manager)
         module_get_second = GetSecondQuery(parameter_set_manager)
@@ -57,5 +58,5 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db):
     sv_db.create_caller_indices()
 
     # return the run_id
-    return jumps_to_db.cpp_module.jump_inserter.sv_caller_run_id
+    return jumps_to_db.cpp_module.jump_inserter.sv_jump_run_id
 

@@ -21,6 +21,7 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, sequenced_genome_path, d
 
     counter = 0
     inserter = ReadInserter(database, name)
+    json_info_file["seq_id"] = inserter.sequencer_id
     while not reader.is_finished():
         reads = reader.execute()
         reads[0].name = "paired_read_prim_" + str(counter)
@@ -45,6 +46,7 @@ def create_reads_survivor(sequenced_genome_pack, sequenced_genome_path, database
 
     counter = 0
     inserter = ReadInserter(database, name)
+    json_info_file["seq_id"] = inserter.sequencer_id
     while not reader.is_finished():
         read = reader.execute()
         read.name = "read_" + str(counter)
@@ -91,13 +93,12 @@ def create_separate_svs(pack, database, json_info_file, sv_func, sv_size, sv_mar
     json_info_file["sv_margin"] = sv_margin
     json_info_file["sv_func"] = sv_func[0].__name__
 
-    caller_id = SvJumpInserter(database, "simulated sv", "the sv's that were simulated").sv_caller_run_id
-    sv_inserter = SvCallInserter(database, caller_id)
+    sv_inserter = SvCallInserter(database, "simulated sv", "the sv's that were simulated")
 
     for s, l in zip(pack.contigStarts(), pack.contigLengths()):
         for pos in range(s + sv_margin, s + l - sv_margin, sv_size + sv_margin):
             sv_func[0](sv_inserter, pos, sv_size, *sv_func[1])
-    return caller_id
+    return sv_inserter.sv_caller_run_id
 ##
 # create_svs_func signature: def create_svs_func(pack, database, json_info_file) -> caller_id
 # create_reads_funcs is a list of functions with the signature: 

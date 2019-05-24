@@ -66,7 +66,8 @@ class YRangeTree:
 
 class WarpedBitVector:
     def __init__(self, size, warp_factor=5000, center_strip_up=5000, center_strip_down=1000):
-        self.physical_size = int((size - center_strip_up) / warp_factor + (size - center_strip_down) / warp_factor)
+        self.physical_size = math.ceil(   max(0, size - center_strip_up) / warp_factor 
+                                        + max(0, size - center_strip_down) / warp_factor)
         self.physical_size += center_strip_up + center_strip_down + 1
         print("physical size:", self.physical_size / (8*10**9), "gb")
         self.bit_vec = YRangeTree(self.physical_size)
@@ -127,9 +128,9 @@ class WarpedBitVector:
                                                       self.to_new_coord_system_c(end, x_value))
 
 
-def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size):
+def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name):
     sweeper = SortedSvJumpFromSql(sv_db, run_id)
-    call_inserter = SvCallInserter(sv_db, run_id)
+    call_inserter = SvCallInserter(sv_db, name, "The python implementation of the sv caller")
     print("creating sweep list...")
 
     y_range_tree = WarpedBitVector(ref_size)

@@ -1,5 +1,7 @@
 from MA import *
 from svCallPy import *
+from bokeh.plotting import figure, show, reset_output, ColumnDataSource
+PRINTS = False
 
 def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
     def to_end(sv_jmp):
@@ -9,7 +11,11 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
         return
     # squash sv_jump indices
     pos_list = []
+    if PRINTS:
+        print("==================")
     for sv_jmp in sv_jmps:
+        if PRINTS:
+            print(sv_jmp.from_start(), sv_jmp.to_start(), sv_jmp.from_end(), sv_jmp.to_end())
         pos_list.append(sv_jmp.to_start())
         pos_list.append(to_end(sv_jmp))
     pos_list.sort()
@@ -34,7 +40,7 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
 
     # setup sweep vector
     sweep_vec = []
-    for _ in range(idx+1):
+    for _ in range(idx):
         sweep_vec.append([0,None])
 
     # define linesweep helpers
@@ -44,21 +50,27 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
             cluster.call.to_size = sv_jmp.from_size() + 1
         # join with all overlapping clusters
         i = pos_dict[sv_jmp.to_start()]
+        joined_clusters = set()
         while i <= pos_dict[to_end(sv_jmp)]:
-            if sweep_vec[i][0] > 0:
+            if sweep_vec[i][0] > 0 and not sweep_vec[i][1] in joined_clusters:
                 cluster.join(sweep_vec[i][1])
+                joined_clusters.add(sweep_vec[i][1])
                 # we can jump to the end of the discovered cluster immediately
-                i = max(i, pos_dict[sweep_vec[i][1].call.to_size + sweep_vec[i][1].call.to_start - 1])
+                # NO WE CANNOT -> the cluster may have a u shape... like this: 
+                #  xxxxx
+                #  x
+                #  xxxxx
+                #i = max(i, pos_dict[sweep_vec[i][1].call.to_size + sweep_vec[i][1].call.to_start - 1])
             i += 1
         # insert the newly computed cluster above and below the current sv_jump (we can't know the actual cluster size)
         i = pos_dict[cluster.call.to_start]
         while i < pos_dict[sv_jmp.to_start()]:
-            if sweep_vec[i][1] == sweep_vec[pos_dict[sv_jmp.to_start()]][1]:
+            if sweep_vec[i][1] in joined_clusters:
                 sweep_vec[i][1] = cluster
             i += 1
         i = pos_dict[to_end(sv_jmp)] + 1
         while i <= pos_dict[cluster.call.to_size + cluster.call.to_start - 1]:
-            if sweep_vec[i][1] == sweep_vec[pos_dict[to_end(sv_jmp)]][1]:
+            if sweep_vec[i][1] in joined_clusters:
                 sweep_vec[i][1] = cluster
             i += 1
 
@@ -68,6 +80,10 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
             sweep_vec[i][0] += 1
             sweep_vec[i][1] = cluster
             i += 1
+
+        if PRINTS:
+            print( *(x for x,y in sweep_vec), ":: start ::", i)
+            print( *(y.count if not y is None else 0 for x,y in sweep_vec), ":: cluster ::")
 
     ret = []
     def check_cluster(cluster):
@@ -103,22 +119,32 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
         # decrease the amount ef elements in the cluster
         sweep_vec[i][1].count -= 1
         # if the count hits zero check if the cluster is worth keeping
-        if len(sweep_vec[i][1]) == 0:
-            try:
+        try:
+            if len(sweep_vec[i][1]) == 0:
                 check_cluster(sweep_vec[i][1])
-            except:
-                print(pos_dict.items(), i)
-                print("x", sv_jmp.from_start(), sv_jmp.from_end(), sv_jmp.to_start(), to_end(sv_jmp))
-                for sv_jmp in sv_jmps:
-                    print(sv_jmp.from_start(), sv_jmp.from_end(), sv_jmp.to_start(), to_end(sv_jmp))
-                for idx, sv_jmp in sweep_vec:
-                    print(idx, sv_jmp)
-                assert False
+        except:
+            plot = figure()
+            for sv_jmp_ in sv_jmps:
+                plot.quad(sv_jmp_.from_start(), sv_jmp_.from_end(), sv_jmp_.to_start(), sv_jmp_.to_end(), fill_alpha=0.5)
+            plot.quad(sv_jmp.from_start(), sv_jmp.from_end(), sv_jmp.to_start(), sv_jmp.to_end(),
+                      fill_alpha=0.5, color="red")
+            show(plot)
+            #print(pos_dict.items(), i)
+            #print("x", sv_jmp.from_start(), sv_jmp.from_end(), sv_jmp.to_start(), to_end(sv_jmp))
+            #for sv_jmp in sv_jmps:
+            #    print(sv_jmp.from_start(), sv_jmp.from_end(), sv_jmp.to_start(), to_end(sv_jmp))
+            #for idx, sv_jmp in sweep_vec:
+            #    print(idx, sv_jmp)
+            assert False
         # decrement the sv_jump counter
         i = pos_dict[sv_jmp.to_start()]
         while i <= pos_dict[to_end(sv_jmp)]:
             sweep_vec[i][0] -= 1
             i += 1
+
+        if PRINTS:
+            print( *(x for x,y in sweep_vec), ":: end ::", i)
+            print( *(y.count if not y is None else 0 for x,y in sweep_vec), ":: cluster ::")
 
     # do the actual sweep:
     i = 0
