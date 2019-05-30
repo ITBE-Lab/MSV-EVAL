@@ -6,7 +6,7 @@ import json
 from MA import SV_DB
 from sweep_sv_jumps import sv_jumps_to_dict
 
-def render_from_dict(json_dict, start, end, on_y_aswell=False):
+def render_from_dict(json_dict, start=None, end=None, on_y_aswell=True):
     # zip that just loops through the all shorter items, including scalars
     def zip_longest_scalar(*args):
         for i in range(max(len(x) if isinstance(x, list) else 1 for x in args)):
@@ -19,7 +19,6 @@ def render_from_dict(json_dict, start, end, on_y_aswell=False):
         plot = figure(
             width=1700,
             height=panel["h"],
-            x_range=[start, end] if len(plots) == 0 else plots[0].x_range,
             tooltips="@i",
             tools=[
                 "pan", "xpan", "wheel_zoom", "xwheel_zoom", "box_zoom", "save",
@@ -27,9 +26,14 @@ def render_from_dict(json_dict, start, end, on_y_aswell=False):
             ],
             active_drag="xpan",
             active_scroll="xwheel_zoom")
-        if on_y_aswell:
-            plot.y_range.start = start
-            plot.y_range.end = end
+        if not len(plots) == 0:
+            plot.x_range = plots[0].x_range
+        elif not start is None and not end is None:
+            plot.x_range.start = start
+            plot.x_range.end = end
+            if on_y_aswell:
+                plot.y_range.start = start
+                plot.y_range.end = end
         for item in panel["items"]:
             if item["type"] == "box":
                 cds = {
@@ -162,7 +166,8 @@ def render_from_json(json_file_name, start, end, on_y_aswell=False):
     render_from_dict(json_dict, start, end, on_y_aswell)
 
 if __name__ == "__main__":
-    sv_db = SV_DB("/MAdata/databases/sv_simulated", "open")
+    #sv_db = SV_DB("/MAdata/databases/sv_simulated", "open")
+    sv_db = SV_DB("/MAdata/sv_datasets/small_test_1/svs.db", "open")
     #out_dict = create_json_from_db(sv_db, "/MAdata/genome/human/GRCh38.p12/ma/genome")
-    out_dict = sv_jumps_to_dict(sv_db, 0)
-    render_from_dict(out_dict, 7500000, 7550000, True)
+    out_dict = sv_jumps_to_dict(sv_db, [1, 6], 10000, 10000, 10000, 10000)
+    render_from_dict(out_dict)

@@ -96,7 +96,7 @@ def vcf_parser(file_name):
 
 def vcf_to_db(name, sv_db, file_name, pack):
     sv_db.clear_calls_table_for_caller(name)
-    call_inserter = SvCallInserter(sv_db, name, "no desc")
+    call_inserter = SvCallInserter(sv_db, name, "no desc", -1) # -1 since there are no related sv jumps...
     num_calls = 0
     for call in vcf_parser(file_name):
         num_calls += 1
@@ -193,8 +193,9 @@ def compare_caller(sv_db, id_a, id_b, min_score):
     num_almost_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_a, id_b, min_score, 100) # true positives
     num_almost_overlaps_a_to_b -= num_overlaps_a_to_b
     num_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, 0) # how many of the sv's are detected?
+    num_almost_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, 100) # how many of the sv's are detected?
     num_errors = num_calls_b - num_overlaps_b_to_a # how many of the sv's are NOT detected?
-    return (num_calls_a, num_overlaps_a_to_b, num_almost_overlaps_a_to_b, num_errors, rel_call_area_a)
+    return (num_calls_a, num_overlaps_b_to_a, num_almost_overlaps_b_to_a, num_errors, rel_call_area_a)
 
 def compare_callers(db_name, names_a, names_b=["simulated sv"], min_scores=[0]):
     sv_db = SV_DB(db_name, "open")
@@ -211,25 +212,23 @@ def compare_callers(db_name, names_a, names_b=["simulated sv"], min_scores=[0]):
                        *(str(x) for x in compare_caller(sv_db, id_a, id_b, min_score))])
     print_columns(out)
 
-def compare_all_callers_against(sv_db, name_b="simulated sv", min_scores=[0]):
+def compare_all_callers_against(sv_db, name_b="simulated sv"):
     id_b = sv_db.get_run_id(name_b)
     date_b = sv_db.get_run_date(id_b)
     #print("sensitivity = true positive rate = recall")
     #print("missing rate = how many calls are missing")
-    print("ground truth is: ", name_b, "-", date_b)
-    out = [["test set", "time", "t", "#calls", "#found", "#almost", "#missed", "fuzziness"]]
+    print("ground truth is:", name_b, "-", date_b, "[ id:", id_b, "]")
+    out = [["id", "test set", "time", "#calls", "#found", "#almost", "#missed", "fuzziness"]]
     for id_a in sv_db.newest_unique_runs(3):
         if id_a == id_b:
             continue
         name_a = sv_db.get_run_name(id_a)
         date_a = sv_db.get_run_date(id_a)
-        for min_score in min_scores:
-            out.append([name_a, date_a, str(min_score), 
-                        *(str(x) for x in compare_caller(sv_db, id_a, id_b, min_score))])
+        out.append([str(id_a), name_a, date_a, *(str(x) for x in compare_caller(sv_db, id_a, id_b, 0))])
     print_columns(out)
 
 
-def analyze_sample_dataset(dataset_name):
+def analyze_sample_dataset(dataset_name, run_callers=False):
     # decode hook for the json that decodes lists dicts and floats properly
     def _decode(o):
         if isinstance(o, str):
@@ -250,26 +249,27 @@ def analyze_sample_dataset(dataset_name):
 
     # create the calls
     db = SV_DB("/MAdata/sv_datasets/" + dataset_name + "/svs.db", "open")
-    pack = Pack()
-    pack.load(json_info_file["reference_path"] + "/ma/genome")
-    fm_index = FMIndex()
-    fm_index.load(json_info_file["reference_path"] + "/ma/genome")
+    if run_callers:
+        pack = Pack()
+        pack.load(json_info_file["reference_path"] + "/ma/genome")
+        fm_index = FMIndex()
+        fm_index.load(json_info_file["reference_path"] + "/ma/genome")
 
-    # create alignment files if they do not exist
-    create_alignments_if_necessary(dataset_name, json_info_file, db, pack, fm_index)
-    # save the info.json file
-    print(json_info_file)
-    with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "w") as json_out:
-        json.dump(json_info_file, json_out)
+        # create alignment files if they do not exist
+        create_alignments_if_necessary(dataset_name, json_info_file, db, pack, fm_index)
+        # save the info.json file
+        print(json_info_file)
+        with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "w") as json_out:
+            json.dump(json_info_file, json_out)
 
 
 
-    run_callers_if_necessary(dataset_name, json_info_file, db, pack)
+        run_callers_if_necessary(dataset_name, json_info_file, db, pack)
 
-    # save the info.json file
-    print(json_info_file)
-    with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "w") as json_out:
-        json.dump(json_info_file, json_out)
+        # save the info.json file
+        print(json_info_file)
+        with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "w") as json_out:
+            json.dump(json_info_file, json_out)
 
     compare_all_callers_against(db)
 
@@ -278,6 +278,6 @@ def analyze_sample_dataset(dataset_name):
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("small_test_1")
+    analyze_sample_dataset("small_test_1", False)
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))

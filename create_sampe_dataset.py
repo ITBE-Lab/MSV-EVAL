@@ -93,7 +93,8 @@ def create_separate_svs(pack, database, json_info_file, sv_func, sv_size, sv_mar
     json_info_file["sv_margin"] = sv_margin
     json_info_file["sv_func"] = sv_func[0].__name__
 
-    sv_inserter = SvCallInserter(database, "simulated sv", "the sv's that were simulated")
+    # -1 since there are no related sv jumps
+    sv_inserter = SvCallInserter(database, "simulated sv", "the sv's that were simulated", -1)
 
     for s, l in zip(pack.contigStarts(), pack.contigLengths()):
         for pos in range(s + sv_margin, s + l - sv_margin, sv_size + sv_margin):

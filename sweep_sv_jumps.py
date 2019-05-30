@@ -130,7 +130,7 @@ class WarpedBitVector:
 
 def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name):
     sweeper = SortedSvJumpFromSql(sv_db, run_id)
-    call_inserter = SvCallInserter(sv_db, name, "The python implementation of the sv caller")
+    call_inserter = SvCallInserter(sv_db, name, "The python implementation of the sv caller", run_id)
     print("creating sweep list...")
 
     y_range_tree = WarpedBitVector(ref_size)
@@ -200,7 +200,7 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name):
     print("done sweeping")
 
 
-def sv_jumps_to_dict(sv_db, run_id):
+def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None):
     forw_boxes_data = []
     unknown_boxes_data_a = []
     unknown_boxes_data_b = []
@@ -208,50 +208,59 @@ def sv_jumps_to_dict(sv_db, run_id):
     accepted_lines_data = []
     plus_data = []
     patch_data = []
-    
-    sweeper = SortedSvJumpFromSql(sv_db, run_id)
-    while sweeper.has_next_start():
-        jump = sweeper.get_next_start()
-        x = [jump.from_start_same_strand() - 0.5,
-                jump.to_start() - 0.5,
-                jump.from_size() + 1,
-                jump.to_size() + 1,
-                jump.score(),
-                str(jump.id) + " " + str(jump.score())]
-        if jump.switch_strand_known():
-            if jump.does_switch_strand():
-                sw_boxes_data.append(x)
-            else:
-                forw_boxes_data.append(x)
+
+    if run_ids is None:
+        run_ids = sv_db.newest_unique_runs( 3 )
+    for cnt, run_id in enumerate(run_ids):
+        assert sv_db.run_exists(run_id)
+        sweeper = None
+        if not None in [x, y, w, h]:
+            sweeper = SortedSvJumpFromSql(sv_db, sv_db.get_run_jump_id(run_id), x, y, w, h)
         else:
-            if jump.from_known():
-                unknown_boxes_data_a.append(x)
+            sweeper = SortedSvJumpFromSql(sv_db, sv_db.get_run_jump_id(run_id))
+
+        while sweeper.has_next_start():
+            jump = sweeper.get_next_start()
+            xs = [jump.from_start_same_strand() - 0.5,
+                    jump.to_start() - 0.5,
+                    jump.from_size() + 1,
+                    jump.to_size() + 1,
+                    jump.score(),
+                    str(jump.id) + " " + str(jump.score())]
+            if jump.switch_strand_known():
+                if jump.does_switch_strand():
+                    sw_boxes_data.append(xs)
+                else:
+                    forw_boxes_data.append(xs)
             else:
-                unknown_boxes_data_b.append(x)
-        f = jump.from_pos
-        t = jump.to_pos
-        if not jump.from_known():
-            f = t
-        if not jump.to_known():
-            t = f
-        if not jump.from_fuzziness_is_rightwards():
-            if not jump.to_fuzziness_is_downwards():
-                patch_data.append(
-                    [[f - 2.5, f + .5, f + .5],
-                     [t - .5, t + 2.5, t - .5]])
+                if jump.from_known():
+                    unknown_boxes_data_a.append(xs)
+                else:
+                    unknown_boxes_data_b.append(xs)
+            f = jump.from_pos
+            t = jump.to_pos
+            if not jump.from_known():
+                f = t
+            if not jump.to_known():
+                t = f
+            if not jump.from_fuzziness_is_rightwards():
+                if not jump.to_fuzziness_is_downwards():
+                    patch_data.append(
+                        [[f - 2.5, f + .5, f + .5],
+                        [t - .5, t + 2.5, t - .5]])
+                else:
+                    patch_data.append(
+                        [[f - 2.5, f + .5, f + .5],
+                        [t + .5, t - 2.5, t + .5]])
             else:
-                patch_data.append(
-                    [[f - 2.5, f + .5, f + .5],
-                     [t + .5, t - 2.5, t + .5]])
-        else:
-            if not jump.to_fuzziness_is_downwards():
-                patch_data.append(
-                    [[f + 2.5, f - .5, f - .5],
-                     [t - .5, t + 2.5, t - .5]])
-            else:
-                patch_data.append(
-                    [[f + 2.5, f - .5, f - .5],
-                     [t + .5, t - 2.5, t + .5]])
+                if not jump.to_fuzziness_is_downwards():
+                    patch_data.append(
+                        [[f + 2.5, f - .5, f - .5],
+                        [t - .5, t + 2.5, t - .5]])
+                else:
+                    patch_data.append(
+                        [[f + 2.5, f - .5, f - .5],
+                        [t + .5, t - 2.5, t + .5]])
 
     out_dict = {
         "x_offset": 0,
@@ -314,11 +323,13 @@ def sv_jumps_to_dict(sv_db, run_id):
         ]
     }
 
-    runs_from_db = SvCallerRunsFromDb(sv_db)
-    cnt = 0
-    while not runs_from_db.eof():
-        name = runs_from_db.name()
-        calls_from_db = SvCallsFromDb(sv_db, runs_from_db.id())
+    for cnt, run_id in enumerate(run_ids):
+        name = sv_db.get_run_name(run_id)
+        calls_from_db = None
+        if not None in [x, y, w, h]:
+            calls_from_db = SvCallsFromDb(sv_db, run_id, x, y, w, h)
+        else:
+            calls_from_db = SvCallsFromDb(sv_db, run_id)
         accepted_boxes_data = []
         accepted_plus_data = []
         while calls_from_db.hasNext():
@@ -375,7 +386,6 @@ def sv_jumps_to_dict(sv_db, run_id):
             out_dict["panels"][0]["items"].append(sv_call_dict)
         if len(accepted_plus_data) > 0:
             out_dict["panels"][0]["items"].append(sv_plus_dict)
-        runs_from_db.next()
 
     #conn = sqlite3.connect(db_name)
     #cur = conn.cursor()
