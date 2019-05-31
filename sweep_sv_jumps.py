@@ -129,7 +129,7 @@ class WarpedBitVector:
 
 
 def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name):
-    sweeper = SortedSvJumpFromSql(sv_db, run_id)
+    sweeper = SortedSvJumpFromSql(parameter_set_manager, sv_db, run_id)
     call_inserter = SvCallInserter(sv_db, name, "The python implementation of the sv caller", run_id)
     print("creating sweep list...")
 
@@ -200,7 +200,7 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name):
     print("done sweeping")
 
 
-def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None):
+def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_supporting_jumps=False):
     forw_boxes_data = []
     unknown_boxes_data_a = []
     unknown_boxes_data_b = []
@@ -209,18 +209,26 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None):
     plus_data = []
     patch_data = []
 
+    min_ = float("inf")
+    max_ = 0
+
     if run_ids is None:
         run_ids = sv_db.newest_unique_runs( 3 )
     for cnt, run_id in enumerate(run_ids):
         assert sv_db.run_exists(run_id)
-        sweeper = None
-        if not None in [x, y, w, h]:
-            sweeper = SortedSvJumpFromSql(sv_db, sv_db.get_run_jump_id(run_id), x, y, w, h)
-        else:
-            sweeper = SortedSvJumpFromSql(sv_db, sv_db.get_run_jump_id(run_id))
 
-        while sweeper.has_next_start():
-            jump = sweeper.get_next_start()
+        name = sv_db.get_run_name(run_id)
+        params = ParameterSetManager()
+        if "illumina" in name:
+            params.set_selected("SV-Illumina")
+        if "pacBio" in name:
+            params.set_selected("SV-PacBio")
+        if "nanopore" in name:
+            params.set_selected("SV-ONT")
+
+        def render_jump(jump):
+            nonlocal min_
+            nonlocal max_
             xs = [jump.from_start_same_strand() - 0.5,
                     jump.to_start() - 0.5,
                     jump.from_size() + 1,
@@ -239,6 +247,8 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None):
                     unknown_boxes_data_b.append(xs)
             f = jump.from_pos
             t = jump.to_pos
+            min_ = min(f, t, min_)
+            max_ = max(f, t, max_)
             if not jump.from_known():
                 f = t
             if not jump.to_known():
@@ -261,6 +271,26 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None):
                     patch_data.append(
                         [[f + 2.5, f - .5, f - .5],
                         [t + .5, t - 2.5, t + .5]])
+
+        if only_supporting_jumps:
+            calls_from_db = None
+            if not None in [x, y, w, h]:
+                calls_from_db = SvCallsFromDb(params, sv_db, run_id, x, y, w, h)
+            else:
+                calls_from_db = SvCallsFromDb(params, sv_db, run_id)
+            while calls_from_db.hasNext():
+                call = calls_from_db.next()
+                for idx in range(len(call.supporing_jump_ids)):
+                    render_jump(call.get_jump(idx))
+        else:
+            sweeper = None
+            if not None in [x, y, w, h]:
+                sweeper = SortedSvJumpFromSql(params, sv_db, sv_db.get_run_jump_id(run_id), x, y, w, h)
+            else:
+                sweeper = SortedSvJumpFromSql(params, sv_db, sv_db.get_run_jump_id(run_id))
+
+            while sweeper.has_next_start():
+                render_jump(sweeper.get_next_start())
 
     out_dict = {
         "x_offset": 0,
@@ -309,7 +339,7 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None):
                         "type": "line",
                         "color": "black",
                         "group": "diagonal",
-                        "data": [[0, 0, 3*10**9, 3*10**9]]
+                        "data": [[min_, min_, max_ - min_, max_ - min_]]
                     },
                     {
                         "type": "patch",
@@ -325,11 +355,20 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None):
 
     for cnt, run_id in enumerate(run_ids):
         name = sv_db.get_run_name(run_id)
+
+        params = ParameterSetManager()
+        if "illumina" in name:
+            params.set_selected("SV-Illumina")
+        if "pacBio" in name:
+            params.set_selected("SV-PacBio")
+        if "nanopore" in name:
+            params.set_selected("SV-ONT")
+
         calls_from_db = None
         if not None in [x, y, w, h]:
-            calls_from_db = SvCallsFromDb(sv_db, run_id, x, y, w, h)
+            calls_from_db = SvCallsFromDb(params, sv_db, run_id, x, y, w, h)
         else:
-            calls_from_db = SvCallsFromDb(sv_db, run_id)
+            calls_from_db = SvCallsFromDb(params, sv_db, run_id)
         accepted_boxes_data = []
         accepted_plus_data = []
         while calls_from_db.hasNext():

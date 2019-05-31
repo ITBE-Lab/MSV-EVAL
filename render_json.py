@@ -3,7 +3,7 @@ from bokeh.plotting import figure, show, reset_output, ColumnDataSource
 from bokeh.models import Arrow, VeeHead
 from create_json import create_json_from_db
 import json
-from MA import SV_DB
+from MA import SV_DB, ParameterSetManager
 from sweep_sv_jumps import sv_jumps_to_dict
 
 def render_from_dict(json_dict, start=None, end=None, on_y_aswell=True):
@@ -20,12 +20,18 @@ def render_from_dict(json_dict, start=None, end=None, on_y_aswell=True):
             width=1700,
             height=panel["h"],
             tooltips="@i",
+            #tools=[
+            #    "pan", "xpan", "wheel_zoom", "xwheel_zoom", "box_zoom", "save",
+            #    "reset", "hover"
+            #],
+            #active_drag="xpan",
+            #active_scroll="xwheel_zoom"
             tools=[
-                "pan", "xpan", "wheel_zoom", "xwheel_zoom", "box_zoom", "save",
+                "pan", "wheel_zoom", "box_zoom", "save",
                 "reset", "hover"
             ],
-            active_drag="xpan",
-            active_scroll="xwheel_zoom")
+            active_drag="pan",
+            active_scroll="wheel_zoom")
         if not len(plots) == 0:
             plot.x_range = plots[0].x_range
         elif not start is None and not end is None:
@@ -169,5 +175,5 @@ if __name__ == "__main__":
     #sv_db = SV_DB("/MAdata/databases/sv_simulated", "open")
     sv_db = SV_DB("/MAdata/sv_datasets/small_test_1/svs.db", "open")
     #out_dict = create_json_from_db(sv_db, "/MAdata/genome/human/GRCh38.p12/ma/genome")
-    out_dict = sv_jumps_to_dict(sv_db, [1, 6], 10000, 10000, 10000, 10000)
+    out_dict = sv_jumps_to_dict(sv_db, [1, 60], 450000, 450000, 10000, 10000, False)
     render_from_dict(out_dict)

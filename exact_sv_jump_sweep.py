@@ -5,7 +5,7 @@ PRINTS = False
 
 def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
     def to_end(sv_jmp):
-        return sv_jmp.to_end() if sv_jmp.switch_strand_known() else sv_jmp.to_start() + sv_jmp.from_size()
+        return sv_jmp.to_end() - 1 if sv_jmp.switch_strand_known() else sv_jmp.to_start() + sv_jmp.from_size()
 
     if len(sv_jmps) == 0: # sanity check
         return

@@ -44,8 +44,16 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index):
         if not "jump_id" in read_set:
             print("computing jumps for MA-SV on", read_set["name"])
             db.drop_jump_indices() # @todo should work with partial indices here
-
-            read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(ParameterSetManager(), fm_index, pack, db, 
+            params = ParameterSetManager()
+            if read_set["func_name"] == "create_illumina_reads_dwgsim":
+                params.set_selected("SV-Illumina")
+            elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
+                params.set_selected("SV-PacBio")
+            elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
+                params.set_selected("SV-ONT")
+            else:
+                print("WARNING: unknown read simulator - using default parameters for sv jumps")
+            read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(params, fm_index, pack, db, 
                                                                     read_set["seq_id"])
         for alignment_call in alignment_calls[read_set["func_name"]]:
             sam_file_path = "/MAdata/sv_datasets/" + dataset_name + "/alignments/" \
@@ -154,7 +162,16 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
             if not "MA_SV" in read_set["calls"]:
                 read_set["calls"].append("MA_SV")
             print("creating calls for", read_set["name"], "MA_SV")
-            sweep_sv_jumps.sweep_sv_jumps(ParameterSetManager(), db, read_set["jump_id"], 
+            params = ParameterSetManager()
+            if read_set["func_name"] == "create_illumina_reads_dwgsim":
+                params.set_selected("SV-Illumina")
+            elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
+                params.set_selected("SV-PacBio")
+            elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
+                params.set_selected("SV-ONT")
+            else:
+                print("WARNING: unknown read simulator - using default parameters for sv jumps")
+            sweep_sv_jumps.sweep_sv_jumps(params, db, read_set["jump_id"], 
                                           pack.unpacked_size_single_strand, read_set["name"] + "." + "MA_SV")
 
             for alignment in read_set["alignments"]:
@@ -223,6 +240,7 @@ def compare_all_callers_against(sv_db, name_b="simulated sv"):
         if id_a == id_b:
             continue
         name_a = sv_db.get_run_name(id_a)
+        print("analyzing", name_a)
         date_a = sv_db.get_run_date(id_a)
         out.append([str(id_a), name_a, date_a, *(str(x) for x in compare_caller(sv_db, id_a, id_b, 0))])
     print_columns(out)
