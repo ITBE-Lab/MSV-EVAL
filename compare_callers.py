@@ -5,7 +5,7 @@ import json
 import compute_sv_jumps
 import sweep_sv_jumps
 
-def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index):
+def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, recompute_jumps=False):
     def bwa_paired(read_set, sam_file_path):
         index_str = json_dict["reference_path"] + "/bwa/genome"
         os.system("~/workspace/bwa/bwa mem -t 32 " + index_str + " " + read_set["fasta_file"] + " "
@@ -41,7 +41,7 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index):
     for read_set in json_dict["create_reads_funcs"]:
         if not "alignments" in read_set:
             read_set["alignments"] = []
-        if not "jump_id" in read_set:
+        if not "jump_id" in read_set or recompute_jumps:
             print("computing jumps for MA-SV on", read_set["name"])
             db.drop_jump_indices() # @todo should work with partial indices here
             params = ParameterSetManager()
@@ -246,7 +246,7 @@ def compare_all_callers_against(sv_db, name_b="simulated sv"):
     print_columns(out)
 
 
-def analyze_sample_dataset(dataset_name, run_callers=False):
+def analyze_sample_dataset(dataset_name, run_callers=False, recompute_jumps=False):
     # decode hook for the json that decodes lists dicts and floats properly
     def _decode(o):
         if isinstance(o, str):
@@ -274,7 +274,7 @@ def analyze_sample_dataset(dataset_name, run_callers=False):
         fm_index.load(json_info_file["reference_path"] + "/ma/genome")
 
         # create alignment files if they do not exist
-        create_alignments_if_necessary(dataset_name, json_info_file, db, pack, fm_index)
+        create_alignments_if_necessary(dataset_name, json_info_file, db, pack, fm_index, recompute_jumps)
         # save the info.json file
         print(json_info_file)
         with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "w") as json_out:
@@ -296,6 +296,6 @@ def analyze_sample_dataset(dataset_name, run_callers=False):
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("small_test_1", False)
+    analyze_sample_dataset("small_test_1", True)
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))
