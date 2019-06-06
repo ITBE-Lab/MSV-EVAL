@@ -128,9 +128,9 @@ class WarpedBitVector:
                                                       self.to_new_coord_system_c(end, x_value))
 
 
-def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name):
+def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc):
     sweeper = SortedSvJumpFromSql(parameter_set_manager, sv_db, run_id)
-    call_inserter = SvCallInserter(sv_db, name, "The python implementation of the sv caller", run_id)
+    call_inserter = SvCallInserter(sv_db, name, desc, run_id)
     print("creating sweep list...")
 
     y_range_tree = WarpedBitVector(ref_size)

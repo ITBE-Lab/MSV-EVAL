@@ -38,43 +38,46 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
         "create_illumina_reads_dwgsim": [bwa_paired]
     }
 
-    for read_set in json_dict["create_reads_funcs"]:
-        if not "alignments" in read_set:
-            read_set["alignments"] = []
-        if not "jump_id" in read_set or recompute_jumps:
-            print("computing jumps for MA-SV on", read_set["name"])
-            db.drop_jump_indices() # @todo should work with partial indices here
-            params = ParameterSetManager()
-            if read_set["func_name"] == "create_illumina_reads_dwgsim":
-                params.set_selected("SV-Illumina")
-            elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
-                params.set_selected("SV-PacBio")
-            elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
-                params.set_selected("SV-ONT")
-            else:
-                print("WARNING: unknown read simulator - using default parameters for sv jumps")
-            read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(params, fm_index, pack, db, 
-                                                                    read_set["seq_id"])
-        for alignment_call in alignment_calls[read_set["func_name"]]:
-            sam_file_path = "/MAdata/sv_datasets/" + dataset_name + "/alignments/" \
-                          + read_set["name"] + "." + alignment_call.__name__
-            if os.path.exists( sam_file_path + ".sam" ):
-                continue
-            if not alignment_call.__name__  in read_set["alignments"]:
-                read_set["alignments"].append(alignment_call.__name__)
-            else:
-                print("recreating alignments!")
-            print("creating alignment files for", read_set["name"], alignment_call.__name__)
-            alignment_call(read_set, sam_file_path + ".sam")
+    for dataset in json_dict["datasets"]:
+        for read_set in dataset["create_reads_funcs"]:
+            if not "alignments" in read_set:
+                read_set["alignments"] = []
+            if not "jump_id" in read_set or recompute_jumps:
+                print("computing jumps for MA-SV on", read_set["name"])
+                db.drop_jump_indices() # @todo should work with partial indices here
+                params = ParameterSetManager()
+                if read_set["func_name"] == "create_illumina_reads_dwgsim":
+                    params.set_selected("SV-Illumina")
+                elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
+                    params.set_selected("SV-PacBio")
+                elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
+                    params.set_selected("SV-ONT")
+                else:
+                    print("WARNING: unknown read simulator - using default parameters for sv jumps")
+                read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(params, fm_index, pack, db, 
+                                                                        read_set["seq_id"])
+            for alignment_call in alignment_calls[read_set["func_name"]]:
+                sam_file_path = "/MAdata/sv_datasets/" + dataset_name + "/alignments/" \
+                            + read_set["name"] + "-" + alignment_call.__name__
+                if os.path.exists( sam_file_path + ".sam" ):
+                    continue
+                if not alignment_call.__name__ in read_set["alignments"]:
+                    read_set["alignments"].append(alignment_call.__name__)
+                else:
+                    print("recreating alignments!")
+                print("creating alignment files for", read_set["name"], alignment_call.__name__)
+                alignment_call(read_set, sam_file_path + ".sam")
 
-            # create sorted and indexed bam files
-            sam_tools_pref = "~/workspace/samtools/samtools "
-            to_bam_cmd = sam_tools_pref + "view -Sb " + sam_file_path + ".sam > " + sam_file_path + ".bam"
-            os.system(to_bam_cmd)
-            sort_cmd = sam_tools_pref + "sort -@ 32 -m 1G " + sam_file_path + ".bam > " + sam_file_path + ".sorted.bam"
-            os.system(sort_cmd + " 2> /dev/null")
-            index_cmd = sam_tools_pref + "index " + sam_file_path + ".sorted.bam > " + sam_file_path + ".sorted.bam.bai"
-            os.system(index_cmd)
+                # create sorted and indexed bam files
+                sam_tools_pref = "~/workspace/samtools/samtools "
+                to_bam_cmd = sam_tools_pref + "view -Sb " + sam_file_path + ".sam > " + sam_file_path + ".bam"
+                os.system(to_bam_cmd)
+                sort_cmd = sam_tools_pref + "sort -@ 32 -m 1G " + sam_file_path + ".bam > " \
+                            + sam_file_path + ".sorted.bam"
+                os.system(sort_cmd + " 2> /dev/null")
+                index_cmd = sam_tools_pref + "index " + sam_file_path + ".sorted.bam > " \
+                            + sam_file_path + ".sorted.bam.bai"
+                os.system(index_cmd)
     db.create_jump_indices() # @todo should work with partial indices here
 
 def vcf_parser(file_name):
@@ -102,9 +105,9 @@ def vcf_parser(file_name):
                         d[name] = field
                 yield d
 
-def vcf_to_db(name, sv_db, file_name, pack):
+def vcf_to_db(name, desc, sv_db, file_name, pack):
     sv_db.clear_calls_table_for_caller(name)
-    call_inserter = SvCallInserter(sv_db, name, "no desc", -1) # -1 since there are no related sv jumps...
+    call_inserter = SvCallInserter(sv_db, name, desc, -1) # -1 since there are no related sv jumps...
     num_calls = 0
     for call in vcf_parser(file_name):
         num_calls += 1
@@ -151,63 +154,70 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
         os.system("~/workspace/Sniffles/bin/sniffles-core-1.0.8/sniffles -t 32 -m " + bam_file + " -v " + vcf_file
                   + " >/dev/null 2>&1")
     sv_calls = [sniffles]
-    for read_set in json_dict["create_reads_funcs"]:
-        if not "calls" in read_set:
-            read_set["calls"] = []
-        for sv_call in sv_calls:
-            if not sv_call.__name__ in read_set["calls"]:
-                read_set["calls"].append(sv_call.__name__)
-            
-            # MA-SV
-            if not "MA_SV" in read_set["calls"]:
-                read_set["calls"].append("MA_SV")
-            print("creating calls for", read_set["name"], "MA_SV")
-            params = ParameterSetManager()
-            if read_set["func_name"] == "create_illumina_reads_dwgsim":
-                params.set_selected("SV-Illumina")
-            elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
-                params.set_selected("SV-PacBio")
-            elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
-                params.set_selected("SV-ONT")
-            else:
-                print("WARNING: unknown read simulator - using default parameters for sv jumps")
-            sweep_sv_jumps.sweep_sv_jumps(params, db, read_set["jump_id"], 
-                                          pack.unpacked_size_single_strand, read_set["name"] + "." + "MA_SV")
+    for dataset in json_dict["datasets"]:
+        for read_set in dataset["create_reads_funcs"]:
+            if not "calls" in read_set:
+                read_set["calls"] = []
+            for sv_call in sv_calls:
+                if not sv_call.__name__ in read_set["calls"]:
+                    read_set["calls"].append(sv_call.__name__)
+                
+                # MA-SV
+                if not "MA_SV" in read_set["calls"]:
+                    read_set["calls"].append("MA_SV")
+                print("creating calls for", read_set["name"], "MA_SV")
+                params = ParameterSetManager()
+                if read_set["func_name"] == "create_illumina_reads_dwgsim":
+                    params.set_selected("SV-Illumina")
+                elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
+                    params.set_selected("SV-PacBio")
+                elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
+                    params.set_selected("SV-ONT")
+                else:
+                    print("WARNING: unknown read simulator - using default parameters for sv jumps")
+                sweep_sv_jumps.sweep_sv_jumps(params, db, read_set["jump_id"], 
+                                            pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
+                                            "ground_truth=" + str(dataset["ground_truth"]))
 
-            for alignment in read_set["alignments"]:
-                vcf_file_path = "/MAdata/sv_datasets/" + dataset_name + "/calls/" \
-                        + read_set["name"] + "." + alignment + "." + sv_call.__name__ + ".vcf"
-                bam_file_path = "/MAdata/sv_datasets/" + dataset_name + "/alignments/" \
-                        + read_set["name"] + "." + alignment + ".sorted.bam"
-                if os.path.exists( vcf_file_path ):
-                    print("not creating calls for", read_set["name"], alignment, sv_call.__name__)
-                    continue
-                print("creating calls for", read_set["name"], alignment, sv_call.__name__)
-                sv_call(bam_file_path, vcf_file_path)
-                vcf_to_db(read_set["name"] + "." + alignment + "." + sv_call.__name__, db, vcf_file_path, pack)
+                for alignment in read_set["alignments"]:
+                    vcf_file_path = "/MAdata/sv_datasets/" + dataset_name + "/calls/" \
+                            + read_set["name"] + "-" + alignment + "-" + sv_call.__name__ + ".vcf"
+                    bam_file_path = "/MAdata/sv_datasets/" + dataset_name + "/alignments/" \
+                            + read_set["name"] + "-" + alignment + ".sorted.bam"
+                    if os.path.exists( vcf_file_path ):
+                        print("not creating calls for", read_set["name"], alignment, sv_call.__name__)
+                        continue
+                    print("creating calls for", read_set["name"], alignment, sv_call.__name__)
+                    sv_call(bam_file_path, vcf_file_path)
+                    vcf_to_db(read_set["name"] + "-" + alignment + "-" + sv_call.__name__,
+                              "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack)
 
 
 def print_columns(data):
     col_width = [max([len(data[j][i]) for j in range(len(data))]) for i in range(len(data[0]))]
     first = True
-    cat = data[1][0]
+    last_row = col_width
     for row in data:
-        if not first and cat != row[0]:
-            print("| " + "".join(" "*l + " | " for l in col_width))
-            cat = row[0]
-        print("| " + "".join(word.ljust(col_width[i]) + " | " for i, word in enumerate(row)))
+        #if not first and cat != row[0]:
+        #    print("| " + "".join(" "*l + " | " for l in col_width))
+        #    cat = row[0]
+        print("| " + "".join(
+                (word.ljust(col_width[i]) if last_row[:i+1] != row[:i+1] \
+                                          else " "*col_width[i]) + " | " for i, word in enumerate(row)
+              ) )
         if first:
             print("-" * (sum(col_width) + len(col_width)*3 + 1))
             first = False
+        last_row = row
 
 def compare_caller(sv_db, id_a, id_b, min_score):
     num_calls_a = sv_db.get_num_calls(id_a, min_score) # num calls made
     num_calls_b = sv_db.get_num_calls(id_b, min_score) # num actual calls
     call_area_a = sv_db.get_call_area(id_a, min_score)
     if num_calls_a > 0:
-        rel_call_area_a = math.sqrt(call_area_a/num_calls_a) # get the edge length
+        rel_call_area_a = int(math.sqrt(call_area_a/num_calls_a)) # get the edge length
     else:
-        rel_call_area_a = 0
+        rel_call_area_a = "n/a"
     call_area_b = sv_db.get_call_area(id_b, min_score)
     rel_call_area_b = call_area_b/num_calls_b
     num_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_a, id_b, min_score, 0) # true positives
@@ -234,25 +244,29 @@ def compare_callers(db_name, names_a, names_b=["simulated sv"], min_scores=[0]):
                        *(str(x) for x in compare_caller(sv_db, id_a, id_b, min_score))])
     print_columns(out)
 
-def compare_all_callers_against(sv_db, name_b="simulated sv"):
-    id_b = sv_db.get_run_id(name_b)
-    date_b = sv_db.get_run_date(id_b)
-    #print("sensitivity = true positive rate = recall")
-    #print("missing rate = how many calls are missing")
+def compare_all_callers_against(sv_db, json_info_file):
     out = []
-    for id_a in sv_db.newest_unique_runs(2):
-        if id_a == id_b:
-            continue
-        name_a = sv_db.get_run_name(id_a)
-        cat = name_a[:name_a.index(".")]
-        caller = name_a[name_a.index(".")+1:]
-        print("analyzing", name_a)
-        #date_a = sv_db.get_run_date(id_a)
-        out.append([cat, str(id_a), caller, *(str(x) for x in compare_caller(sv_db, id_a, id_b, 0))])
-    out.sort(key=lambda x: (x[0], x[2]))
-    out.insert(0, ["read set", "id", "caller", "#calls", "#found", "#almost", "#missed", "#way off", "fuzziness"])
+    for dataset in json_info_file["datasets"]:
+        id_b = dataset["ground_truth"]
+        name_b = dataset["name"]
+        date_b = sv_db.get_run_date(id_b)
+        print("ground truth is:", name_b, "-", date_b, "[ id:", id_b, "] - with", sv_db.get_num_calls(id_b, 0), "calls")
+        #print("sensitivity = true positive rate = recall")
+        #print("missing rate = how many calls are missing")
+        for id_a in sv_db.newest_unique_runs(2, "ground_truth=" + str(id_b)):
+            name_a = sv_db.get_run_name(id_a).split("-")
+            seq = name_a[1]
+            cov = name_a[2]
+            aligner = name_a[3]
+            caller = name_a[4]
+            date_a = sv_db.get_run_date(id_a)
+            print("analyzing", id_a, name_a, date_a)
+            out.append([name_b, seq, cov, caller, aligner, str(id_a),
+                        *(str(x) for x in compare_caller(sv_db, id_a, id_b, 0))])
+    out.sort()
+    out.insert(0, ["dataset", "sequencer", "coverage", "caller", "aligner", "id", "#calls", "#found", "#almost",
+                    "#missed", "#way off", "fuzziness"])
     print()
-    print("ground truth is:", name_b, "-", date_b, "[ id:", id_b, "] - with", sv_db.get_num_calls(id_b, 0), "calls")
     print_columns(out)
 
 
@@ -299,14 +313,14 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "w") as json_out:
             json.dump(json_info_file, json_out)
 
-    compare_all_callers_against(db)
+    compare_all_callers_against(db, json_info_file)
 
 
 #print("===============")
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("100nt-del-illumina-250nt-25x", False)
+    analyze_sample_dataset("small_test", False)
     #analyze_sample_dataset("small_test_1")
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))

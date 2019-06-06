@@ -91,18 +91,19 @@ def sv_insertion(sv_inserter, position, sv_size):
 ##
 # sv_func signature: def sv_func(sv_inserter, position, sv_size)
 #
-def create_separate_svs(pack, database, json_info_file, sv_func, sv_size, sv_margin):
+def separate_svs(pack, database, json_info_file, sv_func, sv_size, sv_margin):
     json_info_file["sv_size"] = sv_size
     json_info_file["sv_margin"] = sv_margin
     json_info_file["sv_func"] = sv_func[0].__name__
 
     # -1 since there are no related sv jumps
-    sv_inserter = SvCallInserter(database, "simulated sv", "the sv's that were simulated", -1)
+    sv_inserter = SvCallInserter(database, json_info_file["name"] + "_simulated_sv", "the sv's that were simulated", -1)
 
     for s, l in zip(pack.contigStarts(), pack.contigLengths()):
         for pos in range(s + sv_margin, s + l - sv_margin, sv_size + sv_margin):
             sv_func[0](sv_inserter, pos, sv_size, *sv_func[1])
     return sv_inserter.sv_caller_run_id
+
 def no_svs(pack, database, json_info_file):
     return 0
 
@@ -113,17 +114,17 @@ def no_svs(pack, database, json_info_file):
 #       def create_reads_func(sequenced_genome_pack, sequenced_genome_path, database, reads_folder,
 #                             json_info_file, coverage, name)
 #
-def create_dataset(reference_path, dataset_name, create_svs_func,
+def create_dataset(reference_path, dataset_name, create_svs_funcs,
                    create_reads_funcs, coverages):
     os.mkdir("/MAdata/sv_datasets/" + dataset_name) # this throws an error if the dataset already exists
     os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/reads")
+    os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/genomes")
     os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/alignments")
     os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/calls")
 
     json_info_file = {
         "reference_path": reference_path,
-        "create_svs_func": create_svs_func[0].__name__,
-        "create_reads_funcs": [],
+        "datasets": [],
         "version": 1
     }
 
@@ -134,46 +135,59 @@ def create_dataset(reference_path, dataset_name, create_svs_func,
     database = SV_DB("/MAdata/sv_datasets/" + dataset_name + "/svs.db", "create")
     ref_pack = Pack()
     ref_pack.load(reference_path + "/ma/genome")
-
-    # create the svs
-    caller_id = create_svs_func[0](ref_pack, database, json_info_file, *create_svs_func[1])
-    database.create_caller_indices()
     print(time.time() - start, "seconds")
 
-    print("creating sequenced genome...")
-    start = time.time()
+    for create_svs_func, sv_func_name, create_svs_funcs_params in create_svs_funcs:
+        seq_gen_path = "/MAdata/sv_datasets/" + dataset_name + "/genomes/sequenced_genome_" + sv_func_name
+        print("creating", sv_func_name, "dataset ...")
+        start = time.time()
+        # create the svs
+        json_info_file_dataset_sub = {
+            "func_name": create_svs_func.__name__,
+            "create_reads_funcs": [],
+            "sequenced_genome_path": seq_gen_path,
+            "name": sv_func_name
+        }
+        caller_id = create_svs_func(ref_pack, database, json_info_file_dataset_sub, *create_svs_funcs_params)
+        json_info_file_dataset_sub["ground_truth"] = caller_id
+        database.create_caller_indices()
+        print(time.time() - start, "seconds")
 
-    # save the sequenced genome
-    seq_pack = database.reconstruct_sequenced_genome(ref_pack, caller_id)
-    seq_pack.store("/MAdata/sv_datasets/" + dataset_name + "/sequenced_genome")
-    with open("/MAdata/sv_datasets/" + dataset_name + "/sequenced_genome.fasta", "w") as fasta_out:
-        for name, sequence in zip(seq_pack.contigNames(), seq_pack.contigSeqs()):
-            fasta_out.write(">")
-            fasta_out.write(name)
-            fasta_out.write("\n")
-            for line in textwrap.wrap(sequence, 50):
-                fasta_out.write(line)
+        print("creating sequenced genome...")
+        start = time.time()
+
+        # save the sequenced genome
+        seq_pack = database.reconstruct_sequenced_genome(ref_pack, caller_id)
+        seq_pack.store(seq_gen_path)
+        with open(seq_gen_path + ".fasta", "w") as fasta_out:
+            for name, sequence in zip(seq_pack.contigNames(), seq_pack.contigSeqs()):
+                fasta_out.write(">")
+                fasta_out.write(name)
                 fasta_out.write("\n")
-    print(time.time() - start, "seconds")
+                for line in textwrap.wrap(sequence, 50):
+                    fasta_out.write(line)
+                    fasta_out.write("\n")
+        print(time.time() - start, "seconds")
 
-    print("creating reads...")
-    start = time.time()
+        print("creating reads...")
+        start = time.time()
 
-    # create the reads
-    for create_reads_func, name, create_reads_args in create_reads_funcs:
-        for coverage in coverages:
-            name_c = name + "-" + str(coverage) + "x"
-            print(name_c, "...")
-            json_info_file_sub = {
-                "func_name": create_reads_func.__name__,
-                "name": name_c,
-                "coverage": coverage
-            }
-            create_reads_func(seq_pack, "/MAdata/sv_datasets/" + dataset_name + "/sequenced_genome.fasta", 
-                            database, "/MAdata/sv_datasets/" + dataset_name + "/reads/", json_info_file_sub,
-                            coverage, name_c, *create_reads_args)
-            json_info_file["create_reads_funcs"].append(json_info_file_sub)
-    print(time.time() - start, "seconds")
+        # create the reads
+        for create_reads_func, name, create_reads_args in create_reads_funcs:
+            for coverage in coverages:
+                name_c = sv_func_name + "-" + name + "-" + str(coverage) + "x"
+                print(name_c, "...")
+                json_info_file_sub = {
+                    "func_name": create_reads_func.__name__,
+                    "name": name_c,
+                    "coverage": coverage
+                }
+                create_reads_func(seq_pack, seq_gen_path + ".fasta",
+                                database, "/MAdata/sv_datasets/" + dataset_name + "/reads/", json_info_file_sub,
+                                coverage, name_c, *create_reads_args)
+                json_info_file_dataset_sub["create_reads_funcs"].append(json_info_file_sub)
+        json_info_file["datasets"].append(json_info_file_dataset_sub)
+        print(time.time() - start, "seconds")
 
     # save the info.json file
     with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "w") as json_out:
@@ -188,9 +202,20 @@ if __name__ == "__main__":
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
     create_dataset("/MAdata/genome/random",
-                        "100nt-del-illumina-250nt-25x",
-                        ( create_separate_svs, ( (sv_deletion, tuple()), 250, 1000 ) ),
-                        [(create_illumina_reads_dwgsim, "illumina-250nt", (250,)),
+                        "small_test",
+                        [( separate_svs, "del-250", ( (sv_deletion, tuple()), 250, 1000 ) ),
+                         ( separate_svs, "inv-250", ( (sv_inversion, tuple()), 250, 1000 ) ),
+                         ( separate_svs, "dup-250", ( (sv_duplication, tuple()), 250, 1000 ) ),
+                         ( separate_svs, "trans-250", ( (sv_translocation, tuple()), 250, 1000 ) ),
+                         ( separate_svs, "ins-250", ( (sv_insertion, tuple()), 250, 1000 ) ),
+                         ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),
+                         ( separate_svs, "inv-1000", ( (sv_inversion, tuple()), 1000, 5000 ) ),
+                         ( separate_svs, "dup-1000", ( (sv_duplication, tuple()), 1000, 5000 ) ),
+                         ( separate_svs, "trans-1000", ( (sv_translocation, tuple()), 1000, 5000 ) ),
+                         ( separate_svs, "ins-1000", ( (sv_insertion, tuple()), 1000, 5000 ) )],
+                        [(create_illumina_reads_dwgsim, "ill_250", (250,)),
+                        (create_illumina_reads_dwgsim, "ill_150", (150,)),
+                        (create_illumina_reads_dwgsim, "ill_100", (100,)),
                          (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
                         [5, 10, 25, 50])
     """
