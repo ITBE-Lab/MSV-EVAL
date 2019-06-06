@@ -13,16 +13,7 @@ class Caller():
         self.pack = pack
         self.fm_index = fm_index
         self.parameter_set_manager = parameter_set_manager
-        self.parameter_set_manager.set_selected("PacBio")
-        self.parameter_set_manager.get_selected().register_parameter(
-            # name, description, group_id, group_name, value
-            libMA.AlignerParameterInt("num destinations", "desc", 6, "Structural Variants Caller", 2))
-        self.parameter_set_manager.get_selected().register_parameter(
-            # name, description, group_id, group_name, value
-            libMA.AlignerParameterInt("fuzziness", "desc", 6, "Structural Variants Caller", 3))
-        self.parameter_set_manager.get_selected().register_parameter(
-            # name, description, group_id, group_name, value
-            libMA.AlignerParameterInt("min coverage", "desc", 6, "Structural Variants Caller", 7))
+        self.parameter_set_manager.set_selected("sv-illumina")
 
     def call(self):
         print("calling sv jumps...")

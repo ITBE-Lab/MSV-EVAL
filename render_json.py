@@ -173,8 +173,9 @@ def render_from_json(json_file_name, start, end, on_y_aswell=False):
 
 if __name__ == "__main__":
     #sv_db = SV_DB("/MAdata/databases/sv_simulated", "open")
-    sv_db = SV_DB("/MAdata/sv_datasets/small_test_1/svs.db", "open")
+    sv_db = SV_DB("/MAdata/sv_datasets/100nt-del-illumina-250nt-25x/svs.db", "open")
     #out_dict = create_json_from_db(sv_db, "/MAdata/genome/human/GRCh38.p12/ma/genome")
     #out_dict = sv_jumps_to_dict(sv_db, [1, 60], 450000, 450000, 10000, 10000, False)
-    out_dict = sv_jumps_to_dict(sv_db, [1, 60], only_supporting_jumps=True)
+    
+    out_dict = sv_jumps_to_dict(sv_db, [1, 8], only_supporting_jumps=True)
     render_from_dict(out_dict)

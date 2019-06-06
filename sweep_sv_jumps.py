@@ -179,7 +179,7 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name):
         if len(cluster_dict[key]) <= 0:
             # check for acceptance:
             # @note these parameters are hardcoded in two locations @todo
-            if cluster_dict[key].score >= 0.3 and len(cluster_dict[key].call.supporing_jump_ids) >= 5:
+            if len(cluster_dict[key].call.supporing_jump_ids) >= 5:
                 for accepted_cluster in sweep_sv_call(cluster_dict[key]):
                     #print("accepting", str(accepted_cluster))
                     call_inserter.insert_call(accepted_cluster.call)
@@ -198,8 +198,13 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name):
     while sweeper.has_next_end():
         sweep_sv_end(sweeper.get_next_end())
 
-    libMA.combine_overlapping_calls(parameter_set_manager, sv_db, call_inserter.sv_caller_run_id)
     print("done sweeping")
+    sv_caller_run_id = call_inserter.sv_caller_run_id
+    del call_inserter # trigger deconstructor for call inserter (commits insert transaction)
+    print("overlapping...")
+    libMA.combine_overlapping_calls(parameter_set_manager, sv_db, sv_caller_run_id)
+    print("num calls:", sv_db.get_num_calls(sv_caller_run_id, 0))
+    print("done overlapping")
 
 
 def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_supporting_jumps=False):
@@ -249,12 +254,12 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
                     unknown_boxes_data_b.append(xs)
             f = jump.from_pos
             t = jump.to_pos
-            min_ = min(f, t, min_)
-            max_ = max(f, t, max_)
             if not jump.from_known():
                 f = t
             if not jump.to_known():
                 t = f
+            min_ = min(f, t, min_)
+            max_ = max(f, t, max_)
             if not jump.from_fuzziness_is_rightwards():
                 if not jump.to_fuzziness_is_downwards():
                     patch_data.append(

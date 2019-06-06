@@ -3,6 +3,7 @@ import os
 import textwrap
 import time
 import json
+import compare_callers
 
 def create_illumina_reads_dwgsim(sequenced_genome_pack, sequenced_genome_path, database, reads_folder, json_info_file,
                                  coverage, name, read_length):
@@ -17,15 +18,17 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, sequenced_genome_path, d
         " -C " + str(coverage) + " " + sequenced_genome_path + " " + reads_folder + name
     os.system(command + " >/dev/null 2>&1")
     
-    reader = PairedFileReader(ParameterSetManager(), [libMA.path(reads1)], [libMA.path(reads2)])
+    reader = PairedFileReader(ParameterSetManager(), 
+                              libMA.filePathVector([libMA.path(reads1)]),
+                              libMA.filePathVector([libMA.path(reads2)]))
 
     counter = 0
     inserter = ReadInserter(database, name)
     json_info_file["seq_id"] = inserter.sequencer_id
     while not reader.is_finished():
         reads = reader.execute()
-        reads[0].name = "paired_read_prim_" + str(counter)
-        reads[1].name = "paired_read_mate_" + str(counter)
+        reads[0].name += "_paired_read_prim_" + str(counter)
+        reads[1].name += "_paired_read_mate_" + str(counter)
         inserter.insert_paired_read(reads[0], reads[1])
         counter += 1
 
@@ -49,7 +52,7 @@ def create_reads_survivor(sequenced_genome_pack, sequenced_genome_path, database
     json_info_file["seq_id"] = inserter.sequencer_id
     while not reader.is_finished():
         read = reader.execute()
-        read.name = "read_" + str(counter)
+        read.name += "_read_" + str(counter)
         inserter.insert_read(read)
         counter += 1
 
@@ -100,6 +103,10 @@ def create_separate_svs(pack, database, json_info_file, sv_func, sv_size, sv_mar
         for pos in range(s + sv_margin, s + l - sv_margin, sv_size + sv_margin):
             sv_func[0](sv_inserter, pos, sv_size, *sv_func[1])
     return sv_inserter.sv_caller_run_id
+def no_svs(pack, database, json_info_file):
+    return 0
+
+
 ##
 # create_svs_func signature: def create_svs_func(pack, database, json_info_file) -> caller_id
 # create_reads_funcs is a list of functions with the signature: 
@@ -141,10 +148,10 @@ def create_dataset(reference_path, dataset_name, create_svs_func,
     seq_pack.store("/MAdata/sv_datasets/" + dataset_name + "/sequenced_genome")
     with open("/MAdata/sv_datasets/" + dataset_name + "/sequenced_genome.fasta", "w") as fasta_out:
         for name, sequence in zip(seq_pack.contigNames(), seq_pack.contigSeqs()):
-            fasta_out.write("> ")
+            fasta_out.write(">")
             fasta_out.write(name)
             fasta_out.write("\n")
-            for line in textwrap.wrap(sequence, 70):
+            for line in textwrap.wrap(sequence, 50):
                 fasta_out.write(line)
                 fasta_out.write("\n")
     print(time.time() - start, "seconds")
@@ -179,11 +186,24 @@ def create_dataset(reference_path, dataset_name, create_svs_func,
 if __name__ == "__main__":
     survivor_error_profile_pac_b = "~/workspace/SURVIVOR/HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
+
     create_dataset("/MAdata/genome/random",
-                   "small_test_1",
-                   ( create_separate_svs, ( (sv_deletion, tuple()), 100, 1000 ) ),
-                   [(create_illumina_reads_dwgsim, "illumina-150nt", (150,)),
-                    (create_illumina_reads_dwgsim, "illumina-250nt", (250,)),
-                    #(create_reads_survivor, "ont", (survivor_error_profile_ont, "ont")),
-                    (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
-                   [5, 10, 25, 50])
+                        "100nt-del-illumina-250nt-25x",
+                        ( create_separate_svs, ( (sv_deletion, tuple()), 250, 1000 ) ),
+                        [(create_illumina_reads_dwgsim, "illumina-250nt", (250,)),
+                         (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+                        [5, 10, 25, 50])
+    """
+    for sv_size in [100, 150, 500]:
+        for sv_type in [sv_deletion, sv_duplication, sv_inversion, sv_insertion]:
+            dataset_name = "separate_random_" + sv_type.__name__ + "_" + str(sv_size) + "nt"
+            create_dataset("/MAdata/genome/random",
+                        dataset_name,
+                        ( create_separate_svs, ( (sv_type, tuple()), sv_size, 1000 ) ),
+                        [(create_illumina_reads_dwgsim, "illumina-150nt", (150,)),
+                            (create_illumina_reads_dwgsim, "illumina-250nt", (250,)),
+                            #(create_reads_survivor, "ont", (survivor_error_profile_ont, "ont")),
+                            (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+                        [5, 10, 25, 50])
+            analyze_sample_dataset(dataset_name)
+    """

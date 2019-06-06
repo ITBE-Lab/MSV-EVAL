@@ -102,7 +102,7 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
 
         # if the cluster still fulfills the required criteria
         # @note these parameters are hardcoded in two locations @todo
-        if cluster.score >= 5 and len(cluster.call.supporing_jump_ids) >= 5:
+        if len(cluster.call.supporing_jump_ids) >= 5:
             if re_estimate_cluster_size:
                 right = cluster.right()
                 up = cluster.up()

@@ -190,7 +190,11 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
 def print_columns(data):
     col_width = [max([len(data[j][i]) for j in range(len(data))]) for i in range(len(data[0]))]
     first = True
+    cat = data[1][0]
     for row in data:
+        if not first and cat != row[0]:
+            print("| " + "".join(" "*l + " | " for l in col_width))
+            cat = row[0]
         print("| " + "".join(word.ljust(col_width[i]) + " | " for i, word in enumerate(row)))
         if first:
             print("-" * (sum(col_width) + len(col_width)*3 + 1))
@@ -212,13 +216,14 @@ def compare_caller(sv_db, id_a, id_b, min_score):
     num_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, 0) # how many of the sv's are detected?
     num_almost_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, 100) # how many of the sv's are detected?
     num_errors = num_calls_b - num_overlaps_b_to_a # how many of the sv's are NOT detected?
-    return (num_calls_a, num_overlaps_b_to_a, num_almost_overlaps_b_to_a, num_errors, rel_call_area_a)
+    num_way_off = num_calls_b - num_almost_overlaps_b_to_a # how many of the sv's are NOT detected?
+    return (num_calls_a, num_overlaps_b_to_a, num_almost_overlaps_b_to_a, num_errors, num_way_off, rel_call_area_a)
 
 def compare_callers(db_name, names_a, names_b=["simulated sv"], min_scores=[0]):
     sv_db = SV_DB(db_name, "open")
     #print("sensitivity = true positive rate = recall")
     #print("missing rate = how many calls are missing")
-    out = [["test caller", "ground truth caller", "min score", "#calls", "#found", "#almost", "#missed", "fuzziness"]]
+    out = [["test caller", "ground truth caller", "min score", "#calls", "#found", "#almost", "#missed", "#way off", "fuzziness"]]
     for name_a, name_b in zip(names_a, names_b):
         id_a = sv_db.get_run_id(name_a)
         id_b = sv_db.get_run_id(name_b)
@@ -234,19 +239,24 @@ def compare_all_callers_against(sv_db, name_b="simulated sv"):
     date_b = sv_db.get_run_date(id_b)
     #print("sensitivity = true positive rate = recall")
     #print("missing rate = how many calls are missing")
-    print("ground truth is:", name_b, "-", date_b, "[ id:", id_b, "]")
-    out = [["id", "test set", "time", "#calls", "#found", "#almost", "#missed", "fuzziness"]]
-    for id_a in sv_db.newest_unique_runs(3):
+    out = []
+    for id_a in sv_db.newest_unique_runs(2):
         if id_a == id_b:
             continue
         name_a = sv_db.get_run_name(id_a)
+        cat = name_a[:name_a.index(".")]
+        caller = name_a[name_a.index(".")+1:]
         print("analyzing", name_a)
-        date_a = sv_db.get_run_date(id_a)
-        out.append([str(id_a), name_a, date_a, *(str(x) for x in compare_caller(sv_db, id_a, id_b, 0))])
+        #date_a = sv_db.get_run_date(id_a)
+        out.append([cat, str(id_a), caller, *(str(x) for x in compare_caller(sv_db, id_a, id_b, 0))])
+    out.sort(key=lambda x: (x[0], x[2]))
+    out.insert(0, ["read set", "id", "caller", "#calls", "#found", "#almost", "#missed", "#way off", "fuzziness"])
+    print()
+    print("ground truth is:", name_b, "-", date_b, "[ id:", id_b, "] - with", sv_db.get_num_calls(id_b, 0), "calls")
     print_columns(out)
 
 
-def analyze_sample_dataset(dataset_name, run_callers=False, recompute_jumps=False):
+def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False):
     # decode hook for the json that decodes lists dicts and floats properly
     def _decode(o):
         if isinstance(o, str):
@@ -296,6 +306,7 @@ def analyze_sample_dataset(dataset_name, run_callers=False, recompute_jumps=Fals
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("small_test_1", True)
+    analyze_sample_dataset("100nt-del-illumina-250nt-25x", False)
+    #analyze_sample_dataset("small_test_1")
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))
