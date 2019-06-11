@@ -4,6 +4,7 @@ import textwrap
 import time
 import json
 import compare_callers
+import random
 
 def create_illumina_reads_dwgsim(sequenced_genome_pack, sequenced_genome_path, database, reads_folder, json_info_file,
                                  coverage, name, read_length):
@@ -70,7 +71,7 @@ def sv_translocation(sv_inserter, position, sv_size, gap_size):
     assert gap_size < sv_size # sanity check
     assert gap_size > 30 # otherwise (1) & (2) combine & we need a special case for that
     start_a = position
-    end_a = position + (sv_size - gap_size) / 2
+    end_a = position + int((sv_size - gap_size) / 2)
     start_b = end_a + gap_size
     end_b = position + sv_size
     sv_inserter.insert_call(SvCall(start_a, start_b, 1, 1, False, float('inf')))
@@ -175,7 +176,7 @@ def create_dataset(reference_path, dataset_name, create_svs_funcs,
         # create the reads
         for create_reads_func, name, create_reads_args in create_reads_funcs:
             for coverage in coverages:
-                name_c = sv_func_name + "-" + name + "-" + str(coverage) + "x"
+                name_c = sv_func_name + "-" + name + "-" + str(coverage).zfill(2) + "x"
                 print(name_c, "...")
                 json_info_file_sub = {
                     "func_name": create_reads_func.__name__,
@@ -202,22 +203,22 @@ if __name__ == "__main__":
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
     create_dataset("/MAdata/genome/random",
-                        "small_test",
-                        [( separate_svs, "del-250", ( (sv_deletion, tuple()), 250, 1000 ) ),
-                         ( separate_svs, "inv-250", ( (sv_inversion, tuple()), 250, 1000 ) ),
-                         ( separate_svs, "dup-250", ( (sv_duplication, tuple()), 250, 1000 ) ),
-                         ( separate_svs, "trans-250", ( (sv_translocation, tuple()), 250, 1000 ) ),
-                         ( separate_svs, "ins-250", ( (sv_insertion, tuple()), 250, 1000 ) ),
-                         ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),
-                         ( separate_svs, "inv-1000", ( (sv_inversion, tuple()), 1000, 5000 ) ),
-                         ( separate_svs, "dup-1000", ( (sv_duplication, tuple()), 1000, 5000 ) ),
-                         ( separate_svs, "trans-1000", ( (sv_translocation, tuple()), 1000, 5000 ) ),
-                         ( separate_svs, "ins-1000", ( (sv_insertion, tuple()), 1000, 5000 ) )],
-                        [(create_illumina_reads_dwgsim, "ill_250", (250,)),
-                        (create_illumina_reads_dwgsim, "ill_150", (150,)),
-                        (create_illumina_reads_dwgsim, "ill_100", (100,)),
-                         (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
-                        [5, 10, 25, 50])
+                   "small_test",
+                   [( separate_svs, "del-250", ( (sv_deletion, tuple()), 250, 1000 ) ),
+                    ( separate_svs, "inv-250", ( (sv_inversion, tuple()), 250, 1000 ) ),
+                    ( separate_svs, "dup-250", ( (sv_duplication, tuple()), 250, 1000 ) ),
+                    ( separate_svs, "trans-250", ( (sv_translocation, (50,)), 250, 1000 ) ),
+                    ( separate_svs, "ins-250", ( (sv_insertion, tuple()), 250, 1000 ) ),
+                    ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),
+                    ( separate_svs, "inv-1000", ( (sv_inversion, tuple()), 1000, 5000 ) ),
+                    ( separate_svs, "dup-1000", ( (sv_duplication, tuple()), 1000, 5000 ) ),
+                    ( separate_svs, "trans-1000", ( (sv_translocation, (200,)), 1000, 5000 ) ),
+                    ( separate_svs, "ins-1000", ( (sv_insertion, tuple()), 1000, 5000 ) )],
+                   [(create_illumina_reads_dwgsim, "ill_250", (250,)),
+                    (create_illumina_reads_dwgsim, "ill_150", (150,)),
+                    (create_illumina_reads_dwgsim, "ill_100", (100,)),
+                    (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+                   [5, 10, 25, 50])
     """
     for sv_size in [100, 150, 500]:
         for sv_type in [sv_deletion, sv_duplication, sv_inversion, sv_insertion]:

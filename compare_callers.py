@@ -128,6 +128,13 @@ def vcf_to_db(name, desc, sv_db, file_name, pack):
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
             to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
             call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, float('inf')))
+        elif call["ALT"] == "<DUP>" and "IMPRECISE" in call["INFO"]:
+            #print(call)
+            std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
+            std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
+            from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
+            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, float('inf')))
         elif call["ALT"] == "<INS>" and "PRECISE" in call["INFO"]:
             #print(call)
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
@@ -144,6 +151,14 @@ def vcf_to_db(name, desc, sv_db, file_name, pack):
             to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
             call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, True, float('inf')))
             call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, True, float('inf')))
+        elif call["ALT"] == "<INV>" and "IMPRECISE" in call["INFO"]:
+            #print(call)
+            std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
+            std_to = math.ceil(float(call["INFO"]["STD_quant_stop"])) - int(std_from/2)
+            from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_to/2)
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
+            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, to_pos, True, float('inf')))
+            call_inserter.insert_call(SvCall(to_pos, from_pos, from_pos, to_pos, True, float('inf')))
         else:
             print("unrecognized sv:", call)
             exit(0)
@@ -244,7 +259,7 @@ def compare_callers(db_name, names_a, names_b=["simulated sv"], min_scores=[0]):
                        *(str(x) for x in compare_caller(sv_db, id_a, id_b, min_score))])
     print_columns(out)
 
-def compare_all_callers_against(sv_db, json_info_file):
+def compare_all_callers_against(sv_db, json_info_file, out_file_name=None):
     out = []
     for dataset in json_info_file["datasets"]:
         id_b = dataset["ground_truth"]
@@ -255,19 +270,28 @@ def compare_all_callers_against(sv_db, json_info_file):
         #print("missing rate = how many calls are missing")
         for id_a in sv_db.newest_unique_runs(2, "ground_truth=" + str(id_b)):
             name_a = sv_db.get_run_name(id_a).split("-")
-            seq = name_a[1]
-            cov = name_a[2]
-            aligner = name_a[3]
-            caller = name_a[4]
+            dataset_name = name_a[0]
+            dataset_size = name_a[1]
+            seq = name_a[2]
+            cov = name_a[3]
+            aligner = name_a[4]
+            caller = name_a[5]
             date_a = sv_db.get_run_date(id_a)
             print("analyzing", id_a, name_a, date_a)
-            out.append([name_b, seq, cov, caller, aligner, str(id_a),
+            out.append([dataset_name, dataset_size, seq, cov, caller, aligner, str(id_a),
                         *(str(x) for x in compare_caller(sv_db, id_a, id_b, 0))])
     out.sort()
-    out.insert(0, ["dataset", "sequencer", "coverage", "caller", "aligner", "id", "#calls", "#found", "#almost",
+    out.insert(0, ["dataset", "size", "sequencer", "coverage", "caller", "aligner", "id", "#calls", "#found", "#almost",
                     "#missed", "#way off", "fuzziness"])
     print()
     print_columns(out)
+    if not out_file_name is None:
+        with open(out_file_name, "w") as file_out:
+            for line in out:
+                for cell in line:
+                    file_out.write(cell)
+                    file_out.write("\t")
+                file_out.write("\n")
 
 
 def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False):
@@ -320,7 +344,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("small_test", False)
+    analyze_sample_dataset("small_test", False, "small_test.csv")
     #analyze_sample_dataset("small_test_1")
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))
