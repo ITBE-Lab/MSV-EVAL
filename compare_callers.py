@@ -6,12 +6,13 @@ import compute_sv_jumps
 import sweep_sv_jumps
 
 def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, recompute_jumps=False):
-    def bwa_paired(read_set, sam_file_path):
+    def bwa(read_set, sam_file_path):
         index_str = json_dict["reference_path"] + "/bwa/genome"
-        os.system("~/workspace/bwa/bwa mem -t 32 " + index_str + " " + read_set["fasta_file"] + " "
-                  + read_set["fasta_file_mate"] + " > " + sam_file_path + " 2> /dev/null")
+        os.system("~/workspace/bwa/bwa mem -R \"@RG\\tID:1\\tSM:" + read_set["name"] + "\" -t 32 " + index_str + " "
+                  + read_set["fasta_file"] + " " + read_set["fasta_file_mate"] + " > " + sam_file_path
+                  + " 2> /dev/null")
 
-    def minimap2(read_set, sam_file_path):
+    def mm2(read_set, sam_file_path):
         presetting = None # noop
         if read_set["technology"] == "pb":
             presetting = "map-pb"
@@ -19,7 +20,7 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
             presetting = "map-ont"
         index_str = json_dict["reference_path"] + "/minimap/genome." + presetting + ".mmi"
         # -c output CIGAR in PAF; -a output SAM
-        os.system("~/workspace/minimap2/minimap2 -c -a -t 32 -x " + presetting + " " + index_str + " "
+        os.system("~/workspace/minimap2/minimap2 --MD -c -a -t 32 -x " + presetting + " " + index_str + " "
                   + read_set["fasta_file"] + " > " + sam_file_path + " 2> /dev/null")
 
     def ngmlr(read_set, sam_file_path):
@@ -33,9 +34,27 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
         os.system("~/workspace/ngmlr/bin/ngmlr-0.2.8/ngmlr -r " + index_str + " -q "
                   + read_set["fasta_file"] + " -t 32 -x " + presetting + " > " + sam_file_path + " 2> /dev/null")
 
+    def blasr(read_set, sam_file_path):
+        s = "~/workspace/legacy_blasr/blasr " + read_set["fasta_file"] + " " + json_dict["reference_path"] \
+                  + "/blasr/genome.fasta -printSAMQV -nproc 32 -sam -out " + sam_file_path + ".no_qstring > /dev/null"
+        #print(s)
+        os.system(s)
+        with open(sam_file_path + ".no_qstring", "r") as in_file:
+            with open(sam_file_path, "w") as out_file:
+                for line in in_file:
+                    if line[0] == "@":
+                        out_file.write(line) # \n contained in line
+                    else:
+                        columns = line[:-1].split("\t")
+                        columns[10] = "~"*len(columns[9]) # overwrite qString
+                        for column in columns:
+                            out_file.write(column + "\t")
+                        out_file.write("\n")
+
+
     alignment_calls = {
-        "create_reads_survivor": [minimap2, ngmlr],
-        "create_illumina_reads_dwgsim": [bwa_paired]
+        "create_reads_survivor": [mm2, ngmlr, blasr],
+        "create_illumina_reads_dwgsim": [bwa]
     }
 
     for dataset in json_dict["datasets"]:
@@ -168,33 +187,77 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
     def sniffles(bam_file, vcf_file):
         os.system("~/workspace/Sniffles/bin/sniffles-core-1.0.8/sniffles -t 32 -m " + bam_file + " -v " + vcf_file
                   + " >/dev/null 2>&1")
-    sv_calls = [sniffles]
+
+    def pbHoney(bam_file, vcf_file):
+        os.system("~/workspace/pbhoney/PBSuite_15.8.24/bin/Honey.py pie -n 32 -o " + vcf_file + ".pie.bam " + bam_file +
+                  " " + json_dict["reference_path"] + "/blasr/genome.fasta")
+
+        os.system("~/workspace/samtools/samtools sort -@ 32 -m 1G " + vcf_file + ".pie.bam > " + 
+                   vcf_file + ".pie.sorted.bam")
+        os.system("~/workspace/samtools/samtools index " + vcf_file + ".pie.sorted.bam > " + 
+                   vcf_file + ".pie.sorted.bam.bai")
+
+        os.system("~/workspace/pbhoney/PBSuite_15.8.24/bin/Honey.py tails -o " + vcf_file + ".hon.tails " + 
+                   vcf_file + ".pie.sorted.bam")
+
+
+        os.system("~/workspace/pbhoney/PBSuite_15.8.24/bin/Honey.py spots -o " + vcf_file + 
+                  ".hon.spots --reference " + json_dict["reference_path"] + "/blasr/genome.fasta " + vcf_file +
+                  ".pie.sorted.bam" )
+
+        os.system("~/workspace/bcftools/bcftools-1.9/bcftools merge " + vcf_file + ".hon.tails " + vcf_file + 
+                  ".hon.spots.spots > " + vcf_file)
+
+    def delly(bam_file, vcf_file):
+        os.system("~/workspace/delly/delly call -g " + json_dict["reference_path"] + "/fasta/genome.fna " + bam_file
+                  + " -o " + vcf_file + ".bcf ") #>/dev/null 2>&1
+
+        os.system("~/workspace/bcftools/bcftools-1.9/bcftools view " + vcf_file + ".bcf > " + vcf_file)
+    def smoove(bam_file, vcf_file):
+        bam_folder = bam_file[:bam_file.rfind("/")]
+        bam_filename = bam_file[bam_file.rfind("/")+1:]
+        vcf_folder = vcf_file[:vcf_file.rfind("/")]
+        vcf_filename = vcf_file[vcf_file.rfind("/")+1:]
+        s = "docker run -v " + bam_folder + ":/bam_folder/ -v " + json_dict["reference_path"] + \
+            "/fasta:/genome_folder/ -v " + vcf_folder + \
+            ":/vcf_folder/ -it brentp/smoove smoove call -x -o /vcf_folder/ --name " + vcf_filename + \
+            " --fasta /genome_folder/genome.fna -p 32 --genotype /bam_folder/" + bam_filename
+        print(s)
+        os.system( s )
+        os.system("gunzip " + vcf_file + "-smoove.genotyped.vcf.gz")
+
+
+    sv_calls = {
+        "bwa":   [delly, smoove],
+        "mm2":   [sniffles],
+        "ngmlr": [sniffles],
+        "blasr": [pbHoney]
+    }
+    
     for dataset in json_dict["datasets"]:
         for read_set in dataset["create_reads_funcs"]:
             if not "calls" in read_set:
                 read_set["calls"] = []
-            for sv_call in sv_calls:
-                if not sv_call.__name__ in read_set["calls"]:
-                    read_set["calls"].append(sv_call.__name__)
-                
-                # MA-SV
-                if not "MA_SV" in read_set["calls"]:
-                    read_set["calls"].append("MA_SV")
-                print("creating calls for", read_set["name"], "MA_SV")
-                params = ParameterSetManager()
-                if read_set["func_name"] == "create_illumina_reads_dwgsim":
-                    params.set_selected("SV-Illumina")
-                elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
-                    params.set_selected("SV-PacBio")
-                elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
-                    params.set_selected("SV-ONT")
-                else:
-                    print("WARNING: unknown read simulator - using default parameters for sv jumps")
-                sweep_sv_jumps.sweep_sv_jumps(params, db, read_set["jump_id"], 
-                                            pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
-                                            "ground_truth=" + str(dataset["ground_truth"]))
 
-                for alignment in read_set["alignments"]:
+            # MA-SV
+            if not "MA_SV" in read_set["calls"]:
+                read_set["calls"].append("MA_SV")
+            print("creating calls for", read_set["name"], "MA_SV")
+            params = ParameterSetManager()
+            if read_set["func_name"] == "create_illumina_reads_dwgsim":
+                params.set_selected("SV-Illumina")
+            elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
+                params.set_selected("SV-PacBio")
+            elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
+                params.set_selected("SV-ONT")
+            else:
+                print("WARNING: unknown read simulator - using default parameters for sv jumps")
+            #sweep_sv_jumps.sweep_sv_jumps(params, db, read_set["jump_id"], 
+            #                              pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
+            #                              "ground_truth=" + str(dataset["ground_truth"]))
+            # other callers
+            for alignment in read_set["alignments"]:
+                for sv_call in sv_calls[alignment]:
                     vcf_file_path = "/MAdata/sv_datasets/" + dataset_name + "/calls/" \
                             + read_set["name"] + "-" + alignment + "-" + sv_call.__name__ + ".vcf"
                     bam_file_path = "/MAdata/sv_datasets/" + dataset_name + "/alignments/" \
@@ -204,8 +267,15 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
                         continue
                     print("creating calls for", read_set["name"], alignment, sv_call.__name__)
                     sv_call(bam_file_path, vcf_file_path)
+                    if not os.path.exists( vcf_file_path ):
+                        print("caller did not create calls: ", read_set["name"], alignment, sv_call.__name__)
+                        continue
                     vcf_to_db(read_set["name"] + "-" + alignment + "-" + sv_call.__name__,
                               "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack)
+
+            for sv_call in sv_calls[alignment]:
+                if not sv_call.__name__ in read_set["calls"]:
+                    read_set["calls"].append(sv_call.__name__)
 
 
 def print_columns(data):
@@ -294,7 +364,7 @@ def compare_all_callers_against(sv_db, json_info_file, out_file_name=None):
                 file_out.write("\n")
 
 
-def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False):
+def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False, out_file_name=None):
     # decode hook for the json that decodes lists dicts and floats properly
     def _decode(o):
         if isinstance(o, str):
@@ -337,14 +407,14 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "w") as json_out:
             json.dump(json_info_file, json_out)
 
-    compare_all_callers_against(db, json_info_file)
+    compare_all_callers_against(db, json_info_file, "/MAdata/sv_datasets/" + dataset_name + "/bar_diagrams.tsv")
 
 
 #print("===============")
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("small_test", False, "small_test.csv")
-    #analyze_sample_dataset("small_test_1")
+    #analyze_sample_dataset("comprehensive_random", True)
+    analyze_sample_dataset("minimal", True)
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))
