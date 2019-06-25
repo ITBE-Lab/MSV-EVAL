@@ -30,7 +30,7 @@ def render_from_list(tsv_list, plot_category=(0,0), plot_sub_category=(0,2), cat
     plotss = []
     for _, sub_lists in split_by_cat(*plot_category, tsv_list[1:]):
         plots = []
-        for name, sub_list in split_by_cat(*plot_sub_category, sub_lists[1:]):
+        for name, sub_list in split_by_cat(*plot_sub_category, sub_lists):
             x = []
             for row in sub_list:
                 tup = (*row[category[0] : category[1]], row[category[1]] + " [id: " + str(row[6]) + "]")
@@ -113,8 +113,12 @@ def render_from_tsv(dataset_name):
     with open("/MAdata/sv_datasets/" + dataset_name + "/bar_diagrams.tsv", "r") as tsv_file:
         for line in tsv_file:
             tsv_list.append(line.split("\t"))
+    fist_line = tsv_list[0]
+    tsv_list = tsv_list[1:]
     tsv_list.sort()
+    tsv_list.insert(0, fist_line)
+    print(tsv_list)
     render_from_list(tsv_list)
 
 if __name__ == "__main__":
-    render_from_tsv("comprehensive_random")
+    render_from_tsv("minimal")

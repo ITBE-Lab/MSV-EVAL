@@ -100,9 +100,29 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
     db.create_jump_indices() # @todo should work with partial indices here
 
 def vcf_parser(file_name):
+    class VCFFile:
+        def __init__(self, d):
+            self.data = d
+
+        def __getitem__(self, name):
+            if not name in self.data:
+                return []
+            return self.data[name]
+
+        def __contains__(self, name):
+            return name in self.data
+
+        def __str__(self):
+            s = " {"
+            for key, val in self.data.items():
+                s += str(key) + ": " + str(val) + ", "
+            return s + " }"
+
     with open(file_name, "r") as vcf_file:
         names = []
         for line in vcf_file:
+            if line[-1] == "\n":
+                line = line[:-1]
             if line[:2] == "##":
                 pass
                 #info.append(line)
@@ -119,10 +139,10 @@ def vcf_parser(file_name):
                                 d2[key] = value
                             else:
                                 d2[key_value] = True
-                        d[name] = d2
+                        d[name] = VCFFile(d2)
                     else:
                         d[name] = field
-                yield d
+                yield VCFFile(d)
 
 def vcf_to_db(name, desc, sv_db, file_name, pack):
     sv_db.clear_calls_table_for_caller(name)
@@ -130,61 +150,66 @@ def vcf_to_db(name, desc, sv_db, file_name, pack):
     num_calls = 0
     for call in vcf_parser(file_name):
         num_calls += 1
-        if "ALT" in call:
-            if call["ALT"] == "<DEL>" and "PRECISE" in call["INFO"]:
-                #print(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, float('inf')))
-            elif call["ALT"] == "<DEL>" and "IMPRECISE" in call["INFO"]:
-                #print(call)
-                std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
-                std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
-                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
-                call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, float('inf')))
-            elif call["ALT"] == "<DUP>" and "PRECISE" in call["INFO"]:
-                #print(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, float('inf')))
-            elif call["ALT"] == "<DUP>" and "IMPRECISE" in call["INFO"]:
-                #print(call)
-                std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
-                std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
-                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
-                call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, float('inf')))
-            elif call["ALT"] == "<INS>" and "PRECISE" in call["INFO"]:
-                #print(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, float('inf')))
-            elif call["ALT"] == "<INS>" and "IMPRECISE" in call["INFO"]:
-                #print(call)
-                from_start = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                from_end = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(from_start, from_start, from_end - from_start,
-                                                    from_end - from_start, False, float('inf')))
-            elif call["ALT"] == "<INV>" and "PRECISE" in call["INFO"]:
-                #print(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, True, float('inf')))
-                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, True, float('inf')))
-            elif call["ALT"] == "<INV>" and "IMPRECISE" in call["INFO"]:
-                #print(call)
-                std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
-                std_to = math.ceil(float(call["INFO"]["STD_quant_stop"])) - int(std_from/2)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_to/2)
-                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, to_pos, True, float('inf')))
-                call_inserter.insert_call(SvCall(to_pos, from_pos, from_pos, to_pos, True, float('inf')))
-            else:
-                print("unrecognized sv:", call)
-                exit(0)
+        if call["TYPE"] == "DEL":
+            #print(call)
+            from_pos = int(call["START"]) + pack.start_of_sequence(call["CHROM"])
+            to_pos = int(call["END"]) + pack.start_of_sequence(call["CHROM"])
+            call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, float('inf')))
+        elif call["ALT"] == "<DEL>" and "PRECISE" in call["INFO"]:
+            #print(call)
+            from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
+            call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, float('inf')))
+        elif call["ALT"] == "<DEL>" and "IMPRECISE" in call["INFO"]:
+            #print(call)
+            std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
+            std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
+            from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
+            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, float('inf')))
+        elif call["ALT"] == "<DUP>" and "PRECISE" in call["INFO"]:
+            #print(call)
+            from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
+            call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, float('inf')))
+        elif call["ALT"] == "<DUP>" and "IMPRECISE" in call["INFO"]:
+            #print(call)
+            std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
+            std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
+            from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
+            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, float('inf')))
+        elif call["ALT"] == "<INS>" and "PRECISE" in call["INFO"]:
+            #print(call)
+            from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+            call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, float('inf')))
+        elif call["TYPE"] == "INS":
+            #print(call)
+            from_pos = int(call["START"]) + pack.start_of_sequence(call["CHROM"])
+            call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, float('inf')))
+        elif call["ALT"] == "<INS>" and "IMPRECISE" in call["INFO"]:
+            #print(call)
+            from_start = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+            from_end = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
+            call_inserter.insert_call(SvCall(from_start, from_start, from_end - from_start,
+                                                from_end - from_start, False, float('inf')))
+        elif call["ALT"] == "<INV>" and "PRECISE" in call["INFO"]:
+            #print(call)
+            from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
+            call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, True, float('inf')))
+            call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, True, float('inf')))
+        elif call["ALT"] == "<INV>" and "IMPRECISE" in call["INFO"]:
+            #print(call)
+            std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
+            std_to = math.ceil(float(call["INFO"]["STD_quant_stop"])) - int(std_from/2)
+            from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_to/2)
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
+            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, to_pos, True, float('inf')))
+            call_inserter.insert_call(SvCall(to_pos, from_pos, from_pos, to_pos, True, float('inf')))
         else:
             print("unrecognized sv:", call)
-            exit(0)
+            #exit(0)
     print("number of calls:", num_calls)
 
 def run_callers_if_necessary(dataset_name, json_dict, db, pack):
@@ -210,8 +235,10 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
         with open(vcf_file + ".hon.spots.spots", "w") as out_file:
             out_file.write("##fileformat=VCFv4.0\n")
             out_file.write("#CHROM\tOUTERSTART\tSTART\tINNERSTART\tINNEREND\tEND\tOUTEREND\tTYPE\tSIZE\tINFO\n")
-        os.system("~/workspace/pbhoney/PBSuite_15.8.24/bin/Honey.py spots -n 32 -o " + vcf_file + 
-                  ".hon.spots --reference " + json_dict["reference_path"] + "/blasr/genome.fasta" + bam_file )
+        #os.system("~/workspace/pbhoney/PBSuite_15.8.24/bin/Honey.py spots -n 32 -o " + vcf_file + 
+        #          ".hon.spots --reference " + json_dict["reference_path"] + "/blasr/genome.fasta " + bam_file )
+        os.system("~/workspace/pbhoney/PBSuite_15.8.24/bin/Honey.py spots --consensus None -n 32 -o " + vcf_file + 
+                  ".hon.spots " + bam_file )
 
         with open(vcf_file, "w") as out_file:
             with open(vcf_file + ".hon.spots.spots", "r") as in_file:
@@ -229,16 +256,22 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
 
         os.system("~/workspace/bcftools/bcftools-1.9/bcftools view " + vcf_file + ".bcf > " + vcf_file)
     def smoove(bam_file, vcf_file):
-        bam_folder = bam_file[:bam_file.rfind("/")]
-        bam_filename = bam_file[bam_file.rfind("/")+1:]
-        vcf_folder = vcf_file[:vcf_file.rfind("/")]
-        vcf_filename = vcf_file[vcf_file.rfind("/")+1:]
-        s = "docker run -v " + bam_folder + ":/bam_folder/ -v " + json_dict["reference_path"] + \
-            "/fasta:/genome_folder/ -v " + vcf_folder + \
-            ":/vcf_folder/ -it brentp/smoove smoove call -x -o /vcf_folder/ --name " + vcf_filename + \
-            " --fasta /genome_folder/genome.fna -p 32 --genotype /bam_folder/" + bam_filename
-        print(s)
-        os.system( s )
+        docker = True
+        if docker:
+            bam_folder = bam_file[:bam_file.rfind("/")]
+            bam_filename = bam_file[bam_file.rfind("/")+1:]
+            vcf_folder = vcf_file[:vcf_file.rfind("/")]
+            os.system( "rm -f " + vcf_folder + "/*.disc.*" )
+            vcf_filename = vcf_file[vcf_file.rfind("/")+1:]
+            s = "docker run -v " + bam_folder + ":/bam_folder/ -v " + json_dict["reference_path"] + \
+                "/fasta:/genome_folder/ -v " + vcf_folder + \
+                ":/vcf_folder/ -it brentp/smoove smoove call -o /vcf_folder/ --name " + vcf_filename + \
+                " --noextrafilters --fasta /genome_folder/genome.fna -p 32 --genotype /bam_folder/" + bam_filename
+            print(s)
+            os.system( s )
+        else:
+            os.system( "smoove call -o " + vcf_file + " --noextrafilters --fasta " + json_dict["reference_path"] 
+                       + " /fasta/genome.fna -p 32 --genotype " + bam_file )
         os.system("gunzip " + vcf_file + "-smoove.genotyped.vcf.gz")
 
 
@@ -267,9 +300,9 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
                 params.set_selected("SV-ONT")
             else:
                 print("WARNING: unknown read simulator - using default parameters for sv jumps")
-            #sweep_sv_jumps.sweep_sv_jumps(params, db, read_set["jump_id"], 
-            #                              pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
-            #                              "ground_truth=" + str(dataset["ground_truth"]))
+            sweep_sv_jumps.sweep_sv_jumps(params, db, read_set["jump_id"], 
+                                          pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
+                                          "ground_truth=" + str(dataset["ground_truth"]))
             # other callers
             for alignment in read_set["alignments"]:
                 for sv_call in sv_calls[alignment]:

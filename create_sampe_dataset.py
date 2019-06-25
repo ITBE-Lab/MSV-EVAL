@@ -202,9 +202,11 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = "~/workspace/SURVIVOR/HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset("/MAdata/genome/random",
+    create_dataset("/MAdata/genome/random_10_pow_6",
                    "minimal",
-                   [( separate_svs, "del-250", ( (sv_deletion, tuple()), 250, 1000 ) )],
+                   [( separate_svs, "del-0250", ( (sv_deletion, tuple()), 250, 1000 ) ),
+                    ( separate_svs, "ins-0250", ( (sv_insertion, tuple()), 250, 1000 ) ),
+                    ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) )],
                    [(create_illumina_reads_dwgsim, "ill_250", (250,)),
                    (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
                    [25])
