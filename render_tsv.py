@@ -1,6 +1,7 @@
 from bokeh.layouts import layout
 from bokeh.plotting import figure, show, reset_output, ColumnDataSource
 from bokeh.models import Arrow, VeeHead, FactorRange, LabelSet
+from bokeh.palettes import Category20, Category10
 from bokeh.transform import dodge
 from bokeh.core.properties import value
 from create_json import create_json_from_db
@@ -23,7 +24,7 @@ def to_int(x):
         return 0
     return int(x)
 
-def render_from_list(tsv_list, plot_category=(0,0), plot_sub_category=(0,2), category=(3,5), 
+def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category=(0,2), category=(3,5), 
                      stacks=[(8, 9, 11, "green", "orange", "gray")],
                      bars=[(7, 9, "red"), (12, None, "blue")]):
 
@@ -103,7 +104,39 @@ def render_from_list(tsv_list, plot_category=(0,0), plot_sub_category=(0,2), cat
             plot.legend.location = "top_center"
             plot.legend.orientation = "horizontal"
             plots.append(plot)
+
+
         plotss.append(plots)
+    
+    plotss.append([])
+    for name, sub_lists in split_by_cat(0, 3, tsv_list[1:]):
+        plot_2 = figure(title=str(name), tooltips="@i", active_scroll="wheel_zoom")
+        for idx, row in enumerate(sub_list):
+            x_every = 3
+            aligner_name = str((row[5], row[4]))
+            if aligner_name in json_dict[str(name)]:
+                x, y, x_2, y_2, p = json_dict[str(name)][aligner_name]
+                #print(x,y,x_2,y_2)
+
+                            
+                plot_2.line(x="x", y="y", legend=aligner_name + " (100nt blur)", color=Category20[10][2*(idx%10)+1],
+                            source=ColumnDataSource(data=dict(x=x_2, y=y_2)), line_width=2)
+                plot_2.x(x="x", y="y", legend=aligner_name + " (100nt blur)", color=Category20[10][2*(idx%10)+1],
+                         source=ColumnDataSource(data=dict(x=x_2[::x_every], y=y_2[::x_every], i=p[::x_every])),
+                         size=6, line_width=3)
+
+                plot_2.line(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
+                            source=ColumnDataSource(data=dict(x=x, y=y)), line_width=3)
+                plot_2.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
+                         source=ColumnDataSource(data=dict(x=x[::x_every], y=y[::x_every], i=p[::x_every])),
+                         size=10, line_width=4)
+        if len(plotss[-1]) > 0:
+            plot_2.x_range = plotss[-1][-1].x_range
+            plot_2.y_range = plotss[-1][-1].y_range
+        plot_2.xaxis.axis_label = "recall"
+        plot_2.yaxis.axis_label = "precision"
+        plot_2.legend.location = "bottom_left"
+        plotss[-1].append(plot_2)
 
     reset_output()
     show(layout(plotss))
@@ -113,12 +146,29 @@ def render_from_tsv(dataset_name):
     with open("/MAdata/sv_datasets/" + dataset_name + "/bar_diagrams.tsv", "r") as tsv_file:
         for line in tsv_file:
             tsv_list.append(line.split("\t"))
+    # decode hook for the json that decodes lists dicts and floats properly
+    def _decode(o):
+        if isinstance(o, str):
+            try:
+                return float(o)
+            except ValueError:
+                return o
+        elif isinstance(o, dict):
+            return {_decode(k): _decode(v) for k, v in o.items()}
+        elif isinstance(o, list):
+            return [_decode(v) for v in o]
+        else:
+            return o
+    #actually open and load the file
+    json_dict = None # noop
+    with open("/MAdata/sv_datasets/" + dataset_name + "/by_score.json", "r") as json_file:
+        json_dict = json.loads(json_file.read(), object_hook=_decode)
     fist_line = tsv_list[0]
     tsv_list = tsv_list[1:]
     tsv_list.sort()
     tsv_list.insert(0, fist_line)
     print(tsv_list)
-    render_from_list(tsv_list)
+    render_from_list(tsv_list, json_dict)
 
 if __name__ == "__main__":
     render_from_tsv("minimal")

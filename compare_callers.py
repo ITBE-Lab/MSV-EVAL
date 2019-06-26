@@ -154,59 +154,59 @@ def vcf_to_db(name, desc, sv_db, file_name, pack):
                 #print(call)
                 from_pos = int(call["START"]) + pack.start_of_sequence(call["CHROM"])
                 to_pos = int(call["END"]) + pack.start_of_sequence(call["CHROM"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, float('inf')))
+                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, call["INFO"]["coverage"]))
             elif call["ALT"] == "<DEL>" and "PRECISE" in call["INFO"]:
                 #print(call)
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, float('inf')))
+                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, call["INFO"]["RE"]))
             elif call["ALT"] == "<DEL>" and "IMPRECISE" in call["INFO"]:
                 #print(call)
                 std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
                 std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
-                call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, float('inf')))
+                call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, call["INFO"]["RE"]))
             elif call["ALT"] == "<DUP>" and "PRECISE" in call["INFO"]:
                 #print(call)
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, float('inf')))
+                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, call["INFO"]["RE"]))
             elif call["ALT"] == "<DUP>" and "IMPRECISE" in call["INFO"]:
                 #print(call)
                 std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
                 std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
-                call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, float('inf')))
+                call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, call["INFO"]["RE"]))
             elif call["ALT"] == "<INS>" and "PRECISE" in call["INFO"]:
                 #print(call)
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, float('inf')))
+                call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, call["INFO"]["RE"]))
             elif call["TYPE"] == "INS":
                 #print(call)
                 from_pos = int(call["START"]) + pack.start_of_sequence(call["CHROM"])
-                call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, float('inf')))
+                call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, call["INFO"]["coverage"]))
             elif call["ALT"] == "<INS>" and "IMPRECISE" in call["INFO"]:
                 #print(call)
                 from_start = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
                 from_end = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
                 call_inserter.insert_call(SvCall(from_start, from_start, from_end - from_start,
-                                                    from_end - from_start, False, float('inf')))
+                                                    from_end - from_start, False, call["INFO"]["RE"]))
             elif call["ALT"] == "<INV>" and "PRECISE" in call["INFO"]:
                 #print(call)
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, True, float('inf')))
-                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, True, float('inf')))
+                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, True, call["INFO"]["RE"]))
+                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, True, call["INFO"]["RE"]))
             elif call["ALT"] == "<INV>" and "IMPRECISE" in call["INFO"]:
                 #print(call)
                 std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
                 std_to = math.ceil(float(call["INFO"]["STD_quant_stop"])) - int(std_from/2)
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_to/2)
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, to_pos, True, float('inf')))
-                call_inserter.insert_call(SvCall(to_pos, from_pos, from_pos, to_pos, True, float('inf')))
+                call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, to_pos, True, call["INFO"]["RE"]))
+                call_inserter.insert_call(SvCall(to_pos, from_pos, from_pos, to_pos, True, call["INFO"]["RE"]))
             else:
                 print("unrecognized sv:", call)
                 #exit(0)
@@ -346,6 +346,45 @@ def print_columns(data):
             first = False
         last_row = row
 
+def analyze_by_score(sv_db, id_a, id_b):
+    num_calls_a = sv_db.get_num_calls(id_a, 0) # num calls made
+    if num_calls_a == 0:
+        return [], [], [], [], []
+    min_score = sv_db.get_min_score(id_a)
+    max_score = sv_db.get_max_score(id_a)
+    p = min_score
+    inc = (max_score - min_score) / 30
+    if max_score <= min_score:
+        inc = 1
+    xs = []
+    xs_2 = []
+    ys = []
+    ys_2 = []
+    ps = []
+    num_calls_b = sv_db.get_num_calls(id_b, 0) # num actual calls
+    if num_calls_b == 0 or min_score == float('inf') or max_score == float('inf'):
+        #print(num_calls_a, min_score, max_score)
+        return [], [], [], [], []
+    while p <= max_score:
+        #print(min_score, p, max_score)
+        ps.append(p)
+        # how many of the sv's are detected?
+        num_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, p, 0)
+        num_almost_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_b, id_a, p, 100)
+
+        xs.append(num_overlaps_b_to_a/num_calls_b)
+        xs_2.append(num_almost_overlaps_a_to_b/num_calls_b)
+
+        num_calls_a = sv_db.get_num_calls(id_a, p) # num calls made
+
+        ys.append(num_overlaps_b_to_a/num_calls_a)
+        ys_2.append(num_almost_overlaps_a_to_b/num_calls_a)
+
+        p += inc
+
+    # recall, precision, recall_relaxed, precision_relaxed, score
+    return xs, ys, xs_2, ys_2, ps
+
 def compare_caller(sv_db, id_a, id_b, min_score):
     num_calls_a = sv_db.get_num_calls(id_a, min_score) # num calls made
     num_calls_b = sv_db.get_num_calls(id_b, min_score) # num actual calls
@@ -382,8 +421,9 @@ def compare_callers(db_name, names_a, names_b=["simulated sv"], min_scores=[0]):
                        *(str(x) for x in compare_caller(sv_db, id_a, id_b, min_score))])
     print_columns(out)
 
-def compare_all_callers_against(sv_db, json_info_file, out_file_name=None):
+def compare_all_callers_against(sv_db, json_info_file, out_file_name=None, outfile_2_name=None):
     out = []
+    out_2 = {}
     for dataset in json_info_file["datasets"]:
         id_b = dataset["ground_truth"]
         name_b = dataset["name"]
@@ -403,6 +443,10 @@ def compare_all_callers_against(sv_db, json_info_file, out_file_name=None):
             print("analyzing", id_a, name_a, date_a)
             out.append([dataset_name, dataset_size, seq, cov, caller, aligner, str(id_a),
                         *(str(x) for x in compare_caller(sv_db, id_a, id_b, 0))])
+            if str(name_a[:4]) not in out_2:
+                out_2[str(name_a[:4])] = {}
+            out_2[str(name_a[:4])][str((aligner, caller))] = analyze_by_score(sv_db, id_a, id_b)
+
     out.sort()
     out.insert(0, ["dataset", "size", "sequencer", "coverage", "caller", "aligner", "id", "#calls", "#found", "#almost",
                     "#missed", "#way off", "fuzziness"])
@@ -415,6 +459,9 @@ def compare_all_callers_against(sv_db, json_info_file, out_file_name=None):
                     file_out.write(cell)
                     file_out.write("\t")
                 file_out.write("\n")
+    if not outfile_2_name is None:
+        with open(outfile_2_name, "w") as file_out:
+            json.dump(out_2, file_out)
 
 
 def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False, out_file_name=None):
@@ -459,7 +506,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "w") as json_out:
             json.dump(json_info_file, json_out)
 
-    compare_all_callers_against(db, json_info_file, "/MAdata/sv_datasets/" + dataset_name + "/bar_diagrams.tsv")
+    compare_all_callers_against(db, json_info_file, "/MAdata/sv_datasets/" + dataset_name + "/bar_diagrams.tsv", "/MAdata/sv_datasets/" + dataset_name + "/by_score.json")
 
 
 #print("===============")
@@ -467,6 +514,6 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #print("===============")
 if __name__ == "__main__":
     #analyze_sample_dataset("comprehensive_random", True)
-    analyze_sample_dataset("minimal", True)
+    analyze_sample_dataset("minimal", False)
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))
