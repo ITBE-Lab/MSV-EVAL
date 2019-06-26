@@ -56,6 +56,8 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0):
     # drain all sources
     res.simultaneous_get( parameter_set_manager.get_num_threads() )
     sv_db.create_caller_indices()
+    
+    db.create_jump_indices( jumps_to_db.cpp_module.jump_inserter.sv_jump_run_id )
 
     # return the run_id
     return jumps_to_db.cpp_module.jump_inserter.sv_jump_run_id

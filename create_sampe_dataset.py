@@ -16,7 +16,7 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, sequenced_genome_path, d
 
     dwgsim = "~/workspace/DWGSIM/dwgsim"
     command = dwgsim + " -1 " + str(read_length) + " -2 " + str(read_length) + \
-        " -C " + str(coverage) + " " + sequenced_genome_path + " " + reads_folder + name
+        " -C " + str(coverage) + " -r 0 " + sequenced_genome_path + " " + reads_folder + name
     os.system(command + " >/dev/null 2>&1")
     
     reader = PairedFileReader(ParameterSetManager(), 
