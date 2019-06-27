@@ -202,32 +202,32 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = "~/workspace/SURVIVOR/HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset("/MAdata/genome/random_10_pow_6",
-                   "minimal",
-                   [( separate_svs, "del-0250", ( (sv_deletion, tuple()), 250, 1000 ) ),
-                    ( separate_svs, "ins-0250", ( (sv_insertion, tuple()), 250, 1000 ) ),
-                    ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) )],
-                   [(create_illumina_reads_dwgsim, "ill_250", (250,)),
-                   (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
-                   [25])
-
-    #create_dataset("/MAdata/genome/random",
-    #               "comprehensive_random",
-    #               [( separate_svs, "del-250", ( (sv_deletion, tuple()), 250, 1000 ) ),
-    #                ( separate_svs, "inv-250", ( (sv_inversion, tuple()), 250, 1000 ) ),
-    #                ( separate_svs, "dup-250", ( (sv_duplication, tuple()), 250, 1000 ) ),
-    #                ( separate_svs, "trans-250", ( (sv_translocation, (50,)), 250, 1000 ) ),
-    #                ( separate_svs, "ins-250", ( (sv_insertion, tuple()), 250, 1000 ) ),
-    #                ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),
-    #                ( separate_svs, "inv-1000", ( (sv_inversion, tuple()), 1000, 5000 ) ),
-    #                ( separate_svs, "dup-1000", ( (sv_duplication, tuple()), 1000, 5000 ) ),
-    #                ( separate_svs, "trans-1000", ( (sv_translocation, (200,)), 1000, 5000 ) ),
-    #                ( separate_svs, "ins-1000", ( (sv_insertion, tuple()), 1000, 5000 ) )],
+    #create_dataset("/MAdata/genome/random_10_pow_6",
+    #               "minimal",
+    #               [( separate_svs, "del-0250", ( (sv_deletion, tuple()), 250, 1000 ) ),
+    #                ( separate_svs, "ins-0250", ( (sv_insertion, tuple()), 250, 1000 ) ),
+    #                ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) )],
     #               [(create_illumina_reads_dwgsim, "ill_250", (250,)),
-    #                (create_illumina_reads_dwgsim, "ill_150", (150,)),
-    #                (create_illumina_reads_dwgsim, "ill_100", (100,)),
-    #                (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
-    #               [5, 10, 25, 50])
+    #               (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+    #               [25])
+
+    create_dataset("/MAdata/genome/random_10_pow_6",
+                   "comprehensive_random",
+                   [( separate_svs, "del-250", ( (sv_deletion, tuple()), 250, 1000 ) ),
+                    ( separate_svs, "inv-250", ( (sv_inversion, tuple()), 250, 1000 ) ),
+                    ( separate_svs, "dup-250", ( (sv_duplication, tuple()), 250, 1000 ) ),
+                    ( separate_svs, "trans-250", ( (sv_translocation, (50,)), 250, 1000 ) ),
+                    ( separate_svs, "ins-250", ( (sv_insertion, tuple()), 250, 1000 ) ),
+                    ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),
+                    ( separate_svs, "inv-1000", ( (sv_inversion, tuple()), 1000, 5000 ) ),
+                    ( separate_svs, "dup-1000", ( (sv_duplication, tuple()), 1000, 5000 ) ),
+                    ( separate_svs, "trans-1000", ( (sv_translocation, (200,)), 1000, 5000 ) ),
+                    ( separate_svs, "ins-1000", ( (sv_insertion, tuple()), 1000, 5000 ) )],
+                   [(create_illumina_reads_dwgsim, "ill_250", (250,)),
+                    (create_illumina_reads_dwgsim, "ill_150", (150,)),
+                    (create_illumina_reads_dwgsim, "ill_100", (100,)),
+                    (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+                   [5, 10, 25, 50])
     """
     for sv_size in [100, 150, 500]:
         for sv_type in [sv_deletion, sv_duplication, sv_inversion, sv_insertion]:

@@ -177,5 +177,5 @@ if __name__ == "__main__":
     #out_dict = create_json_from_db(sv_db, "/MAdata/genome/human/GRCh38.p12/ma/genome")
     #out_dict = sv_jumps_to_dict(sv_db, [3, 23], 0, 0, 10000, 10000)
     
-    out_dict = sv_jumps_to_dict(sv_db, [3, 23], only_supporting_jumps=True)
+    out_dict = sv_jumps_to_dict(sv_db, [2, 41], only_supporting_jumps=True)
     render_from_dict(out_dict)

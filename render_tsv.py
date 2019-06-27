@@ -109,34 +109,41 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
         plotss.append(plots)
     
     plotss.append([])
+    plotss.append([])
     for name, sub_lists in split_by_cat(0, 3, tsv_list[1:]):
         plot_2 = figure(title=str(name), tooltips="@i", active_scroll="wheel_zoom")
-        for idx, row in enumerate(sub_list):
+        plot_3 = figure(title=str(name) + " - 100nt blur", tooltips="@i", active_scroll="wheel_zoom")
+        for idx, row in enumerate(sub_lists):
             x_every = 3
             aligner_name = str((row[5], row[4]))
             if aligner_name in json_dict[str(name)]:
                 x, y, x_2, y_2, p = json_dict[str(name)][aligner_name]
                 #print(x,y,x_2,y_2)
 
-                            
-                plot_2.line(x="x", y="y", legend=aligner_name + " (100nt blur)", color=Category20[10][2*(idx%10)+1],
-                            source=ColumnDataSource(data=dict(x=x_2, y=y_2)), line_width=2)
-                plot_2.x(x="x", y="y", legend=aligner_name + " (100nt blur)", color=Category20[10][2*(idx%10)+1],
+                plot_3.line(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
+                            source=ColumnDataSource(data=dict(x=x_2, y=y_2)), line_width=2, alpha=0.5)
+                plot_3.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
                          source=ColumnDataSource(data=dict(x=x_2[::x_every], y=y_2[::x_every], i=p[::x_every])),
                          size=6, line_width=3)
 
                 plot_2.line(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                            source=ColumnDataSource(data=dict(x=x, y=y)), line_width=3)
+                            source=ColumnDataSource(data=dict(x=x, y=y)), line_width=3, alpha=0.5)
                 plot_2.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
                          source=ColumnDataSource(data=dict(x=x[::x_every], y=y[::x_every], i=p[::x_every])),
                          size=10, line_width=4)
-        if len(plotss[-1]) > 0:
-            plot_2.x_range = plotss[-1][-1].x_range
-            plot_2.y_range = plotss[-1][-1].y_range
+        if len(plotss[-2]) > 0:
+            plot_2.x_range = plotss[-2][0].x_range
+            plot_2.y_range = plotss[-2][0].y_range
+            plot_3.x_range = plotss[-2][0].x_range
+            plot_3.y_range = plotss[-2][0].y_range
         plot_2.xaxis.axis_label = "recall"
         plot_2.yaxis.axis_label = "precision"
         plot_2.legend.location = "bottom_left"
-        plotss[-1].append(plot_2)
+        plot_3.xaxis.axis_label = "recall"
+        plot_3.yaxis.axis_label = "precision"
+        plot_3.legend.location = "bottom_left"
+        plotss[-2].append(plot_2)
+        plotss[-1].append(plot_3)
 
     reset_output()
     show(layout(plotss))
