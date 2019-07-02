@@ -176,8 +176,7 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
 def sweep_sv_call(sv_call):
     # single linkage clustering for jump distances
     # we call sweep_sv_jumps for all insert_ratio clusters with a max dist of max_insert_ratio_diff
-    max_insert_ratio_diff = 500
-    max_q_len = 200
+    max_insert_ratio_diff = 150
 
     sv_jmps = [sv_call.call.get_jump(x) for x in range(len(sv_call.call.supporing_jump_ids))]
     sv_jmps.sort(key=lambda x: x.insert_ratio())
