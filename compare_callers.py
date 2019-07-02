@@ -149,9 +149,11 @@ def vcf_to_db(name, desc, sv_db, file_name, pack):
     def find_confidence(call):
         if "coverage" in call["INFO"]:
             return float(call["INFO"]["coverage"])
-        if "PE" in call["INFO"] and "SR" in call["INFO"]:
+        if "RE" in call["INFO"]: # sniffles
+            return float(call["INFO"]["RE"])
+        if "PE" in call["INFO"] and "SR" in call["INFO"]: # pbHoney
             return float(call["INFO"]["PE"]) + float(call["INFO"]["SR"])
-        if call["QUAL"] != ".":
+        if call["QUAL"] != ".": # vcf...
             return float(call["QUAL"])
         return float("inf")
     num_calls = 0
