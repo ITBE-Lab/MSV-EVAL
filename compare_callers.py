@@ -12,6 +12,12 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
                   + read_set["fasta_file"] + " " + read_set["fasta_file_mate"] + " > " + sam_file_path
                   + " 2> /dev/null")
 
+    def bowtie(read_set, sam_file_path):
+        index_str = json_dict["reference_path"] + "/bowtie/genome.fna"
+        os.system("~/workspace/bowtie2/bowtie2-2.3.3.1/bowtie2 --rg-id 1 --rg SM:" + read_set["name"] + " -p 32 -x " +
+                  index_str + " -1 " + read_set["fasta_file"] + " -2 " + read_set["fasta_file_mate"] + " -S " + sam_file_path
+                  + " 2> /dev/null")
+
     def mm2(read_set, sam_file_path):
         presetting = None # noop
         if read_set["technology"] == "pb":
@@ -54,7 +60,7 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
 
     alignment_calls = {
         "create_reads_survivor": [mm2, ngmlr, blasr],
-        "create_illumina_reads_dwgsim": [bwa]
+        "create_illumina_reads_dwgsim": [bwa, bowtie]
     }
 
     for dataset in json_dict["datasets"]:
@@ -269,6 +275,13 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
                   + " -o " + vcf_file + ".bcf ") #>/dev/null 2>&1
 
         os.system("~/workspace/bcftools/bcftools-1.9/bcftools view " + vcf_file + ".bcf > " + vcf_file)
+
+    def manta(bam_file, vcf_file):
+        os.system("python2 ~/workspace/manta/manta-1.5.0.centos6_x86_64/bin/configManta.py call --referenceFasta " + json_dict["reference_path"] + "/fasta/genome.fna --bam " + bam_file + " --runDir " + vcf_file + ".manta" )
+
+        os.system("cp " + vcf_file + ".manta/diploidSV.vcf.gz" + " " + vcf_file + ".gz")
+        os.system("gunzip " + vcf_file + ".gz")
+
     def smoove(bam_file, vcf_file):
         docker = True
         if docker:
@@ -290,7 +303,7 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
 
 
     sv_calls = {
-        "bwa":   [delly, smoove],
+        "bwa":   [delly, smoove, manta],
         "mm2":   [sniffles],
         "ngmlr": [sniffles],
         "blasr": [pbHoney]
@@ -525,6 +538,6 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #print("===============")
 if __name__ == "__main__":
     #analyze_sample_dataset("comprehensive_random", True)
-    analyze_sample_dataset("minimal", True, True)
+    analyze_sample_dataset("minimal", True)
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))

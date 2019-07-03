@@ -147,7 +147,7 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc):
         for key in cluster_keys:
             if key not in cluster_dict:
                 print("CRITICAL:", key, "not in dict")
-                print("bitvec:", y_range_tree.bit_vec.bit_vec[key-10:key+10])
+                print("bitvec:", y_range_tree.bit_vec.bit_vec[max(0,key-10):min(key+10,len(y_range_tree.bit_vec.bit_vec))])
                 assert False
             cluster.join(cluster_dict[key])
             #print("del", key, cluster_dict[key])
@@ -183,7 +183,7 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc):
                 for accepted_cluster in sweep_sv_call(cluster_dict[key]):
                     #print("accepting", str(accepted_cluster))
                     call_inserter.insert_call(accepted_cluster.call)
-            y_range_tree.clear_downwards(key + 1)
+            y_range_tree.clear_downwards(key + 1) # @todo tmrrw fix 0 not in dict error here?
             #print("del", key, cluster_dict[key])
             del cluster_dict[key]
 

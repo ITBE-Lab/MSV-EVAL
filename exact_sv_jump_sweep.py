@@ -106,8 +106,8 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
             if re_estimate_cluster_size:
                 right = cluster.right()
                 up = cluster.up()
-                cluster.call.from_start = cluster.left()
-                cluster.call.to_start = cluster.down()
+                cluster.call.from_start = max(0, cluster.left())
+                cluster.call.to_start = max(0, cluster.down())
                 cluster.call.from_size = max(right - cluster.call.from_start, 1)
                 cluster.call.to_size = max(1, up - cluster.call.to_start)
             cluster.call.score = 0
