@@ -138,6 +138,8 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc):
     print("sweeping...")
     #for switch_strand, from_pos, to_start, to_end, is_end, score, jmp in line_sweep_list:
     def sweep_sv_start(sv_jmp):
+        #if sv_jmp.to_start() == 0:
+        #    print("start:", sv_jmp.to_start(), sv_jmp.to_end(), sv_jmp.from_start(), sv_jmp.from_end())
         #if not sv_jmp.switch_strand_known():
         #    return # @todo
         cluster = SvCallPy(sv_jmp)
@@ -165,6 +167,8 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc):
                   new_key)
             assert False
     def sweep_sv_end(sv_jmp):
+        #if sv_jmp.to_start() == 0:
+        #    print("end:", sv_jmp.to_start(), sv_jmp.to_end(), sv_jmp.from_start(), sv_jmp.from_end())
         #if not sv_jmp.switch_strand_known():
         #    return # @todo
         key = y_range_tree.find_zero(sv_jmp.to_start(), sv_jmp.from_start_same_strand())
@@ -173,7 +177,7 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc):
             print("searched from", y_range_tree.to_new_coord_system_c(
                 sv_jmp.to_start(), sv_jmp.from_start_same_strand()))
             print(
-                "bitvec:", y_range_tree.bit_vec.bit_vec[key-10:key+10])
+                "bitvec:", y_range_tree.bit_vec.bit_vec[max(key-10,0):key+10])
             assert False
         cluster_dict[key].count -= 1
         if len(cluster_dict[key]) <= 0:
@@ -183,9 +187,14 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc):
                 for accepted_cluster in sweep_sv_call(cluster_dict[key]):
                     #print("accepting", str(accepted_cluster))
                     call_inserter.insert_call(accepted_cluster.call)
-            y_range_tree.clear_downwards(key + 1) # @todo tmrrw fix 0 not in dict error here?
+            y_range_tree.clear_downwards(key + 1)
+            # @todo are the next two lines correct or not?
+            #if key == 0: # fix bug where first bit of cluster is not cleared (not sure wether this is actually correct)
+            #    y_range_tree.bit_vec.bit_vec[0] = 0
             #print("del", key, cluster_dict[key])
             del cluster_dict[key]
+        #if sv_jmp.to_start() == 0:
+        #    print("bitvec:", y_range_tree.bit_vec.bit_vec[0:10])
 
     while sweeper.has_next_start() and sweeper.has_next_end():
         if sweeper.next_start_is_smaller():

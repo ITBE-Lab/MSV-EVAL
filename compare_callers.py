@@ -79,6 +79,8 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
                     params.set_selected("SV-ONT")
                 else:
                     print("WARNING: unknown read simulator - using default parameters for sv jumps")
+                #params.by_name("Number of Threads").set(1)
+                #params.by_name("Use all Processor Cores").set(False)
                 read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(params, fm_index, pack, db, 
                                                                         read_set["seq_id"])
             for alignment_call in alignment_calls[read_set["func_name"]]:
@@ -277,10 +279,14 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
         os.system("~/workspace/bcftools/bcftools-1.9/bcftools view " + vcf_file + ".bcf > " + vcf_file)
 
     def manta(bam_file, vcf_file):
-        os.system("python2 ~/workspace/manta/manta-1.5.0.centos6_x86_64/bin/configManta.py call --referenceFasta " + json_dict["reference_path"] + "/fasta/genome.fna --bam " + bam_file + " --runDir " + vcf_file + ".manta" )
+        # prepare manta
+        os.system("rm -r " + vcf_file + ".manta") # clean up folder
+        os.system("python2 ~/workspace/manta/manta-1.5.0.centos6_x86_64/bin/configManta.py --referenceFasta " + json_dict["reference_path"] + "/fasta/genome.fna --bam " + bam_file + " --runDir " + vcf_file + ".manta" )
+        # actually run manta
+        os.system("python2 " + vcf_file + ".manta/runWorkflow.py" )
 
         os.system("cp " + vcf_file + ".manta/diploidSV.vcf.gz" + " " + vcf_file + ".gz")
-        os.system("gunzip " + vcf_file + ".gz")
+        os.system("gunzip -f " + vcf_file + ".gz")
 
     def smoove(bam_file, vcf_file):
         docker = True
@@ -299,14 +305,15 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
         else:
             os.system( "smoove call -o " + vcf_file + " --noextrafilters --fasta " + json_dict["reference_path"] 
                        + " /fasta/genome.fna -p 32 --genotype " + bam_file )
-        os.system("gunzip " + vcf_file + "-smoove.genotyped.vcf.gz")
+        os.system("gunzip -f " + vcf_file + "-smoove.genotyped.vcf.gz")
 
 
     sv_calls = {
-        "bwa":   [delly, smoove, manta],
-        "mm2":   [sniffles],
-        "ngmlr": [sniffles],
-        "blasr": [pbHoney]
+        "bwa":    [delly, smoove, manta],
+        "bowtie": [delly, smoove, manta],
+        "mm2":    [sniffles],
+        "ngmlr":  [sniffles],
+        "blasr":  [pbHoney]
     }
     
     for dataset in json_dict["datasets"]:
@@ -348,9 +355,9 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
                     vcf_to_db(read_set["name"] + "-" + alignment + "-" + sv_call.__name__,
                               "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack)
 
-            for sv_call in sv_calls[alignment]:
-                if not sv_call.__name__ in read_set["calls"]:
-                    read_set["calls"].append(sv_call.__name__)
+                for sv_call in sv_calls[alignment]:
+                    if not sv_call.__name__ in read_set["calls"]:
+                        read_set["calls"].append(sv_call.__name__)
 
 
 def print_columns(data):
@@ -538,6 +545,6 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #print("===============")
 if __name__ == "__main__":
     #analyze_sample_dataset("comprehensive_random", True)
-    analyze_sample_dataset("minimal", True)
+    analyze_sample_dataset("minimal", True, True)
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))
