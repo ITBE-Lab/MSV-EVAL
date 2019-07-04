@@ -283,7 +283,7 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
         os.system("rm -r " + vcf_file + ".manta") # clean up folder
         os.system("python2 ~/workspace/manta/manta-1.5.0.centos6_x86_64/bin/configManta.py --referenceFasta " + json_dict["reference_path"] + "/fasta/genome.fna --bam " + bam_file + " --runDir " + vcf_file + ".manta" )
         # actually run manta
-        os.system("python2 " + vcf_file + ".manta/runWorkflow.py" )
+        os.system("python2 " + vcf_file + ".manta/runWorkflow.py -j 32 -m local" )
 
         os.system("cp " + vcf_file + ".manta/diploidSV.vcf.gz" + " " + vcf_file + ".gz")
         os.system("gunzip -f " + vcf_file + ".gz")
