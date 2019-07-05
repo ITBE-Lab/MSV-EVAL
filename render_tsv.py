@@ -54,6 +54,15 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
                         "b":[to_int(row[bottom_idx])/2 if to_int(row[bottom_idx]) != 0 else -100 for row in sub_list],
                         "b2":[to_int(row[bottom_idx]) + (to_int(row[bottom2_idx]) - to_int(row[bottom_idx]))/2 if row[bottom2_idx] != row[bottom_idx] else -100 for row in sub_list]
                     }
+
+                # helper lines
+                plot.line(x=[x[0], x[-1]], 
+                          y=[to_int(sub_list[0][bottom2_idx]), to_int(sub_list[0][bottom2_idx])], 
+                          color="orange", line_dash=[3,1])
+                plot.line(x=[x[0], x[-1]], 
+                          y=[to_int(sub_list[0][bottom_idx]), to_int(sub_list[0][bottom_idx])], 
+                          color="green", line_dash=[3,1])
+
                 plot.vbar_stack(["bottom", "bottom2", "top"],
                                 x=dodge('x', -0.4 + idx / n, range=plot.x_range),
                                 width=0.8/n,
@@ -111,8 +120,8 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
     plotss.append([])
     plotss.append([])
     for name, sub_lists in split_by_cat(0, 3, tsv_list[1:]):
-        plot_2 = figure(title=str(name), tooltips="@i", active_scroll="wheel_zoom")
-        plot_3 = figure(title=str(name) + " - 100nt blur", tooltips="@i", active_scroll="wheel_zoom")
+        plot_2 = figure(title=str(name), tooltips="@i", active_drag=None)
+        plot_3 = figure(title=str(name) + " - 100nt blur", tooltips="@i", active_drag=None)
         for idx, row in enumerate(sub_lists):
             x_every = 3
             aligner_name = str((row[5], row[4]))
@@ -121,10 +130,10 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
                 #print(x,y,x_2,y_2)
 
                 plot_3.line(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                            source=ColumnDataSource(data=dict(x=x_2, y=y_2)), line_width=2, alpha=0.5)
+                            source=ColumnDataSource(data=dict(x=x_2, y=y_2)), line_width=3, alpha=0.5)
                 plot_3.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
                          source=ColumnDataSource(data=dict(x=x_2[::x_every], y=y_2[::x_every], i=p[::x_every])),
-                         size=6, line_width=3)
+                         size=10, line_width=4)
 
                 plot_2.line(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
                             source=ColumnDataSource(data=dict(x=x, y=y)), line_width=3, alpha=0.5)

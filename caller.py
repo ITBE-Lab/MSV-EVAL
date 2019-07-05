@@ -18,8 +18,6 @@ class Caller():
     def call(self):
         print("calling sv jumps...")
         sv_db = SV_DB(self.db_name, "open")
-        
-        sv_db.clear_calls_table_for_caller("MA-SV") # do clear old runs?
 
         sv_db.set_num_threads(self.parameter_set_manager.get_num_threads())
         run_id = compute_sv_jumps(self.parameter_set_manager, self.fm_index, self.pack, sv_db)

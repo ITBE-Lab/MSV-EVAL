@@ -6,7 +6,6 @@ import math
 def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0):
     parameter_set_manager.by_name("Mean Distance of Paired Reads").set(500) # @todo sample this...
     parameter_set_manager.by_name("Do Mate Jumps").set(False)
-    sv_db.drop_caller_indices()
     nuc_seq_getter = None
     if parameter_set_manager.by_name("Do Mate Jumps").get():
         nuc_seq_getter = NucSeqFromSql(parameter_set_manager, sv_db, seq_id)
@@ -55,7 +54,6 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0):
 
     # drain all sources
     res.simultaneous_get( parameter_set_manager.get_num_threads() )
-    sv_db.create_caller_indices()
     
     sv_db.create_jump_indices( jumps_to_db.cpp_module.jump_inserter.sv_jump_run_id )
 

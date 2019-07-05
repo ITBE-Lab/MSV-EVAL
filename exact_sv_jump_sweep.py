@@ -102,7 +102,7 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
 
         # if the cluster still fulfills the required criteria
         # @note these parameters are hardcoded in two locations @todo
-        if len(cluster.call.supporing_jump_ids) >= 5:
+        if len(cluster.call.supporing_jump_ids) >= 4:
             if re_estimate_cluster_size:
                 right = cluster.right()
                 up = cluster.up()
@@ -113,7 +113,10 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
             cluster.call.score = 0
             for x in range(len(cluster.call.supporing_jump_ids)):
                 cluster.call.score += cluster.call.get_jump(x).score()
-            ret.append(cluster)
+            # if the cluster still fulfills the required criteria
+            # @note another hardcoded quality parameter @todo
+            if cluster.call.score >= 500:
+                ret.append(cluster)
 
     def helper_end(sv_jmp):
         # get one pointer to the current cluster...
@@ -183,16 +186,15 @@ def sweep_sv_call(sv_call):
 
     i = 0
     j = 0
-    while j < len(sv_jmps):
-        if sv_jmps[i].insert_ratio() + max_insert_ratio_diff >= sv_jmps[j].insert_ratio():
+    ret = []
+    while i < len(sv_jmps):
+        if j < len(sv_jmps) and sv_jmps[i].insert_ratio() + max_insert_ratio_diff >= sv_jmps[j].insert_ratio():
             j += 1
         else:
             # @note currently we always accept the sv_jump with the smaller insert size
             # otherwise we would create artifacts (due to the multiple seeds beeing used)...
             # @todo is there a smarter way to filter the artifacts 
             #       or is it possible to have two insertions with different lengths at the same spot?
-            ret = sweep_sv_jumps(sv_jmps[i:j])
-            if len(ret) > 0:
-                return ret
+            ret.extend(sweep_sv_jumps(sv_jmps[i:j]))
             i = j
-    return sweep_sv_jumps(sv_jmps[i:j])
+    return ret

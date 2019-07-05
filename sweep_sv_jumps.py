@@ -183,7 +183,7 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc):
         if len(cluster_dict[key]) <= 0:
             # check for acceptance:
             # @note these parameters are hardcoded in two locations @todo
-            if len(cluster_dict[key].call.supporing_jump_ids) >= 5:
+            if len(cluster_dict[key].call.supporing_jump_ids) >= 4:
                 for accepted_cluster in sweep_sv_call(cluster_dict[key]):
                     #print("accepting", str(accepted_cluster))
                     call_inserter.insert_call(accepted_cluster.call)
@@ -249,7 +249,7 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
                     jump.to_start() - 0.5,
                     jump.from_size() + 1,
                     jump.to_size() + 1,
-                    jump.score(),
+                    jump.score()/1000,
                     str(jump.id) + " " + str(jump.score())]
             if jump.switch_strand_known():
                 if jump.does_switch_strand():

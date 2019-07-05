@@ -84,7 +84,6 @@ class getSvLinesToDb:
     def __enter__(self):
         self.__sv_db = SV_DB(self.__db_nme)
         print("clearing call tables")
-        self.__sv_db.db.clear_calls_table()
         self.__sv_inserter = libMA.SvInserter(self.__sv_db.db, "caller_name", "desc")
         self.sv_line_to_db = SvLineToDb(self.__sv_db, self.__sv_inserter)
         #self.dummy_sv_line_to_db = DummySvLineToDb(self.__sv_db, self.__sv_inserter)
