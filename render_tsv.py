@@ -16,7 +16,7 @@ def split_by_cat(s, e, l):
     while a < len(l):
         while b < len(l) and l[b][s:e+1] == l[a][s:e+1]:
             b += 1
-        yield str(l[a][s:e+1]), l[a:b]
+        yield l[a][s:e+1], l[a:b]
         a = b
 
 def to_int(x):
@@ -31,7 +31,8 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
     plotss = []
     for _, sub_lists in split_by_cat(*plot_category, tsv_list[1:]):
         plots = []
-        for name, sub_list in split_by_cat(*plot_sub_category, sub_lists):
+        for name_, sub_list in split_by_cat(*plot_sub_category, sub_lists):
+            name = str(name_)
             x = []
             for row in sub_list:
                 tup = (*row[category[0] : category[1]], row[category[1]] + " [id: " + str(row[6]) + "]")
@@ -56,12 +57,12 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
                     }
 
                 # helper lines
-                plot.line(x=[x[0], x[-1]], 
-                          y=[to_int(sub_list[0][bottom2_idx]), to_int(sub_list[0][bottom2_idx])], 
-                          color="orange", line_dash=[3,1])
-                plot.line(x=[x[0], x[-1]], 
-                          y=[to_int(sub_list[0][bottom_idx]), to_int(sub_list[0][bottom_idx])], 
-                          color="green", line_dash=[3,1])
+                #plot.line(x=[x[0], x[-1]], 
+                #          y=[to_int(sub_list[0][bottom2_idx]), to_int(sub_list[0][bottom2_idx])], 
+                #          color="orange", line_dash=[3,1])
+                #plot.line(x=[x[0], x[-1]], 
+                #          y=[to_int(sub_list[0][bottom_idx]), to_int(sub_list[0][bottom_idx])], 
+                #          color="green", line_dash=[3,1])
 
                 plot.vbar_stack(["bottom", "bottom2", "top"],
                                 x=dodge('x', -0.4 + idx / n, range=plot.x_range),
@@ -116,48 +117,84 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
 
 
         plotss.append(plots)
-    
-    plotss.append([])
-    plotss.append([])
-    for name, sub_lists in split_by_cat(0, 3, tsv_list[1:]):
-        plot_2 = figure(title=str(name), tooltips="@i", active_drag=None)
-        plot_3 = figure(title=str(name) + " - 100nt blur", tooltips="@i", active_drag=None)
-        for idx, row in enumerate(sub_lists):
-            x_every = 3
-            aligner_name = str((row[5], row[4]))
-            if aligner_name in json_dict[str(name)]:
-                x, y, x_2, y_2, p = json_dict[str(name)][aligner_name]
-                #print(x,y,x_2,y_2)
-
-                plot_3.line(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                            source=ColumnDataSource(data=dict(x=x_2, y=y_2)), line_width=3, alpha=0.5)
-                plot_3.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                         source=ColumnDataSource(data=dict(x=x_2[::x_every], y=y_2[::x_every], i=p[::x_every])),
-                         size=10, line_width=4)
-
-                plot_2.line(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                            source=ColumnDataSource(data=dict(x=x, y=y)), line_width=3, alpha=0.5)
-                plot_2.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                         source=ColumnDataSource(data=dict(x=x[::x_every], y=y[::x_every], i=p[::x_every])),
-                         size=10, line_width=4)
-        if len(plotss[-2]) > 0:
-            plot_2.x_range = plotss[-2][0].x_range
-            plot_2.y_range = plotss[-2][0].y_range
-            plot_3.x_range = plotss[-2][0].x_range
-            plot_3.y_range = plotss[-2][0].y_range
-        plot_2.xaxis.axis_label = "recall"
-        plot_2.yaxis.axis_label = "precision"
-        plot_2.legend.location = "bottom_left"
-        plot_3.xaxis.axis_label = "recall"
-        plot_3.yaxis.axis_label = "precision"
-        plot_3.legend.location = "bottom_left"
-        plotss[-2].append(plot_2)
-        plotss[-1].append(plot_3)
 
     reset_output()
     show(layout(plotss))
 
+    plotss = []
+    for name_1, sub_lists in split_by_cat(0, 0, tsv_list[1:]):
+        plotss.append([])
+        plotss.append([])
+        for name_2, sub_list in split_by_cat(1, 3, sub_lists):
+            name = str([*name_1, *name_2])
+            plot_2 = figure(title=name, tooltips="@i", active_drag=None)
+            plot_3 = figure(title=name + " - 100nt blur", tooltips="@i", active_drag=None)
+            for idx, row in enumerate(sub_list):
+                x_every_2 = 2
+                x_every = 4
+                aligner_name = str((row[5], row[4]))
+                if aligner_name in json_dict[name]:
+                    x, y, x_2, y_2, p = json_dict[name][aligner_name]
+                    #print(x,y,x_2,y_2)
+
+                    plot_3.line(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
+                                source=ColumnDataSource(data=dict(x=x_2[::x_every_2], y=y_2[::x_every_2])),
+                                line_width=3, alpha=0.5)
+                    plot_3.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
+                            source=ColumnDataSource(data=dict(x=x_2[::x_every], y=y_2[::x_every], i=p[::x_every])),
+                            size=10, line_width=4)
+
+                    plot_2.line(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
+                                source=ColumnDataSource(data=dict(x=x[::x_every_2], y=y[::x_every_2])),
+                                line_width=3, alpha=0.5)
+                    plot_2.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
+                            source=ColumnDataSource(data=dict(x=x[::x_every], y=y[::x_every], i=p[::x_every])),
+                            size=10, line_width=4)
+            if len(plotss[-2]) > 0:
+                plot_2.x_range = plotss[-2][0].x_range
+                plot_2.y_range = plotss[-2][0].y_range
+                plot_3.x_range = plotss[-2][0].x_range
+                plot_3.y_range = plotss[-2][0].y_range
+            plot_2.xaxis.axis_label = "recall"
+            plot_2.yaxis.axis_label = "precision"
+            plot_2.legend.location = "bottom_left"
+            plot_3.xaxis.axis_label = "recall"
+            plot_3.yaxis.axis_label = "precision"
+            plot_3.legend.location = "bottom_left"
+            plotss[-2].append(plot_2)
+            plotss[-1].append(plot_3)
+
+    reset_output()
+    show(layout(plotss))
+
+def print_ground_truth(dataset_name):
+    # decode hook for the json that decodes lists dicts and floats properly
+    def _decode(o):
+        if isinstance(o, str):
+            try:
+                return float(o)
+            except ValueError:
+                return o
+        elif isinstance(o, dict):
+            return {_decode(k): _decode(v) for k, v in o.items()}
+        elif isinstance(o, list):
+            return [_decode(v) for v in o]
+        else:
+            return o
+    #actually open and load the info.json file
+    json_info_file = None # noop
+    with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "r") as json_file:
+        json_info_file = json.loads(json_file.read(), object_hook=_decode)
+    sv_db = SV_DB("/MAdata/sv_datasets/" + dataset_name + "/svs.db", "open")
+    for dataset in json_info_file["datasets"]:
+        id_b = dataset["ground_truth"]
+        name_b = dataset["name"]
+        date_b = sv_db.get_run_date(id_b)
+        print("ground truth is:", name_b, "-", date_b, "[ id:", id_b, "] - with", sv_db.get_num_calls(id_b, 0), "calls")
+
 def render_from_tsv(dataset_name):
+    print_ground_truth(dataset_name)
+
     tsv_list = []
     with open("/MAdata/sv_datasets/" + dataset_name + "/bar_diagrams.tsv", "r") as tsv_file:
         for line in tsv_file:
@@ -183,8 +220,8 @@ def render_from_tsv(dataset_name):
     tsv_list = tsv_list[1:]
     tsv_list.sort()
     tsv_list.insert(0, fist_line)
-    print(tsv_list)
+    #print(tsv_list)
     render_from_list(tsv_list, json_dict)
 
 if __name__ == "__main__":
-    render_from_tsv("minimal")
+    render_from_tsv("comprehensive_random")
