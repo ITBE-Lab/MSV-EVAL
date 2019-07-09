@@ -1,7 +1,8 @@
 from sv_jump import *
 from MA import *
-from intervaltree import Interval, IntervalTree
 
+"""
+from intervaltree import Interval, IntervalTree
 max_distance = 50
 
 class SvCallPyCoverage:
@@ -143,5 +144,39 @@ def compute_coverage(parameter_set_manager, fm_index, pack, sv_db, caller_id, se
     for call in calls:
         call.apply_filter()
         sv_db.update_coverage(call.call)
+"""
+
+def compute_coverage(parameter_set_manager, fm_index, pack, sv_db, caller_id, seq_ids):
+    lock_module = Lock(parameter_set_manager)
+    seeding_module = BinarySeeding(parameter_set_manager)
+    fm_pledge = Pledge()
+    fm_pledge.set(fm_index)
+    pack_pledge = Pledge()
+    pack_pledge.set(pack)
+
+    for seq_id in seq_ids:
+        nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db, seq_id)
+        print("\tconstructing interval tree...")
+        coverage_module = libMA.ComputeCoverage(parameter_set_manager, sv_db, caller_id, seq_id)
+        print("\tdone constructing interval tree")
+
+        res = VectorPledge()
+        queries_pledge = promise_me(nuc_seq_getter) # @note this cannot be in the loop (synchronization!)
+        # graph for single reads
+        for _ in range(parameter_set_manager.get_num_threads()):
+            query_pledge = promise_me(lock_module, queries_pledge)
+            segments_pledge = promise_me(seeding_module, fm_pledge, query_pledge)
+            cov_pledge = promise_me(coverage_module, fm_pledge, queries_pledge, segments_pledge)
+            unlock_pledge = promise_me(UnLock(parameter_set_manager, query_pledge), cov_pledge)
+            res.append(unlock_pledge)
+
+        # drain all sources
+        print("\texecuting graph...")
+        res.simultaneous_get( parameter_set_manager.get_num_threads() )
+        print("\tdone executing graph")
+
+        print("\tcommitting coverage...")
+        del coverage_module
+        print("\tdone committing coverage")
 
 

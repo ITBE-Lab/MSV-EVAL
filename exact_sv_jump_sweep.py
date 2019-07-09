@@ -3,7 +3,7 @@ from svCallPy import *
 from bokeh.plotting import figure, show, reset_output, ColumnDataSource
 PRINTS = False
 
-def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
+def sweep_sv_jumps(sv_jmps, estimated_coverage, re_estimate_cluster_size=True):
     def to_end(sv_jmp):
         return sv_jmp.to_end() - 1 if sv_jmp.switch_strand_known() else sv_jmp.to_start() + sv_jmp.from_size()
 
@@ -102,7 +102,7 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
 
         # if the cluster still fulfills the required criteria
         # @note these parameters are hardcoded in two locations @todo
-        if len(cluster.call.supporing_jump_ids) >= 2:
+        if len(cluster.call.supporing_jump_ids) >= max(2, estimated_coverage/8):
             if re_estimate_cluster_size:
                 right = cluster.right()
                 up = cluster.up()
@@ -176,7 +176,7 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
 # @todo problem: illumina reads have a insert ratio '> remaining query distance'
 # this should mean that they get added to each cluster that matches that
 # -> implement that
-def sweep_sv_call(sv_call):
+def sweep_sv_call(sv_call, estimated_coverage):
     # single linkage clustering for jump distances
     # we call sweep_sv_jumps for all insert_ratio clusters with a max dist of max_insert_ratio_diff
     max_insert_ratio_diff = 150
@@ -195,6 +195,6 @@ def sweep_sv_call(sv_call):
             # otherwise we would create artifacts (due to the multiple seeds beeing used)...
             # @todo is there a smarter way to filter the artifacts 
             #       or is it possible to have two insertions with different lengths at the same spot?
-            ret.extend(sweep_sv_jumps(sv_jmps[i:j]))
+            ret.extend(sweep_sv_jumps(sv_jmps[i:j], estimated_coverage))
             i = j
     return ret

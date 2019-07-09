@@ -134,6 +134,11 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc, s
     call_inserter = SvCallInserter(sv_db, name, desc, run_id)
     print("creating sweep list...")
 
+    estimated_coverage = sum( sv_db.get_num_nts(sequencer_id) for sequencer_id in sequencer_ids ) \
+                           / pack.unpacked_size_single_strand
+
+    print(name, "- estimated_coverage:", estimated_coverage)
+
     y_range_tree = WarpedBitVector(ref_size)
     cluster_dict = {}
     print("sweeping...")
@@ -184,8 +189,8 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc, s
         if len(cluster_dict[key]) <= 0:
             # check for acceptance:
             # @note these parameters are hardcoded in two locations @todo
-            if len(cluster_dict[key].call.supporing_jump_ids) >= 2:
-                for accepted_cluster in sweep_sv_call(cluster_dict[key]):
+            if len(cluster_dict[key].call.supporing_jump_ids) >= max(estimated_coverage/8, 2):
+                for accepted_cluster in sweep_sv_call(cluster_dict[key], estimated_coverage):
                     #print("accepting", str(accepted_cluster))
                     call_inserter.insert_call(accepted_cluster.call)
             y_range_tree.clear_downwards(key + 1)
