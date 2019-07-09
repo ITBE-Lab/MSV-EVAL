@@ -4,7 +4,6 @@ class SvCallPy:
     def __init__(self, jump):
         self.call = SvCall(jump)
         self.count = 1
-        self.score = jump.score()
         self.l_right = []
         self.l_up = []
         self.l_down = []
@@ -58,7 +57,6 @@ class SvCallPy:
     def join(self, other):
         self.call.join(other.call)
         self.count += other.count
-        self.score += other.score
         self.l_down.extend(other.l_down)
         self.l_up.extend(other.l_up)
         self.l_right.extend(other.l_right)
@@ -72,4 +70,4 @@ class SvCallPy:
         for x in range(len(self.call.supporing_jump_ids)):
             q_dist += self.call.get_jump(x).query_distance()
         q_dist /= len(self.call.supporing_jump_ids)
-        return "from " + str(self.call.from_start) + "~" + str(self.call.from_size + self.call.from_start) + " to " + str(self.call.to_start) + "~" + str(self.call.to_size + self.call.to_start) + (" switch_strand" if self.call.switch_strand else "") + " score " + str(self.score) + " cnt " + str(len(self.call.supporing_jump_ids))+ " avg. insert " + str(q_dist)
+        return "from " + str(self.call.from_start) + "~" + str(self.call.from_size + self.call.from_start) + " to " + str(self.call.to_start) + "~" + str(self.call.to_size + self.call.to_start) + (" switch_strand" if self.call.switch_strand else "") + " supp_nt " + str(self.call.num_supp_nt) + " cov " + str(self.call.coverage) + " cnt " + str(len(self.call.supporing_jump_ids))+ " avg. insert " + str(q_dist)

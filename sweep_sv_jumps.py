@@ -5,6 +5,7 @@ import sqlite3
 from MA import *
 from exact_sv_jump_sweep import *
 from svCallPy import *
+from compute_coverage import *
 
 class YRangeTree:
     def __init__(self, size):
@@ -128,7 +129,7 @@ class WarpedBitVector:
                                                       self.to_new_coord_system_c(end, x_value))
 
 
-def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc):
+def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc, sequencer_ids, pack, fm_index):
     sweeper = SortedSvJumpFromSql(parameter_set_manager, sv_db, run_id)
     call_inserter = SvCallInserter(sv_db, name, desc, run_id)
     print("creating sweep list...")
@@ -183,7 +184,7 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc):
         if len(cluster_dict[key]) <= 0:
             # check for acceptance:
             # @note these parameters are hardcoded in two locations @todo
-            if len(cluster_dict[key].call.supporing_jump_ids) >= 4:
+            if len(cluster_dict[key].call.supporing_jump_ids) >= 2:
                 for accepted_cluster in sweep_sv_call(cluster_dict[key]):
                     #print("accepting", str(accepted_cluster))
                     call_inserter.insert_call(accepted_cluster.call)
@@ -214,6 +215,9 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc):
     libMA.combine_overlapping_calls(parameter_set_manager, sv_db, sv_caller_run_id)
     print("num calls:", sv_db.get_num_calls(sv_caller_run_id, 0))
     print("done overlapping")
+    print("computing coverage...")
+    compute_coverage(parameter_set_manager, fm_index, pack, sv_db, sv_caller_run_id, sequencer_ids)
+    print("done computing coverage")
 
 
 def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_supporting_jumps=False):
@@ -249,8 +253,8 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
                     jump.to_start() - 0.5,
                     jump.from_size() + 1,
                     jump.to_size() + 1,
-                    jump.score()/1000,
-                    str(jump.id) + " " + str(jump.score())]
+                    jump.num_supp_nt()/1000,
+                    "SuppNt: " + str(jump.num_supp_nt())]
             if jump.switch_strand_known():
                 if jump.does_switch_strand():
                     sw_boxes_data.append(xs)
@@ -392,15 +396,16 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
             if jump.from_size == 1 and jump.to_size == 1:
                 accepted_plus_data.append([jump.from_start,
                                             jump.to_start,
-                                            name + " " + str(jump.score)])
+                                            name + " suppNt: " + str(jump.num_supp_nt) + " cov: " +
+                                            str(jump.coverage) + " #reads: " + str(len(jump.supporing_jump_ids)) + " score: " + str(jump.num_supp_nt / jump.coverage)])
             else:
                 accepted_boxes_data.append([jump.from_start - 0.5,
                                             jump.to_start - 0.5,
                                             jump.from_size + 1,
                                             jump.to_size + 1,
                                             0,
-                                            name + " " + str(jump.score) + " (" +
-                                            str(len(jump.supporing_jump_ids)) + ")"])
+                                            name + " suppNt: " + str(jump.num_supp_nt) + " cov: " +
+                                            str(jump.coverage) + " #reads: " + str(len(jump.supporing_jump_ids)) + " score: " + str(jump.num_supp_nt / jump.coverage)])
             #if len(jump.l_right) > 0:
             #    accepted_lines_data.append([
             #        jump.right() - 0.5, jump.call.to_start - 0.5,

@@ -205,7 +205,7 @@ if __name__ == "__main__":
                    "minimal",
                    [( separate_svs, "del-0250", ( (sv_deletion, tuple()), 250, 1000 ) ),],
                    [(create_illumina_reads_dwgsim, "ill_250", (250,)),],
-                   [5, 25])
+                   [5, 25, 50])
 
     #create_dataset("/MAdata/genome/random_10_pow_6",
     #               "comprehensive_random",

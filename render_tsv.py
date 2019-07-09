@@ -224,4 +224,4 @@ def render_from_tsv(dataset_name):
     render_from_list(tsv_list, json_dict)
 
 if __name__ == "__main__":
-    render_from_tsv("comprehensive_random")
+    render_from_tsv("minimal")

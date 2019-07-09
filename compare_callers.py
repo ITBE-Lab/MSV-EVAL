@@ -237,7 +237,7 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
     print("number of calls:", num_calls)
     del call_inserter # trigger deconstructor
 
-def run_callers_if_necessary(dataset_name, json_dict, db, pack):
+def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
     def sniffles(bam_file, vcf_file):
         os.system("~/workspace/Sniffles/bin/sniffles-core-1.0.8/sniffles -t 32 -m " + bam_file + " -v " + vcf_file
                   + " >/dev/null 2>&1")
@@ -340,7 +340,8 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack):
                     print("WARNING: unknown read simulator - using default parameters for sv jumps")
                 sweep_sv_jumps.sweep_sv_jumps(params, db, read_set["jump_id"], 
                                             pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
-                                            "ground_truth=" + str(dataset["ground_truth"]))
+                                            "ground_truth=" + str(dataset["ground_truth"]), [read_set["seq_id"]], 
+                                            pack, fm_index)
                 # other callers
                 for alignment in read_set["alignments"]:
                     for sv_call in sv_calls[alignment]:
@@ -534,7 +535,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
             json.dump(json_info_file, json_out)
 
 
-        run_callers_if_necessary(dataset_name, json_info_file, db, pack)
+        run_callers_if_necessary(dataset_name, json_info_file, db, pack, fm_index)
 
         # save the info.json file
         print(json_info_file)
@@ -548,7 +549,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("minimal", True)
+    analyze_sample_dataset("minimal", False)
     #analyze_sample_dataset("minimal", True)
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))

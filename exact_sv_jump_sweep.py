@@ -102,7 +102,7 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
 
         # if the cluster still fulfills the required criteria
         # @note these parameters are hardcoded in two locations @todo
-        if len(cluster.call.supporing_jump_ids) >= 4:
+        if len(cluster.call.supporing_jump_ids) >= 2:
             if re_estimate_cluster_size:
                 right = cluster.right()
                 up = cluster.up()
@@ -110,13 +110,13 @@ def sweep_sv_jumps(sv_jmps, re_estimate_cluster_size=True):
                 cluster.call.to_start = max(0, cluster.down())
                 cluster.call.from_size = max(right - cluster.call.from_start, 1)
                 cluster.call.to_size = max(1, up - cluster.call.to_start)
-            cluster.call.score = 0
+            cluster.call.num_supp_nt = 0
             for x in range(len(cluster.call.supporing_jump_ids)):
-                cluster.call.score += cluster.call.get_jump(x).score()
+                cluster.call.num_supp_nt += cluster.call.get_jump(x).num_supp_nt()
             # if the cluster still fulfills the required criteria
             # @note another hardcoded quality parameter @todo
-            if cluster.call.score >= 500:
-                ret.append(cluster)
+            #if cluster.call.score >= 500:
+            ret.append(cluster)
 
     def helper_end(sv_jmp):
         # get one pointer to the current cluster...
