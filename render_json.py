@@ -1,9 +1,10 @@
 from bokeh.layouts import column
 from bokeh.plotting import figure, show, reset_output, ColumnDataSource
 from bokeh.models import Arrow, VeeHead
+from bokeh.palettes import Category20, Category10
 from create_json import create_json_from_db
 import json
-from MA import SV_DB, ParameterSetManager
+from MA import *
 from sweep_sv_jumps import sv_jumps_to_dict
 
 def render_from_dict(json_dict, start=None, end=None, on_y_aswell=True):
@@ -151,6 +152,95 @@ def render_from_dict(json_dict, start=None, end=None, on_y_aswell=True):
     reset_output()
     show(column(plots))
 
+def render_seeds(sv_db, seq_id, fm_index, out_dict, start, size):
+    parameter_set_manager = ParameterSetManager()
+    parameter_set_manager.set_selected("SV-Illumina")
+    #parameter_set_manager.set_selected("SV-PacBio")
+    #parameter_set_manager.set_selected("SV-ONT")
+
+    nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db, seq_id)
+    lock_module = Lock(parameter_set_manager)
+    seeding_module = BinarySeeding(parameter_set_manager)
+    collector = libMA.NucSeqSegmentCollector(parameter_set_manager)
+
+    fm_pledge = Pledge()
+    fm_pledge.set(fm_index)
+
+    res = VectorPledge()
+    queries_pledge = promise_me(nuc_seq_getter) # @note this cannot be in the loop (synchronization!)
+    # graph for single reads
+    for _ in range(parameter_set_manager.get_num_threads()):
+        query_pledge = promise_me(lock_module, queries_pledge)
+        segments_pledge = promise_me(seeding_module, fm_pledge, query_pledge)
+        empty = promise_me(collector, query_pledge, segments_pledge)
+        unlock_pledge = promise_me(UnLock(parameter_set_manager, query_pledge), empty)
+        res.append(unlock_pledge)
+
+    # drain all sources
+    res.simultaneous_get( parameter_set_manager.get_num_threads() )
+    
+    seeds = []
+    for nuc_seq, segments in collector.cpp_module.collection:
+        curr_seeds = [s for s in segments.extract_seeds(fm_index,
+                                            parameter_set_manager.by_name("Maximal Ambiguity SV").get(),
+                                            parameter_set_manager.by_name("Minimal Seed Size SV").get(),
+                                            len(nuc_seq),
+                                            True)]
+        curr_seeds.sort(key=lambda x: x.start)
+        for idx, s in enumerate(curr_seeds):
+            if s.start_ref + s.size >= start and s.start_ref - s.size <= start + size:
+                seeds.append((s, nuc_seq.id, idx))
+    seeds.sort(key=lambda x: x[0].start_ref)
+    
+    ends_list = []
+
+    render_list = [[] for _ in range(100)]
+
+    for seed, nuc_seq_id, seed_idx in seeds:
+        min_start_ref = seed.start_ref
+        if not seed.on_forward_strand:
+            min_start_ref = seed.start_ref - seed.size
+        idx = len(ends_list)
+        for index, end_pos in enumerate(ends_list):
+            if end_pos + 3 < min_start_ref:
+                idx = index
+                break
+        if idx == len(ends_list):
+            ends_list.append(0)
+
+        if seed.on_forward_strand:
+            ends_list[idx] = seed.start_ref + seed.size
+        else:
+            ends_list[idx] = seed.start_ref
+        
+        xs = [min_start_ref, idx, # x, y
+              seed.size, 0.5, # w, h
+              1, # alpha
+              "read_id: " + str(nuc_seq_id) + " q_pos: " + str(seed.start) + 
+              "index on query: " + str(seed_idx) + 
+              str(" forw" if seed.on_forward_strand else " rev")]
+        render_list[nuc_seq_id%100].append(xs)
+
+
+    panel = {
+                "items": [
+                    {
+                        "type": "box-alpha",
+                        "color": Category10[10][idx%10],
+                        "line_color": Category10[10][int(idx/10)%10],
+                        "line_width": 3,
+                        "group": "seeds",
+                        "data": render_list[idx]
+                    } for idx in range(100)
+                ],
+                "h": 300
+            }
+
+    out_dict["panels"].append(panel)
+
+    return out_dict
+
+
 def render_from_json(json_file_name, start, end, on_y_aswell=False):
     # decode hook for the json that decodes lists dicts and floats properly
     def _decode(o):
@@ -172,10 +262,20 @@ def render_from_json(json_file_name, start, end, on_y_aswell=False):
     render_from_dict(json_dict, start, end, on_y_aswell)
 
 if __name__ == "__main__":
+
+    pos = 10*10**4
+    size = 10*10**4
+
     #sv_db = SV_DB("/MAdata/databases/sv_simulated", "open")
     sv_db = SV_DB("/MAdata/sv_datasets/minimal/svs.db", "open")
     #out_dict = create_json_from_db(sv_db, "/MAdata/genome/human/GRCh38.p12/ma/genome")
-    out_dict = sv_jumps_to_dict(sv_db, [1, 2], 600000, 600000, 50000, 50000)
+    out_dict = sv_jumps_to_dict(sv_db, [1, 17], pos, pos, size, size)
+    #out_dict = sv_jumps_to_dict(sv_db, [1, 17])
     
-    #out_dict = sv_jumps_to_dict(sv_db, [3, 122], only_supporting_jumps=True)
+    #out_dict = sv_jumps_to_dict(sv_db, [1, 2], only_supporting_jumps=True)
+
+    fm_index = FMIndex()
+    fm_index.load("/MAdata/genome/random_10_pow_6/ma/genome")
+    out_dict = render_seeds(sv_db, 1, fm_index, out_dict, pos, size)
+
     render_from_dict(out_dict)

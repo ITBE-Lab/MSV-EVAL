@@ -6,6 +6,9 @@ import json
 import compare_callers
 import random
 
+supporting_nt = 10**6
+coverage = 0
+
 def create_illumina_reads_dwgsim(sequenced_genome_pack, sequenced_genome_path, database, reads_folder, json_info_file,
                                  coverage, name, read_length):
     json_info_file["read_length"] = read_length
@@ -58,14 +61,14 @@ def create_reads_survivor(sequenced_genome_pack, sequenced_genome_path, database
         counter += 1
 
 def sv_deletion(sv_inserter, position, sv_size):
-    sv_inserter.insert_call(SvCall(position, position + sv_size, 1, 1, False, float('inf')))
+    sv_inserter.insert_call(SvCall(position, position + sv_size, 1, 1, False, supporting_nt, coverage))
 
 def sv_duplication(sv_inserter, position, sv_size):
-    sv_inserter.insert_call(SvCall(position + sv_size, position, 1, 1, False, float('inf')))
+    sv_inserter.insert_call(SvCall(position + sv_size, position, 1, 1, False, supporting_nt, coverage))
 
 def sv_inversion(sv_inserter, position, sv_size):
-    sv_inserter.insert_call(SvCall(position + sv_size, position, 1, 1, True, float('inf')))
-    sv_inserter.insert_call(SvCall(position, position + sv_size, 1, 1, True, float('inf')))
+    sv_inserter.insert_call(SvCall(position + sv_size, position, 1, 1, True, supporting_nt, coverage))
+    sv_inserter.insert_call(SvCall(position, position + sv_size, 1, 1, True, supporting_nt, coverage))
 
 def sv_translocation(sv_inserter, position, sv_size, gap_size):
     assert gap_size < sv_size # sanity check
@@ -74,13 +77,13 @@ def sv_translocation(sv_inserter, position, sv_size, gap_size):
     end_a = position + int((sv_size - gap_size) / 2)
     start_b = end_a + gap_size
     end_b = position + sv_size
-    sv_inserter.insert_call(SvCall(start_a, start_b, 1, 1, False, float('inf')))
-    sv_inserter.insert_call(SvCall(end_b, end_a, 1, 1, False, float('inf'))) # (1)
-    sv_inserter.insert_call(SvCall(start_b - 1, start_a + 1, 1, 1, False, float('inf'))) # (2)
-    sv_inserter.insert_call(SvCall(end_a - 1, end_b + 1, 1, 1, False, float('inf')))
+    sv_inserter.insert_call(SvCall(start_a, start_b, 1, 1, False, supporting_nt, coverage))
+    sv_inserter.insert_call(SvCall(end_b, end_a, 1, 1, False, supporting_nt, coverage)) # (1)
+    sv_inserter.insert_call(SvCall(start_b - 1, start_a + 1, 1, 1, False, supporting_nt, coverage)) # (2)
+    sv_inserter.insert_call(SvCall(end_a - 1, end_b + 1, 1, 1, False, supporting_nt, coverage))
 
 def sv_insertion(sv_inserter, position, sv_size):
-    call = SvCall(position, position + 1, 1, 1, False, float('inf'))
+    call = SvCall(position, position + 1, 1, 1, False, supporting_nt, coverage)
 
     ins = ""
     for _ in range(sv_size):

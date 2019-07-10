@@ -130,7 +130,7 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
             plot_2 = figure(title=name, tooltips="@i", active_drag=None)
             plot_3 = figure(title=name + " - 100nt blur", tooltips="@i", active_drag=None)
             for idx, row in enumerate(sub_list):
-                x_every_2 = 2
+                x_every_2 = 1
                 x_every = 4
                 aligner_name = str((row[5], row[4]))
                 if aligner_name in json_dict[name]:
@@ -138,18 +138,20 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
                     #print(x,y,x_2,y_2)
 
                     plot_3.line(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                                source=ColumnDataSource(data=dict(x=x_2[::x_every_2], y=y_2[::x_every_2])),
+                                source=ColumnDataSource(data=dict(x=x_2[::x_every_2], y=y_2[::x_every_2], 
+                                                                  i=p[::x_every_2])),
                                 line_width=3, alpha=0.5)
-                    plot_3.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                            source=ColumnDataSource(data=dict(x=x_2[::x_every], y=y_2[::x_every], i=p[::x_every])),
-                            size=10, line_width=4)
+                    #plot_3.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
+                    #        source=ColumnDataSource(data=dict(x=x_2[::x_every], y=y_2[::x_every], i=p[::x_every])),
+                    #        size=10, line_width=4)
 
                     plot_2.line(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                                source=ColumnDataSource(data=dict(x=x[::x_every_2], y=y[::x_every_2])),
+                                source=ColumnDataSource(data=dict(x=x[::x_every_2], y=y[::x_every_2], 
+                                                        i=p[::x_every_2])),
                                 line_width=3, alpha=0.5)
-                    plot_2.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                            source=ColumnDataSource(data=dict(x=x[::x_every], y=y[::x_every], i=p[::x_every])),
-                            size=10, line_width=4)
+                    #plot_2.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
+                    #        source=ColumnDataSource(data=dict(x=x[::x_every], y=y[::x_every], i=p[::x_every])),
+                    #        size=10, line_width=4)
             if len(plotss[-2]) > 0:
                 plot_2.x_range = plotss[-2][0].x_range
                 plot_2.y_range = plotss[-2][0].y_range
@@ -224,4 +226,4 @@ def render_from_tsv(dataset_name):
     render_from_list(tsv_list, json_dict)
 
 if __name__ == "__main__":
-    render_from_tsv("minimal")
+    render_from_tsv("comprehensive_random/")

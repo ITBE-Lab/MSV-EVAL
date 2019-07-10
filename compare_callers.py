@@ -153,14 +153,14 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
     call_inserter = SvCallInserter(sv_db, name, desc, -1) # -1 since there are no related sv jumps...
     def find_confidence(call):
         if "coverage" in call["INFO"]:
-            return float(call["INFO"]["coverage"])
+            return int(call["INFO"]["coverage"])
         if "RE" in call["INFO"]: # sniffles
-            return float(call["INFO"]["RE"])
+            return int(call["INFO"]["RE"])
         if "PE" in call["INFO"] and "SR" in call["INFO"]: # pbHoney
-            return float(call["INFO"]["PE"]) + float(call["INFO"]["SR"])
+            return int(call["INFO"]["PE"]) + int(call["INFO"]["SR"])
         if call["QUAL"] != ".": # vcf...
-            return float(call["QUAL"])
-        return float("inf")
+            return int(call["QUAL"])
+        return 0
     num_calls = 0
     for call in vcf_parser(file_name):
         num_calls += 1
@@ -389,7 +389,7 @@ def analyze_by_score(sv_db, id_a, id_b):
     min_score = sv_db.get_min_score(id_a)
     max_score = sv_db.get_max_score(id_a)
     p = min_score
-    inc = (max_score - min_score) / 30
+    inc = (max_score - min_score) / 50
     if max_score <= min_score:
         inc = 1
     xs = []
@@ -406,17 +406,18 @@ def analyze_by_score(sv_db, id_a, id_b):
         ps.append(p)
         # how many of the sv's are detected?
         num_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, p, 0)
-        num_almost_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_b, id_a, p, 100)
+        num_almost_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, p, 100)
 
         xs.append(num_overlaps_b_to_a/num_calls_b)
-        xs_2.append(num_almost_overlaps_a_to_b/num_calls_b)
+        xs_2.append(num_almost_overlaps_b_to_a/num_calls_b)
 
         num_calls_a = sv_db.get_num_calls(id_a, p) # num calls made
 
         ys.append(num_overlaps_b_to_a/num_calls_a)
-        ys_2.append(num_almost_overlaps_a_to_b/num_calls_a)
+        ys_2.append(num_almost_overlaps_b_to_a/num_calls_a)
 
         p += inc
+
 
     # recall, precision, recall_relaxed, precision_relaxed, score
     return xs, ys, xs_2, ys_2, ps

@@ -259,7 +259,7 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
                     jump.from_size() + 1,
                     jump.to_size() + 1,
                     jump.num_supp_nt()/1000,
-                    "SuppNt: " + str(jump.num_supp_nt())]
+                    "SuppNt: " + str(jump.num_supp_nt()) + " read_id: " + str(jump.read_id)]
             if jump.switch_strand_known():
                 if jump.does_switch_strand():
                     sw_boxes_data.append(xs)
@@ -397,12 +397,17 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
         accepted_boxes_data = []
         accepted_plus_data = []
         while calls_from_db.hasNext():
+            def score(jump):
+                if jump.coverage == 0:
+                    return ""
+                return " score: " + str(jump.num_supp_nt / jump.coverage)
             jump = calls_from_db.next()
             if jump.from_size == 1 and jump.to_size == 1:
                 accepted_plus_data.append([jump.from_start,
                                             jump.to_start,
                                             name + " suppNt: " + str(jump.num_supp_nt) + " cov: " +
-                                            str(jump.coverage) + " #reads: " + str(len(jump.supporing_jump_ids)) + " score: " + str(jump.num_supp_nt / jump.coverage)])
+                                            str(jump.coverage) + " #reads: " + str(len(jump.supporing_jump_ids)) + 
+                                            score(jump)])
             else:
                 accepted_boxes_data.append([jump.from_start - 0.5,
                                             jump.to_start - 0.5,
@@ -410,7 +415,8 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
                                             jump.to_size + 1,
                                             0,
                                             name + " suppNt: " + str(jump.num_supp_nt) + " cov: " +
-                                            str(jump.coverage) + " #reads: " + str(len(jump.supporing_jump_ids)) + " score: " + str(jump.num_supp_nt / jump.coverage)])
+                                            str(jump.coverage) + " #reads: " + str(len(jump.supporing_jump_ids)) + 
+                                            score(jump)])
             #if len(jump.l_right) > 0:
             #    accepted_lines_data.append([
             #        jump.right() - 0.5, jump.call.to_start - 0.5,
