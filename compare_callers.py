@@ -451,7 +451,7 @@ def compare_callers(db_name, names_a, names_b=["simulated sv"], min_scores=[0]):
     for name_a, name_b in zip(names_a, names_b):
         id_a = sv_db.get_run_id(name_a)
         id_b = sv_db.get_run_id(name_b)
-        date_a = sv_db.get_run_date(id_a)
+        date_a = sv_db.get_run_date(id_a) 
         date_b = sv_db.get_run_date(id_b)
         for min_score in min_scores:
             out.append([name_a + " - " + date_a, name_b + " - " + date_b, min_score,
