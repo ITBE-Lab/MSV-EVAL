@@ -263,16 +263,16 @@ def render_from_json(json_file_name, start, end, on_y_aswell=False):
 
 if __name__ == "__main__":
 
-    pos = 10*10**4
-    size = 10*10**4
+    pos = 0#10*10**4
+    size = 10**6#10*10**4
 
     #sv_db = SV_DB("/MAdata/databases/sv_simulated", "open")
     sv_db = SV_DB("/MAdata/sv_datasets/minimal/svs.db", "open")
     #out_dict = create_json_from_db(sv_db, "/MAdata/genome/human/GRCh38.p12/ma/genome")
-    out_dict = sv_jumps_to_dict(sv_db, [1, 17], pos, pos, size, size)
+    #out_dict = sv_jumps_to_dict(sv_db, [1, 45], pos, pos, size, size)
     #out_dict = sv_jumps_to_dict(sv_db, [1, 17])
     
-    #out_dict = sv_jumps_to_dict(sv_db, [1, 2], only_supporting_jumps=True)
+    out_dict = sv_jumps_to_dict(sv_db, [1, 51], only_supporting_jumps=True, min_score=300)
 
     fm_index = FMIndex()
     fm_index.load("/MAdata/genome/random_10_pow_6/ma/genome")

@@ -225,7 +225,7 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc, s
     print("done computing coverage")
 
 
-def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_supporting_jumps=False):
+def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_supporting_jumps=False, min_score=0):
     forw_boxes_data = []
     unknown_boxes_data_a = []
     unknown_boxes_data_b = []
@@ -305,8 +305,9 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
                 calls_from_db = SvCallsFromDb(params, sv_db, run_id)
             while calls_from_db.hasNext():
                 call = calls_from_db.next()
-                for idx in range(len(call.supporing_jump_ids)):
-                    render_jump(call.get_jump(idx))
+                if call.num_supp_nt > min_score * call.coverage:
+                    for idx in range(len(call.supporing_jump_ids)):
+                        render_jump(call.get_jump(idx))
         else:
             sweeper = None
             if not None in [x, y, w, h]:
@@ -402,41 +403,42 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
                     return ""
                 return " score: " + str(jump.num_supp_nt / jump.coverage)
             jump = calls_from_db.next()
-            if jump.from_size == 1 and jump.to_size == 1:
-                accepted_plus_data.append([jump.from_start,
-                                            jump.to_start,
-                                            name + " suppNt: " + str(jump.num_supp_nt) + " cov: " +
-                                            str(jump.coverage) + " #reads: " + str(len(jump.supporing_jump_ids)) + 
-                                            score(jump)])
-            else:
-                accepted_boxes_data.append([jump.from_start - 0.5,
-                                            jump.to_start - 0.5,
-                                            jump.from_size + 1,
-                                            jump.to_size + 1,
-                                            0,
-                                            name + " suppNt: " + str(jump.num_supp_nt) + " cov: " +
-                                            str(jump.coverage) + " #reads: " + str(len(jump.supporing_jump_ids)) + 
-                                            score(jump)])
-            #if len(jump.l_right) > 0:
-            #    accepted_lines_data.append([
-            #        jump.right() - 0.5, jump.call.to_start - 0.5,
-            #        0, jump.call.to_size + 1
-            #    ])
-            #if len(jump.l_left) > 0:
-            #    accepted_lines_data.append([
-            #        jump.left() - 0.5, jump.call.to_start - 0.5,
-            #        0, jump.call.to_size + 1
-            #    ])
-            #if len(jump.l_up) > 0:
-            #    accepted_lines_data.append([
-            #        jump.call.from_start - 0.5, jump.up() - 0.5,
-            #        jump.call.from_size + 1, 0
-            #    ])
-            #if len(jump.l_down) > 0:
-            #    accepted_lines_data.append([
-            #        jump.call.from_start - 0.5, jump.down() - 0.5,
-            #        jump.call.from_size + 1, 0
-            #    ])
+            if jump.num_supp_nt > min_score * jump.coverage:
+                if jump.from_size == 1 and jump.to_size == 1:
+                    accepted_plus_data.append([jump.from_start,
+                                                jump.to_start,
+                                                name + " suppNt: " + str(jump.num_supp_nt) + " cov: " +
+                                                str(jump.coverage) + " #reads: " + str(len(jump.supporing_jump_ids)) + 
+                                                score(jump)])
+                else:
+                    accepted_boxes_data.append([jump.from_start - 0.5,
+                                                jump.to_start - 0.5,
+                                                jump.from_size + 1,
+                                                jump.to_size + 1,
+                                                0,
+                                                name + " suppNt: " + str(jump.num_supp_nt) + " cov: " +
+                                                str(jump.coverage) + " #reads: " + str(len(jump.supporing_jump_ids)) + 
+                                                score(jump)])
+                #if len(jump.l_right) > 0:
+                #    accepted_lines_data.append([
+                #        jump.right() - 0.5, jump.call.to_start - 0.5,
+                #        0, jump.call.to_size + 1
+                #    ])
+                #if len(jump.l_left) > 0:
+                #    accepted_lines_data.append([
+                #        jump.left() - 0.5, jump.call.to_start - 0.5,
+                #        0, jump.call.to_size + 1
+                #    ])
+                #if len(jump.l_up) > 0:
+                #    accepted_lines_data.append([
+                #        jump.call.from_start - 0.5, jump.up() - 0.5,
+                #        jump.call.from_size + 1, 0
+                #    ])
+                #if len(jump.l_down) > 0:
+                #    accepted_lines_data.append([
+                #        jump.call.from_start - 0.5, jump.down() - 0.5,
+                #        jump.call.from_size + 1, 0
+                #    ])
         c_list = ["green", "purple", "red", "magenta", "brown", "yellow"]
         sv_call_dict = {
                         "type": "box-alpha",

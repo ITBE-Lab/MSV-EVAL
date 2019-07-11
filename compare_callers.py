@@ -165,75 +165,77 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
     for call in vcf_parser(file_name):
         num_calls += 1
         try:
-            print("quality:", find_confidence(call))
+            #print("quality:", find_confidence(call))
             if call["TYPE"] == "DEL":
                 #print(call)
                 from_pos = int(call["START"]) + pack.start_of_sequence(call["CHROM"])
                 to_pos = int(call["END"]) + pack.start_of_sequence(call["CHROM"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call)))
+                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call), 1))
             elif call["ALT"] == "<DEL>" and "PRECISE" in call["INFO"]:
                 #print(call)
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call)))
+                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call), 1))
             elif call["ALT"] == "<DEL>" and "IMPRECISE" in call["INFO"]:
                 #print(call)
                 std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
                 std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
-                call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call)))
+                call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
             elif call["ALT"] == "<DUP>" and "PRECISE" in call["INFO"]:
                 #print(call)
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, find_confidence(call)))
+                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, find_confidence(call), 1))
             elif call["ALT"] == "<DUP>" and "IMPRECISE" in call["INFO"]:
                 #print(call)
                 std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
                 std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
-                call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call)))
+                call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
             elif call["ALT"] == "<INS>" and "PRECISE" in call["INFO"]:
                 #print(call)
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, find_confidence(call)))
+                call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, find_confidence(call), 1))
             elif call["TYPE"] == "INS":
                 #print(call)
                 from_pos = int(call["START"]) + pack.start_of_sequence(call["CHROM"])
-                call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, find_confidence(call)))
+                call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, find_confidence(call), 1))
             elif call["ALT"] == "<INS>" and "IMPRECISE" in call["INFO"]:
                 #print(call)
                 from_start = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
                 from_end = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
                 call_inserter.insert_call(SvCall(from_start, from_start, from_end - from_start,
-                                                    from_end - from_start, False, find_confidence(call)))
+                                                    from_end - from_start, False, find_confidence(call), 1))
             elif call["ALT"] == "<INV>" and "PRECISE" in call["INFO"]:
                 #print(call)
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, True, find_confidence(call)))
-                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, True, find_confidence(call)))
+                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, True, find_confidence(call), 1))
+                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, True, find_confidence(call), 1))
             elif call["ALT"] == "<INV>" and "IMPRECISE" in call["INFO"]:
                 #print(call)
                 std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
                 std_to = math.ceil(float(call["INFO"]["STD_quant_stop"])) - int(std_from/2)
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_to/2)
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, to_pos, True, find_confidence(call)))
-                call_inserter.insert_call(SvCall(to_pos, from_pos, from_pos, to_pos, True, find_confidence(call)))
+                call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, to_pos, True, find_confidence(call), 1))
+                call_inserter.insert_call(SvCall(to_pos, from_pos, from_pos, to_pos, True, find_confidence(call), 1))
             else:
                 print("unrecognized sv:", call)
-                error_file.write("unrecognized sv: ")
+                error_file.write("unrecognized sv: \n")
                 error_file.write(str(call))
-                error_file.write("\n")
+                error_file.write("\n\n\n")
                 #exit(0)
-        except:
+        except Exception as e:
             print("error while handeling sv:", call)
-            error_file.write("error while handeling sv: ")
+            error_file.write("error while handeling sv: \n")
             error_file.write(str(call))
             error_file.write("\n")
+            error_file.write(str(e))
+            error_file.write("\n\n\n")
     print("number of calls:", num_calls)
     del call_inserter # trigger deconstructor
 
@@ -479,7 +481,7 @@ def compare_all_callers_against(sv_db, json_info_file, out_file_name=None, outfi
             date_a = sv_db.get_run_date(id_a)
             print("analyzing", id_a, name_a, date_a)
             out.append([dataset_name, dataset_size, seq, cov, caller, aligner, str(id_a),
-                        *(str(x) for x in compare_caller(sv_db, id_a, id_b, 0))])
+                        *(str(x) for x in compare_caller(sv_db, id_a, id_b, 60 if caller == "MA_SV" else 0))])
             if str(name_a[:4]) not in out_2:
                 out_2[str(name_a[:4])] = {}
             out_2[str(name_a[:4])][str((aligner, caller))] = analyze_by_score(sv_db, id_a, id_b)
@@ -550,7 +552,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("minimal", True)
+    analyze_sample_dataset("comprehensive_random", True)
     #analyze_sample_dataset("minimal", True)
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))
