@@ -153,7 +153,7 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
     call_inserter = SvCallInserter(sv_db, name, desc, -1) # -1 since there are no related sv jumps...
     def find_confidence(call):
         if "coverage" in call["INFO"]:
-            return int(call["INFO"]["coverage"])
+            return int(float(call["INFO"]["coverage"]) * 10)
         if "RE" in call["INFO"]: # sniffles
             return int(call["INFO"]["RE"])
         if "PE" in call["INFO"] and "SR" in call["INFO"]: # pbHoney
@@ -178,8 +178,17 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
                 call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call), 1))
             elif call["ALT"] == "<DEL>" and "IMPRECISE" in call["INFO"]:
                 #print(call)
-                std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
-                std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
+                if "STD_quant_start" in call["INFO"]:
+                    std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
+                if "CIPOS" in call["INFO"]: # delly
+                    x = call["INFO"]["CIPOS"].split(",")
+                    std_from = math.ceil(float(x[1]) - float(x[0]))
+                if "STD_quant_stop" in call["INFO"]:
+                    std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
+                if "CIEND" in call["INFO"]: # delly
+                    x = call["INFO"]["CIEND"].split(",")
+                    std_to = math.ceil(float(x[1]) - float(x[0]))
+
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
                 call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
@@ -223,6 +232,10 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
                 call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, to_pos, True, find_confidence(call), 1))
                 call_inserter.insert_call(SvCall(to_pos, from_pos, from_pos, to_pos, True, find_confidence(call), 1))
+            elif call["INFO"]["SVTYPE"] == "DEL": # Manta
+                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+                to_pos = from_pos - int(call["INFO"]["SVLEN"])
+                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call), 1))
             else:
                 print("unrecognized sv:", call)
                 error_file.write("unrecognized sv: \n")
@@ -415,8 +428,12 @@ def analyze_by_score(sv_db, id_a, id_b):
 
         num_calls_a = sv_db.get_num_calls(id_a, p) # num calls made
 
-        ys.append(num_overlaps_b_to_a/num_calls_a)
-        ys_2.append(num_almost_overlaps_b_to_a/num_calls_a)
+        if num_calls_a == 0:
+            ys.append(0)
+            ys_2.append(0)
+        else:
+            ys.append(num_overlaps_b_to_a/num_calls_a)
+            ys_2.append(num_almost_overlaps_b_to_a/num_calls_a)
 
         p += inc
 
@@ -552,7 +569,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("comprehensive_random", True)
+    analyze_sample_dataset("minimal", True)
     #analyze_sample_dataset("minimal", True)
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))

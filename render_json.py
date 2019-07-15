@@ -217,7 +217,7 @@ def render_seeds(sv_db, seq_id, fm_index, out_dict, start, size):
               seed.size, 0.5, # w, h
               1, # alpha
               "read_id: " + str(nuc_seq_id) + " q_pos: " + str(seed.start) + 
-              "index on query: " + str(seed_idx) + 
+              " index on query: " + str(seed_idx) + 
               str(" forw" if seed.on_forward_strand else " rev")]
         render_list[nuc_seq_id%100].append(xs)
 
@@ -272,7 +272,7 @@ if __name__ == "__main__":
     #out_dict = sv_jumps_to_dict(sv_db, [1, 45], pos, pos, size, size)
     #out_dict = sv_jumps_to_dict(sv_db, [1, 17])
     
-    out_dict = sv_jumps_to_dict(sv_db, [1, 51], only_supporting_jumps=True, min_score=300)
+    out_dict = sv_jumps_to_dict(sv_db, [1, 7], only_supporting_jumps=False, min_score=0)
 
     fm_index = FMIndex()
     fm_index.load("/MAdata/genome/random_10_pow_6/ma/genome")

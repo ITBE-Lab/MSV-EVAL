@@ -172,29 +172,35 @@ def sweep_sv_jumps(sv_jmps, estimated_coverage, re_estimate_cluster_size=True):
 
     return ret
 
+## complete linkage clustering for jump distances
+# we call sweep_sv_jumps for all insert_ratio clusters with a max dist of max_insert_ratio_diff
+# this clustering is necessary because there might be an edge in the graph that has several different inserted
+# sequences. We need to consider these sequences individually -> cluster by sequence length
+# if the sequences are different by nucleotides, we need to figure that out later in the multialignment step...
 #
-# @todo problem: illumina reads have a insert ratio '> remaining query distance'
-# this should mean that they get added to each cluster that matches that
-# -> implement that
 def sweep_sv_call(sv_call, estimated_coverage):
-    # single linkage clustering for jump distances
-    # we call sweep_sv_jumps for all insert_ratio clusters with a max dist of max_insert_ratio_diff
     max_insert_ratio_diff = 150
 
     sv_jmps = [sv_call.call.get_jump(x) for x in range(len(sv_call.call.supporing_jump_ids))]
-    sv_jmps.sort(key=lambda x: x.insert_ratio())
+    sv_jmps.sort(key=lambda x: (x.insert_ratio(), x.query_distance()))
 
+    # i & j are the start and end positions of the clusters, respectiveley
+    # this works by setting i to the start of the cluster and then gradually increasing j while it belongs to the 
+    # complete linkage cluster (we work on sorted linear data)
     i = 0
     j = 0
     ret = []
     while i < len(sv_jmps):
-        if j < len(sv_jmps) and sv_jmps[i].insert_ratio() + max_insert_ratio_diff >= sv_jmps[j].insert_ratio():
+        # increase j if the insert_ratio between the 'i' and 'j' object is closer than 'max_insert_ratio_diff'
+        # if we reach a tail edge (those edges are sorted to the end since their insert 
+        # size is 'inf') we check if the current insert ratio is larger than the tail of the read that created the edge
+        # if so we join the tail edge into the cluster.
+        if j < len(sv_jmps) and sv_jmps[i].insert_ratio() >= \
+                    (sv_jmps[j].insert_ratio() - max_insert_ratio_diff if sv_jmps[j].switch_strand_known() else sv_jmps[j].query_distance()):
             j += 1
         else:
-            # @note currently we always accept the sv_jump with the smaller insert size
-            # otherwise we would create artifacts (due to the multiple seeds beeing used)...
-            # @todo is there a smarter way to filter the artifacts 
-            #       or is it possible to have two insertions with different lengths at the same spot?
+            # perform the overlapping on the cluster
             ret.extend(sweep_sv_jumps(sv_jmps[i:j], estimated_coverage))
+            # set i to the start of the next cluster
             i = j
     return ret

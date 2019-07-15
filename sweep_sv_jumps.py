@@ -216,10 +216,17 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc, s
     print("done sweeping")
     sv_caller_run_id = call_inserter.sv_caller_run_id
     del call_inserter # trigger deconstructor for call inserter (commits insert transaction)
-    print("overlapping...")
-    libMA.combine_overlapping_calls(parameter_set_manager, sv_db, sv_caller_run_id)
     print("num calls:", sv_db.get_num_calls(sv_caller_run_id, 0))
-    print("done overlapping")
+    print("filtering low support short calls...")
+    num_removed = sv_db.filter_short_edges_with_low_support(sv_caller_run_id, 300, 50)
+    print("done filtering; removed", num_removed, "calls")
+    print("filtering fuzzy calls calls...")
+    num_removed = sv_db.filter_fuzzy_calls(sv_caller_run_id, 50)
+    print("done filtering; removed", num_removed, "calls")
+    print("overlapping...")
+    num_combined = libMA.combine_overlapping_calls(parameter_set_manager, sv_db, sv_caller_run_id)
+    print("done overlapping; combined", num_combined, "calls")
+    print("num calls remaining:", sv_db.get_num_calls(sv_caller_run_id, 0))
     print("computing coverage...")
     compute_coverage(parameter_set_manager, fm_index, pack, sv_db, sv_caller_run_id, sequencer_ids)
     print("done computing coverage")
@@ -259,7 +266,8 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
                     jump.from_size() + 1,
                     jump.to_size() + 1,
                     jump.num_supp_nt()/1000,
-                    "SuppNt: " + str(jump.num_supp_nt()) + " read_id: " + str(jump.read_id)]
+                    "SuppNt: " + str(jump.num_supp_nt()) + " read_id: " + str(jump.read_id) + " q_len: " + 
+                    str(jump.query_distance())]
             if jump.switch_strand_known():
                 if jump.does_switch_strand():
                     sw_boxes_data.append(xs)

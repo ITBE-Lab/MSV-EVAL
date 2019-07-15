@@ -8,7 +8,7 @@ from create_json import create_json_from_db
 import json
 from MA import SV_DB, ParameterSetManager
 from sweep_sv_jumps import sv_jumps_to_dict
-
+from bokeh.models import Legend
 
 def split_by_cat(s, e, l):
     a = 0
@@ -121,53 +121,65 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
     reset_output()
     show(layout(plotss))
 
-    plotss = []
-    for name_1, sub_lists in split_by_cat(0, 0, tsv_list[1:]):
-        plotss.append([])
-        plotss.append([])
-        for name_2, sub_list in split_by_cat(1, 3, sub_lists):
-            name = str([*name_1, *name_2])
-            plot_2 = figure(title=name, tooltips="@i", active_drag=None)
-            plot_3 = figure(title=name + " - 100nt blur", tooltips="@i", active_drag=None)
-            for idx, row in enumerate(sub_list):
-                x_every_2 = 1
-                x_every = 4
-                aligner_name = str((row[5], row[4]))
-                if aligner_name in json_dict[name]:
-                    x, y, x_2, y_2, p = json_dict[name][aligner_name]
-                    #print(x,y,x_2,y_2)
+    for name_1, sub_lists in split_by_cat(0, 1, tsv_list[1:]):
+        plotss = []
+        for name_2, sub_lists_2 in split_by_cat(2, 2, sub_lists):
+            plotss.append([])
+            for name_3, sub_list in split_by_cat(3, 3, sub_lists_2):
+                legend = []
+                name = str([*name_1, *name_2, *name_3])
+                plot_3 = figure(title=name + " - 100nt blur", tooltips="@i", active_drag=None, width=500, height=300)
+                for idx, row in enumerate(sub_list):
+                    x_every_2 = 1
+                    x_every = 4
+                    aligner_name = str((row[5], row[4]))
+                    if aligner_name in json_dict[name]:
+                        x, y, x_2, y_2, p = json_dict[name][aligner_name]
 
-                    plot_3.line(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                                source=ColumnDataSource(data=dict(x=x_2[::x_every_2], y=y_2[::x_every_2], 
-                                                                  i=p[::x_every_2])),
-                                line_width=3, alpha=0.5)
-                    #plot_3.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                    #        source=ColumnDataSource(data=dict(x=x_2[::x_every], y=y_2[::x_every], i=p[::x_every])),
-                    #        size=10, line_width=4)
+                        line = plot_3.line(x="x", y="y", color=Category10[10][idx%10],
+                                    source=ColumnDataSource(data=dict(x=x_2[::x_every_2], y=y_2[::x_every_2], 
+                                                                    i=p[::x_every_2])),
+                                    line_width=3, alpha=0.5)
+                        legend.append( (aligner_name, [line]) )
+                if len(plotss[0]) > 0:
+                    plot_3.x_range = plotss[0][0].x_range
+                    plot_3.y_range = plotss[0][0].y_range
+                    
+                plot_3.xaxis.axis_label = "recall"
+                plot_3.yaxis.axis_label = "precision"
+                legend_obj = Legend(items=legend, location="center")
+                plot_3.add_layout(legend_obj, "right")
+                plotss[-1].append(plot_3)
 
-                    plot_2.line(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                                source=ColumnDataSource(data=dict(x=x[::x_every_2], y=y[::x_every_2], 
-                                                        i=p[::x_every_2])),
-                                line_width=3, alpha=0.5)
-                    #plot_2.x(x="x", y="y", legend=aligner_name, color=Category10[10][idx%10],
-                    #        source=ColumnDataSource(data=dict(x=x[::x_every], y=y[::x_every], i=p[::x_every])),
-                    #        size=10, line_width=4)
-            if len(plotss[-2]) > 0:
-                plot_2.x_range = plotss[-2][0].x_range
-                plot_2.y_range = plotss[-2][0].y_range
-                plot_3.x_range = plotss[-2][0].x_range
-                plot_3.y_range = plotss[-2][0].y_range
-            plot_2.xaxis.axis_label = "recall"
-            plot_2.yaxis.axis_label = "precision"
-            plot_2.legend.location = "bottom_left"
-            plot_3.xaxis.axis_label = "recall"
-            plot_3.yaxis.axis_label = "precision"
-            plot_3.legend.location = "bottom_left"
-            plotss[-2].append(plot_2)
-            plotss[-1].append(plot_3)
+        for name_2, sub_lists_2 in split_by_cat(2, 2, sub_lists):
+            plotss.append([])
+            for name_3, sub_list in split_by_cat(3, 3, sub_lists_2):
+                legend = []
+                name = str([*name_1, *name_2, *name_3])
+                plot_2 = figure(title=name, tooltips="@i", active_drag=None, width=500, height=300)
+                for idx, row in enumerate(sub_list):
+                    x_every_2 = 1
+                    x_every = 4
+                    aligner_name = str((row[5], row[4]))
+                    if aligner_name in json_dict[name]:
+                        x, y, x_2, y_2, p = json_dict[name][aligner_name]
 
-    reset_output()
-    show(layout(plotss))
+                        line = plot_2.line(x="x", y="y", color=Category10[10][idx%10],
+                                    source=ColumnDataSource(data=dict(x=x[::x_every_2], y=y[::x_every_2], 
+                                                            i=p[::x_every_2])),
+                                    line_width=3, alpha=0.5)
+                        legend.append((aligner_name, [line]))
+                if len(plotss[0]) > 0:
+                    plot_2.x_range = plotss[0][0].x_range
+                    plot_2.y_range = plotss[0][0].y_range
+                plot_2.xaxis.axis_label = "recall"
+                plot_2.yaxis.axis_label = "precision"
+                legend_obj = Legend(items=legend, location="center")
+                plot_2.add_layout(legend_obj, "right")
+                plotss[-1].append(plot_2)
+
+        reset_output()
+        show(layout(plotss))
 
 def print_ground_truth(dataset_name):
     # decode hook for the json that decodes lists dicts and floats properly
