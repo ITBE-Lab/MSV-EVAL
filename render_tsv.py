@@ -26,7 +26,7 @@ def to_int(x):
 
 def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category=(0,2), category=(3,5), 
                      stacks=[(8, 9, 11, "green", "orange", "gray")],
-                     bars=[(7, 9, "red"), (12, None, "blue")]):
+                     bars=[(7, 9, "red"), (12, None, "blue"), (13, None, "purple")]):
 
     plotss = []
     for _, sub_lists in split_by_cat(*plot_category, tsv_list[1:]):
@@ -41,8 +41,7 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
             plot = figure(x_range=FactorRange(*x),
                           y_range=(-range_num*0.1, range_num * 1.1),
                           title=name,
-                          toolbar_location=None,
-                          tools="",
+                          tools="save",
                           width=800)
             n = len(stacks) + len(bars)
             for idx, (bottom_idx, bottom2_idx, top_idx, bottom_color, bottom2_color, top_color) in enumerate(stacks):
@@ -134,13 +133,13 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
                     x_every = 4
                     aligner_name = str((row[5], row[4]))
                     if aligner_name in json_dict[name]:
-                        x, y, x_2, y_2, p = json_dict[name][aligner_name]
+                        x, y, x_2, y_2, p, _, num_invalid_calls_fuzzy = json_dict[name][aligner_name]
 
                         line = plot_3.line(x="x", y="y", color=Category10[10][idx%10],
                                     source=ColumnDataSource(data=dict(x=x_2[::x_every_2], y=y_2[::x_every_2], 
                                                                     i=p[::x_every_2])),
                                     line_width=3, alpha=0.5)
-                        legend.append( (aligner_name, [line]) )
+                        legend.append( (aligner_name + " #inv:" + str(num_invalid_calls_fuzzy), [line]) )
                 if len(plotss[0]) > 0:
                     plot_3.x_range = plotss[0][0].x_range
                     plot_3.y_range = plotss[0][0].y_range
@@ -162,13 +161,13 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
                     x_every = 4
                     aligner_name = str((row[5], row[4]))
                     if aligner_name in json_dict[name]:
-                        x, y, x_2, y_2, p = json_dict[name][aligner_name]
+                        x, y, x_2, y_2, p, num_invalid_calls, _ = json_dict[name][aligner_name]
 
                         line = plot_2.line(x="x", y="y", color=Category10[10][idx%10],
                                     source=ColumnDataSource(data=dict(x=x[::x_every_2], y=y[::x_every_2], 
                                                             i=p[::x_every_2])),
                                     line_width=3, alpha=0.5)
-                        legend.append((aligner_name, [line]))
+                        legend.append((aligner_name + " #inv:" + str(num_invalid_calls), [line]))
                 if len(plotss[0]) > 0:
                     plot_2.x_range = plotss[0][0].x_range
                     plot_2.y_range = plotss[0][0].y_range

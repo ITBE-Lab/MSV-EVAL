@@ -206,8 +206,8 @@ if __name__ == "__main__":
 
     create_dataset("/MAdata/genome/random_10_pow_6",
                    "minimal",
-                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),],
-                   [(create_illumina_reads_dwgsim, "ill_100", (100,)),],
+                   [( separate_svs, "dup-0250", ( (sv_duplication, tuple()), 250, 1000 ) ),],
+                   [(create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb")),],
                    [5])
 
     #create_dataset("/MAdata/genome/random_10_pow_6",

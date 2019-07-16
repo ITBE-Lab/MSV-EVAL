@@ -218,7 +218,7 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc, s
     del call_inserter # trigger deconstructor for call inserter (commits insert transaction)
     print("num calls:", sv_db.get_num_calls(sv_caller_run_id, 0))
     print("filtering low support short calls...")
-    num_removed = sv_db.filter_short_edges_with_low_support(sv_caller_run_id, 300, 50)
+    num_removed = sv_db.filter_short_edges_with_low_support(sv_caller_run_id, 500, 50)
     print("done filtering; removed", num_removed, "calls")
     print("filtering fuzzy calls calls...")
     num_removed = sv_db.filter_fuzzy_calls(sv_caller_run_id, 50)

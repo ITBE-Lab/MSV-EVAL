@@ -110,6 +110,13 @@ def sweep_sv_jumps(sv_jmps, estimated_coverage, re_estimate_cluster_size=True):
                 cluster.call.to_start = max(0, cluster.down())
                 cluster.call.from_size = max(right - cluster.call.from_start, 1)
                 cluster.call.to_size = max(1, up - cluster.call.to_start)
+                # make sure we never have a call smaller than 10x10:
+                if cluster.call.from_size < 10:
+                    cluster.call.from_start = max(0, int(cluster.call.from_start + cluster.call.from_size/2 - 5))
+                    cluster.call.from_size = 10
+                if cluster.call.to_size < 10:
+                    cluster.call.to_start = max(0, int(cluster.call.to_start + cluster.call.to_size/2 - 5))
+                    cluster.call.to_size = 10
             cluster.call.num_supp_nt = 0
             for x in range(len(cluster.call.supporing_jump_ids)):
                 cluster.call.num_supp_nt += cluster.call.get_jump(x).num_supp_nt()
