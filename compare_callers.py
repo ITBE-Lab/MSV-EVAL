@@ -28,8 +28,25 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
             presetting = "map-ont"
         index_str = json_dict["reference_path"] + "/minimap/genome." + presetting + ".mmi"
         # -c output CIGAR in PAF; -a output SAM
-        os.system("~/workspace/minimap2/minimap2 --MD -c -a -t 32 -x " + presetting + " " + index_str + " "
+        os.system("~/workspace/minimap2/minimap2 --MD -c -a -t 32 -x " + presetting + " -R \"@RG\\tID:1\\tSM:"
+                  + read_set["name"] + "\" " + index_str + " "
                   + read_set["fasta_file"] + " > " + sam_file_path + " 2> /dev/null")
+
+    def pbmm2(read_set, sam_file_path):
+        presetting = None # noop
+        if read_set["technology"] == "pb":
+            presetting = "map-pb"
+        if read_set["technology"] == "ont":
+            presetting = "map-ont"
+        index_str = json_dict["reference_path"] + "/minimap/genome." + presetting + ".mmi"
+        # -c output CIGAR in PAF; -a output SAM; -Y softclip
+        os.system("~/workspace/minimap2/minimap2 --MD -Y -c -a -t 32 -x " + presetting + " -R \"@RG\\tID:1\\tSM:"
+                  + read_set["name"] + "\" " + index_str + " "
+                  + read_set["fasta_file"] + " > " + sam_file_path + " 2> /dev/null")
+
+        #os.system("~/miniconda2/bin/pbmm2 align " + json_dict["reference_path"] + "/fasta/genome.fna " 
+        #          + read_set["fasta_file"] + ".bam " + sam_file_path + 
+        #          ".sorted.bam --sort --preset CCS --sample sample1 --rg '@RG\tID:movie1' ")
 
     def ngmlr(read_set, sam_file_path):
         presetting = None # noop
@@ -39,8 +56,9 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
             presetting = "ont"
         index_str = json_dict["reference_path"] + "/ngmlr/genome.fna"
         # -c output CIGAR in PAF; -a output SAM
-        os.system("~/workspace/ngmlr/bin/ngmlr-0.2.8/ngmlr -r " + index_str + " -q "
-                  + read_set["fasta_file"] + " -t 32 -x " + presetting + " > " + sam_file_path + " 2> /dev/null")
+        os.system("~/workspace/ngmlr/bin/ngmlr-0.2.8/ngmlr -r " + index_str + " -q " + read_set["fasta_file"]
+                    + " --rg-id 1, --rg-sm " + read_set["name"]
+                    + " -t 32 -x " + presetting + " > " + sam_file_path + " 2> /dev/null")
 
     def blasr(read_set, sam_file_path):
         s = "~/workspace/legacy_blasr/blasr " + read_set["fasta_file"] + " " + json_dict["reference_path"] \
@@ -61,7 +79,7 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
 
 
     alignment_calls = {
-        "create_reads_survivor": [mm2, ngmlr], #blasr @note is not required at the moment
+        "create_reads_survivor": [mm2, ngmlr, pbmm2], #blasr @note is not required at the moment
         "create_illumina_reads_dwgsim": [bwa, bowtie]
     }
 
@@ -94,16 +112,22 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
                 print("creating alignment files for", read_set["name"], alignment_call.__name__)
                 alignment_call(read_set, sam_file_path + ".sam")
 
-                # create sorted and indexed bam files
-                sam_tools_pref = "~/workspace/samtools/samtools "
-                to_bam_cmd = sam_tools_pref + "view -Sb " + sam_file_path + ".sam > " + sam_file_path + ".bam"
-                os.system(to_bam_cmd)
-                sort_cmd = sam_tools_pref + "sort -@ 32 -m 1G " + sam_file_path + ".bam > " \
-                            + sam_file_path + ".sorted.bam"
-                os.system(sort_cmd + " 2> /dev/null")
-                index_cmd = sam_tools_pref + "index " + sam_file_path + ".sorted.bam > " \
-                            + sam_file_path + ".sorted.bam.bai"
-                os.system(index_cmd)
+                #if os.path.exists( sam_file_path + ".sam.sorted.bam "):
+                #    os.system("mv " + sam_file_path + ".sam.sorted.bam " + sam_file_path + ".sorted.bam ")
+                #    os.system("touch " + sam_file_path + ".sam")
+                if os.path.exists( sam_file_path + ".sam" ):
+                    # create sorted and indexed bam files
+                    sam_tools_pref = "~/workspace/samtools/samtools "
+                    to_bam_cmd = sam_tools_pref + "view -Sb " + sam_file_path + ".sam > " + sam_file_path + ".bam"
+                    os.system(to_bam_cmd)
+                    sort_cmd = sam_tools_pref + "sort -@ 32 -m 1G " + sam_file_path + ".bam > " \
+                                + sam_file_path + ".sorted.bam"
+                    os.system(sort_cmd + " 2> /dev/null")
+                    index_cmd = sam_tools_pref + "index " + sam_file_path + ".sorted.bam > " \
+                                + sam_file_path + ".sorted.bam.bai"
+                    os.system(index_cmd)
+                else:
+                    print("aligner did not create alignments:", alignment_call)
 
 def vcf_parser(file_name):
     class VCFFile:
@@ -150,7 +174,7 @@ def vcf_parser(file_name):
                         d[name] = field
                 yield VCFFile(d)
 
-def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
+def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None, create_sv_func=None):
     call_inserter = SvCallInserter(sv_db, name, desc, -1) # -1 since there are no related sv jumps...
     def find_confidence(call):
         if "coverage" in call["INFO"]:
@@ -165,6 +189,8 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
             return int(float(call["QUAL"]))
         return 0
     def find_std_from_std_to(call):
+        std_from = None
+        std_to = None
         if "STD_quant_start" in call["INFO"]:
             std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
         if "CIPOS" in call["INFO"]: # delly
@@ -177,9 +203,12 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
             std_to = math.ceil(float(x[1]) - float(x[0]))
         return std_from, std_to
     num_calls = 0
+    bnd_mate_dict = {}
     for call in vcf_parser(file_name):
         num_calls += 1
         try:
+            if call["FILTER"] != "PASS": # @todo verify that this is correct
+                continue
             #print("quality:", find_confidence(call))
             if call["TYPE"] == "DEL":
                 #print(call)
@@ -208,6 +237,11 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
                 call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            elif call["ALT"] == "<DUP>": # pbsv
+                #print(call)
+                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+                to_pos = from_pos + int(call["INFO"]["SVLEN"])
+                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, find_confidence(call), 1))
             elif call["ALT"] == "<INS>" and "PRECISE" in call["INFO"]:
                 #print(call)
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
@@ -222,6 +256,10 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
                 from_end = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
                 call_inserter.insert_call(SvCall(from_start, from_start, from_end - from_start,
                                                     from_end - from_start, False, find_confidence(call), 1))
+            elif call["INFO"]["SVTYPE"] == "INS": #pbsv
+                #print(call)
+                from_start = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+                call_inserter.insert_call(SvCall(from_start, from_start, 1, 1, False, find_confidence(call), 1))
             elif call["ALT"] == "<INV>" and "PRECISE" in call["INFO"]:
                 #print(call)
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
@@ -231,10 +269,16 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
             elif call["ALT"] == "<INV>" and "IMPRECISE" in call["INFO"]:
                 #print(call)
                 std_from, std_to = find_std_from_std_to(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_to/2)
-                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
+                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
+                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
                 call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, to_pos, True, find_confidence(call), 1))
                 call_inserter.insert_call(SvCall(to_pos, from_pos, from_pos, to_pos, True, find_confidence(call), 1))
+            elif call["ALT"] == "<INV>": # pbsv
+                #print(call)
+                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+                to_pos = from_pos + int(call["INFO"]["SVLEN"])
+                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, True, find_confidence(call), 1))
+                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, True, find_confidence(call), 1))
             elif call["INFO"]["SVTYPE"] == "DEL": # Manta
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
                 to_pos = from_pos - int(call["INFO"]["SVLEN"])
@@ -244,6 +288,23 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
                 to_pos = from_pos + int(call["INFO"]["SVLEN"]) - int(std_to/2)
                 call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            elif call["INFO"]["SVTYPE"] == "DUP": # Manta
+                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+                to_pos = from_pos + int(call["INFO"]["SVLEN"])
+                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, find_confidence(call), 1))
+            elif call["INFO"]["SVTYPE"] == "BND" and "IMPRECISE" in call["INFO"]: # Manta
+                if call["INFO"]["MATEID"] in bnd_mate_dict:
+                    mate = bnd_mate_dict[call["INFO"]["MATEID"]]
+                    std_from, _ = find_std_from_std_to(mate)
+                    std_to, _ = find_std_from_std_to(call)
+                    from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"]) - int(std_from/2)
+                    to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_to/2)
+                    save_as_inversion = create_sv_func == "sv_inversion"
+                    call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, save_as_inversion,
+                                                     find_confidence(call), 1))
+                    del bnd_mate_dict[call["INFO"]["MATEID"]]
+                else:
+                    bnd_mate_dict[call["ID"]] = call
             else:
                 print("unrecognized sv:", call)
                 error_file.write("unrecognized sv: \n")
@@ -258,6 +319,11 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None):
             error_file.write(str(e))
             error_file.write(traceback.format_exc())
             error_file.write("\n\n\n")
+    for key, value in bnd_mate_dict.items():
+        print("WARNING did not find mate for call", value)
+        error_file.write("WARNING did not find mate for call: \n")
+        error_file.write(str(value))
+        error_file.write("\n\n\n")
     print("number of calls:", num_calls)
     del call_inserter # trigger deconstructor
 
@@ -332,18 +398,21 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
             os.system( s )
         else:
             os.system( "smoove call -o " + vcf_file + " --noextrafilters --fasta " + json_dict["reference_path"] 
-                       + " /fasta/genome.fna -p 32 --genotype " + bam_file )
+                       + "/fasta/genome.fna -p 32 --genotype " + bam_file )
         os.system("gunzip -f " + vcf_file + "-smoove.genotyped.vcf.gz")
 
     def pbSv(bam_file, vcf_file):
-        pass
+        os.system("~/miniconda2/bin/pbsv discover " + bam_file + " " + vcf_file + ".svsig.gz")
+        os.system("~/miniconda2/bin/pbsv call " + json_dict["reference_path"] + "/fasta/genome.fa " + 
+                  vcf_file + ".svsig.gz " + vcf_file)
 
 
     sv_calls = {
         "bwa":    [delly, smoove, manta],
         "bowtie": [delly, smoove, manta],
-        "mm2":    [sniffles, pbSv],
-        "ngmlr":  [sniffles, pbSv],
+        "mm2":    [sniffles],
+        "pbmm2":  [pbSv],
+        "ngmlr":  [sniffles],
         "blasr":  [] #pbHoney @note the vcf file reading seems to be broken anyways
     }
 
@@ -386,7 +455,8 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                             print("caller did not create calls: ", read_set["name"], alignment, sv_call.__name__)
                             continue
                         vcf_to_db(read_set["name"] + "-" + alignment + "-" + sv_call.__name__,
-                                "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack, error_file)
+                                 "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack, error_file,
+                                 dataset["func_name"])
 
                     for sv_call in sv_calls[alignment]:
                         if not sv_call.__name__ in read_set["calls"]:
@@ -410,51 +480,54 @@ def print_columns(data):
             first = False
         last_row = row
 
+blur_amount = 10
+
 def analyze_by_score(sv_db, id_a, id_b):
     num_calls_a = sv_db.get_num_calls(id_a, 0) # num calls made
     if num_calls_a == 0:
-        return [], [], [], [], [], 0, 0
+        return [], [], [], 0, 0
     min_score = sv_db.get_min_score(id_a)
     max_score = sv_db.get_max_score(id_a)
     p = min_score
     inc = (max_score - min_score) / 50
     if max_score <= min_score:
         inc = 1
-    xs = []
+    #xs = []
     xs_2 = []
-    ys = []
+    #ys = []
     ys_2 = []
     ps = []
     num_calls_b = sv_db.get_num_calls(id_b, 0) # num actual calls
     if num_calls_b == 0 or min_score == float('inf') or max_score == float('inf'):
         #print(num_calls_a, min_score, max_score)
-        return [], [], [], [], [], 0, 0
+        return [], [], [], 0, 0
     while p <= max_score:
         #print(min_score, p, max_score)
         ps.append(p)
         # how many of the sv's are detected?
-        num_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, p, 0)
-        num_almost_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, p, 100)
+        #num_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, p, 0)
+        num_almost_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, p, blur_amount)
 
-        xs.append(num_overlaps_b_to_a/num_calls_b)
+        #xs.append(num_overlaps_b_to_a/num_calls_b)
         xs_2.append(num_almost_overlaps_b_to_a/num_calls_b)
 
         num_calls_a = sv_db.get_num_calls(id_a, p) # num calls made
 
         if num_calls_a == 0:
-            ys.append(0)
+            #ys.append(0)
             ys_2.append(0)
         else:
-            ys.append(num_overlaps_b_to_a/num_calls_a)
+            #ys.append(num_overlaps_b_to_a/num_calls_a)
             ys_2.append(num_almost_overlaps_b_to_a/num_calls_a)
 
         p += inc
 
-    num_invalid_calls = sv_db.get_num_invalid_calls(id_a, 0, 0)
-    num_invalid_calls_fuzzy = sv_db.get_num_invalid_calls(id_a, 0, 100)
+    #num_invalid_calls = sv_db.get_num_invalid_calls(id_a, 0, 0)
+    num_invalid_calls_fuzzy = sv_db.get_num_invalid_calls(id_a, 0, blur_amount)
+    avg_blur = sv_db.get_blur_on_overlaps_between_calls(id_b, id_a, 0, blur_amount)
 
-    # recall, precision, recall_relaxed, precision_relaxed, score
-    return xs, ys, xs_2, ys_2, ps, num_invalid_calls, num_invalid_calls_fuzzy
+    return xs_2, ys_2, ps, num_invalid_calls_fuzzy, avg_blur
+    #return xs, ys, xs_2, ys_2, ps, num_invalid_calls, num_invalid_calls_fuzzy, avg_blur
 
 def compare_caller(sv_db, id_a, id_b, min_score):
     num_calls_a = sv_db.get_num_calls(id_a, min_score) # num calls made
@@ -469,10 +542,10 @@ def compare_caller(sv_db, id_a, id_b, min_score):
     call_area_b = sv_db.get_call_area(id_b, min_score)
     rel_call_area_b = call_area_b/num_calls_b
     num_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_a, id_b, min_score, 0) # true positives
-    num_almost_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_a, id_b, min_score, 100) # true positives
+    num_almost_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_a, id_b, min_score, blur_amount) # true positives
     num_almost_overlaps_a_to_b -= num_overlaps_a_to_b
     num_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, 0) # how many of the sv's are detected?
-    num_almost_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, 100) # how many of the sv's are detected?
+    num_almost_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, blur_amount) # how many of the sv's are detected?
     num_errors = num_calls_b - num_overlaps_b_to_a # how many of the sv's are NOT detected?
     num_way_off = num_calls_b - num_almost_overlaps_b_to_a # how many of the sv's are NOT detected?
     num_invalid_calls = sv_db.get_num_invalid_calls(id_a, min_score, 0)
@@ -587,6 +660,6 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #print("===============")
 if __name__ == "__main__":
     analyze_sample_dataset("minimal", True)
-    #analyze_sample_dataset("comprehensive_random", True)
+    #analyze_sample_dataset("comprehensive_random", False)
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))

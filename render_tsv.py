@@ -127,19 +127,26 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
             for name_3, sub_list in split_by_cat(3, 3, sub_lists_2):
                 legend = []
                 name = str([*name_1, *name_2, *name_3])
-                plot_3 = figure(title=name + " - 100nt blur", tooltips="@i", active_drag=None, width=500, height=300)
+                plot_3 = figure(title=name + " - 10nt blur", tooltips="@i", active_drag=None, width=500, height=300)
                 for idx, row in enumerate(sub_list):
                     x_every_2 = 1
                     x_every = 4
                     aligner_name = str((row[5], row[4]))
                     if aligner_name in json_dict[name]:
-                        x, y, x_2, y_2, p, _, num_invalid_calls_fuzzy = json_dict[name][aligner_name]
+                        x_2, y_2, p, num_invalid_calls_fuzzy, avg_blur = json_dict[name][aligner_name]
 
-                        line = plot_3.line(x="x", y="y", color=Category10[10][idx%10],
-                                    source=ColumnDataSource(data=dict(x=x_2[::x_every_2], y=y_2[::x_every_2], 
-                                                                    i=p[::x_every_2])),
-                                    line_width=3, alpha=0.5)
-                        legend.append( (aligner_name + " #inv:" + str(num_invalid_calls_fuzzy), [line]) )
+                        if len(x_2) > x_every_2:
+                            line = plot_3.line(x="x", y="y", color=Category10[10][idx%10],
+                                        source=ColumnDataSource(data=dict(x=x_2[::x_every_2], y=y_2[::x_every_2], 
+                                                                        i=p[::x_every_2])),
+                                        line_width=3, alpha=0.5)
+                        else:
+                            line = plot_3.x(x="x", y="y", color=Category10[10][idx%10],
+                                        source=ColumnDataSource(data=dict(x=x_2[::x_every_2], y=y_2[::x_every_2], 
+                                                                        i=p[::x_every_2])),
+                                        line_width=3, alpha=0.5, size=8)
+                        legend.append( (aligner_name + " #inv:" + str(num_invalid_calls_fuzzy) + " #avgdist: " + \
+                                        str(avg_blur), [line]) )
                 if len(plotss[0]) > 0:
                     plot_3.x_range = plotss[0][0].x_range
                     plot_3.y_range = plotss[0][0].y_range
@@ -150,32 +157,38 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
                 plot_3.add_layout(legend_obj, "right")
                 plotss[-1].append(plot_3)
 
-        for name_2, sub_lists_2 in split_by_cat(2, 2, sub_lists):
-            plotss.append([])
-            for name_3, sub_list in split_by_cat(3, 3, sub_lists_2):
-                legend = []
-                name = str([*name_1, *name_2, *name_3])
-                plot_2 = figure(title=name, tooltips="@i", active_drag=None, width=500, height=300)
-                for idx, row in enumerate(sub_list):
-                    x_every_2 = 1
-                    x_every = 4
-                    aligner_name = str((row[5], row[4]))
-                    if aligner_name in json_dict[name]:
-                        x, y, x_2, y_2, p, num_invalid_calls, _ = json_dict[name][aligner_name]
-
-                        line = plot_2.line(x="x", y="y", color=Category10[10][idx%10],
-                                    source=ColumnDataSource(data=dict(x=x[::x_every_2], y=y[::x_every_2], 
-                                                            i=p[::x_every_2])),
-                                    line_width=3, alpha=0.5)
-                        legend.append((aligner_name + " #inv:" + str(num_invalid_calls), [line]))
-                if len(plotss[0]) > 0:
-                    plot_2.x_range = plotss[0][0].x_range
-                    plot_2.y_range = plotss[0][0].y_range
-                plot_2.xaxis.axis_label = "recall"
-                plot_2.yaxis.axis_label = "precision"
-                legend_obj = Legend(items=legend, location="center")
-                plot_2.add_layout(legend_obj, "right")
-                plotss[-1].append(plot_2)
+        #for name_2, sub_lists_2 in split_by_cat(2, 2, sub_lists):
+        #    plotss.append([])
+        #    for name_3, sub_list in split_by_cat(3, 3, sub_lists_2):
+        #        legend = []
+        #        name = str([*name_1, *name_2, *name_3])
+        #        plot_2 = figure(title=name, tooltips="@i", active_drag=None, width=500, height=300)
+        #        for idx, row in enumerate(sub_list):
+        #            x_every_2 = 1
+        #            x_every = 4
+        #            aligner_name = str((row[5], row[4]))
+        #            if aligner_name in json_dict[name]:
+        #                x, y, x_2, y_2, p, num_invalid_calls, _ = json_dict[name][aligner_name]
+        #
+        #                if len(x) > x_every_2:
+        #                    line = plot_2.line(x="x", y="y", color=Category10[10][idx%10],
+        #                                source=ColumnDataSource(data=dict(x=x[::x_every_2], y=y[::x_every_2], 
+        #                                                        i=p[::x_every_2])),
+        #                                line_width=3, alpha=0.5)
+        #                else:
+        #                    line = plot_2.x(x="x", y="y", color=Category10[10][idx%10],
+        #                                source=ColumnDataSource(data=dict(x=x[::x_every_2], y=y[::x_every_2], 
+        #                                                        i=p[::x_every_2])),
+        #                                line_width=3, alpha=0.5, size=8)
+        #                legend.append((aligner_name + " #inv:" + str(num_invalid_calls), [line]))
+        #        if len(plotss[0]) > 0:
+        #            plot_2.x_range = plotss[0][0].x_range
+        #            plot_2.y_range = plotss[0][0].y_range
+        #        plot_2.xaxis.axis_label = "recall"
+        #        plot_2.yaxis.axis_label = "precision"
+        #        legend_obj = Legend(items=legend, location="center")
+        #        plot_2.add_layout(legend_obj, "right")
+        #        plotss[-1].append(plot_2)
 
         reset_output()
         show(layout(plotss))
