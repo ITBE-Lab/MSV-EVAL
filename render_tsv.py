@@ -120,6 +120,26 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
     reset_output()
     show(layout(plotss))
 
+    auc_mat = {}
+    def get_auc(xs, ys):
+        if len(xs) == 0 or len(ys) == 0:
+            return 0
+        ret = 0
+        for x_1, x_2, y_2, y_1 in zip(xs[1:], xs[:-1], ys[1:], ys[:-1]):
+            assert x_2 >= x_1
+            w = x_2 - x_1
+            h_1 = min(y_1, y_2)
+            h_2 = max(y_1, y_2) - h_1
+            #rectangular area:
+            ret += w * h_1
+            # triangular area
+            ret += w * h_2 / 2.0
+        # final area at the end:
+        w = xs[-1]
+        h = ys[-1]
+        ret += w * h
+        return ret
+
     for name_1, sub_lists in split_by_cat(0, 1, tsv_list[1:]):
         plotss = []
         for name_2, sub_lists_2 in split_by_cat(2, 2, sub_lists):
@@ -134,6 +154,13 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
                     aligner_name = str((row[5], row[4]))
                     if aligner_name in json_dict[name]:
                         x_2, y_2, p, num_invalid_calls_fuzzy, avg_blur = json_dict[name][aligner_name]
+
+                        auc = get_auc(x_2, y_2)
+                        if not aligner_name in auc_mat:
+                            auc_mat[aligner_name] = {}
+                        if not name_1[0] in auc_mat[aligner_name]:
+                            auc_mat[aligner_name][name_1[0]] = []
+                        auc_mat[aligner_name][name_1[0]].append(auc)
 
                         if len(x_2) > x_every_2:
                             line = plot_3.line(x="x", y="y", color=Category10[10][idx%10],
@@ -156,6 +183,11 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
                 legend_obj = Legend(items=legend, location="center")
                 plot_3.add_layout(legend_obj, "right")
                 plotss[-1].append(plot_3)
+
+        for aligner_name, data in auc_mat.items():
+            print(aligner_name, ":")
+            for sv_name, row in data.items():
+                print(sv_name, "\t\t", *row)
 
         #for name_2, sub_lists_2 in split_by_cat(2, 2, sub_lists):
         #    plotss.append([])

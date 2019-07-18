@@ -168,21 +168,24 @@ def create_dataset(reference_path, dataset_name, create_svs_funcs,
         start = time.time()
 
         # save the sequenced genome
+        
+        print("\treconstructing sequenced genome")
         seq_pack = database.reconstruct_sequenced_genome(ref_pack, caller_id)
+        if not chromosome is None:
+            seq_pack_ = Pack()
+            seq_pack_.append(seq_pack.contigNames()[chromosome], "no_description_given", 
+                            NucSeq(seq_pack.contigSeqs()[chromosome]))
+            seq_pack = seq_pack_
+        print("\tstoring sequenced genome")
         seq_pack.store(seq_gen_path)
         with open(seq_gen_path + ".fasta", "w") as fasta_out:
-            def w(name, sequence):
+            for name, sequence in zip(seq_pack.contigNames(), seq_pack.contigSeqs()):
                 fasta_out.write(">")
                 fasta_out.write(name)
                 fasta_out.write("\n")
                 for line in textwrap.wrap(sequence, 50):
                     fasta_out.write(line)
                     fasta_out.write("\n")
-            if chromosome is None:
-                for name, sequence in zip(seq_pack.contigNames(), seq_pack.contigSeqs()):
-                    w(name, sequence)
-            else:
-                w(seq_pack.contigNames()[chromosome], seq_pack.contigSeqs()[chromosome])
         print(time.time() - start, "seconds")
 
         print("creating reads...")
