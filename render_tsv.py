@@ -10,6 +10,49 @@ from MA import SV_DB, ParameterSetManager
 from sweep_sv_jumps import sv_jumps_to_dict
 from bokeh.models import Legend
 
+def light_spec_approximation(x):
+    #map input [0, 1] to wavelength [350, 645]
+    w = 370 + x * (645-370)
+    r = 0.0
+    g = 0.0
+    b = 0.0
+    if w < 440:
+        r = -(w - 440.) / (440. - 380.)
+        b = 1.0
+    elif w >= 440 and w < 490:
+        g = (w - 440.) / (490. - 440.)
+        b = 1.0
+    elif w >= 490 and w < 510:
+        g = 1.0
+        b = -(w - 510.) / (510. - 490.)
+    elif w >= 510 and w < 580:
+        r = (w - 510.) / (580. - 510.)
+        g = 1.0
+    elif w >= 580 and w < 645:
+        r = 1.0
+        g = -(w - 645.) / (645. - 580.)
+    elif w >= 645:
+        r = 1.0
+
+    #intensity
+    i = 1.0
+    if w > 650:
+        i = .3 + .7*(780-w)/(780-650)
+    elif w < 420:
+        i = .3 + .7*(w-380)/(420-380)
+
+    #gamma
+    m = .8
+
+    return (i*r**m, i*g**m, i*b**m)
+
+def format(rgb):
+        def clamp(x):
+            return max(0, min(x, 255))
+        red, green, blue = rgb
+        return "#{0:02x}{1:02x}{2:02x}".format(clamp(int(red * 255)), clamp(int(green * 255)),
+                                               clamp(int(blue * 255)))
+
 def split_by_cat(s, e, l):
     a = 0
     b = 0
@@ -24,7 +67,7 @@ def to_int(x):
         return 0
     return int(x)
 
-def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category=(0,2), category=(3,5), 
+def render_from_list(tsv_list, json_dict, dataset_name, plot_category=(0,0), plot_sub_category=(0,2), category=(3,5), 
                      stacks=[(8, 9, 11, "green", "orange", "gray")],
                      bars=[(7, 9, "red"), (12, None, "blue"), (13, None, "purple")]):
 
@@ -147,20 +190,23 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
             for name_3, sub_list in split_by_cat(3, 3, sub_lists_2):
                 legend = []
                 name = str([*name_1, *name_2, *name_3])
-                plot_3 = figure(title=name + " - 10nt blur", tooltips="@i", active_drag=None, width=500, height=300)
+                plot_3 = figure(title=name + " - 10nt blur - " + dataset_name, tooltips="@i",
+                                active_drag=None, width=500, height=300)
                 for idx, row in enumerate(sub_list):
                     x_every_2 = 1
                     x_every = 4
                     aligner_name = str((row[5], row[4]))
+                    aligner_name_disp = row[5] + " " + row[4]
                     if aligner_name in json_dict[name]:
                         x_2, y_2, p, num_invalid_calls_fuzzy, avg_blur = json_dict[name][aligner_name]
 
                         auc = get_auc(x_2, y_2)
-                        if not aligner_name in auc_mat:
-                            auc_mat[aligner_name] = {}
-                        if not name_1[0] in auc_mat[aligner_name]:
-                            auc_mat[aligner_name][name_1[0]] = []
-                        auc_mat[aligner_name][name_1[0]].append(auc)
+                        if not aligner_name_disp in auc_mat:
+                            auc_mat[aligner_name_disp] = {}
+                        sv_desc = name_1[0] + " " + str(name_1[1]) + "nt"
+                        if not sv_desc in auc_mat[aligner_name_disp]:
+                            auc_mat[aligner_name_disp][sv_desc] = {}
+                        auc_mat[aligner_name_disp][sv_desc][(*name_2, *name_3)] = auc
 
                         if len(x_2) > x_every_2:
                             line = plot_3.line(x="x", y="y", color=Category10[10][idx%10],
@@ -172,7 +218,7 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
                                         source=ColumnDataSource(data=dict(x=x_2[::x_every_2], y=y_2[::x_every_2], 
                                                                         i=p[::x_every_2])),
                                         line_width=3, alpha=0.5, size=8)
-                        legend.append( (aligner_name + " #inv:" + str(num_invalid_calls_fuzzy) + " #avgdist: " + \
+                        legend.append( (aligner_name_disp + " #inv:" + str(num_invalid_calls_fuzzy) + " #avgdist: " + \
                                         str(avg_blur), [line]) )
                 if len(plotss[0]) > 0:
                     plot_3.x_range = plotss[0][0].x_range
@@ -183,11 +229,6 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
                 legend_obj = Legend(items=legend, location="center")
                 plot_3.add_layout(legend_obj, "right")
                 plotss[-1].append(plot_3)
-
-        for aligner_name, data in auc_mat.items():
-            print(aligner_name, ":")
-            for sv_name, row in data.items():
-                print(sv_name, "\t\t", *row)
 
         #for name_2, sub_lists_2 in split_by_cat(2, 2, sub_lists):
         #    plotss.append([])
@@ -224,6 +265,52 @@ def render_from_list(tsv_list, json_dict, plot_category=(0,0), plot_sub_category
 
         reset_output()
         show(layout(plotss))
+
+    x_axis = []
+    y_axis = []
+    for aligner_name, data in auc_mat.items():
+        for sv_name, data_2 in data.items():
+            if not str(sv_name) in y_axis:
+                y_axis.append(str(sv_name))
+            for (seq_name, cov), auc in data_2.items():
+                n = str(seq_name) + " " + str(cov)
+                if not n in x_axis:
+                    x_axis.append(n)
+
+    x_axis.sort()
+    y_axis.sort(reverse=True)
+
+    auc_plots = []
+    for aligner_name, data in auc_mat.items():
+        xs = []
+        ys = []
+        cs = []
+        ds = []
+        for sv_name, data_2 in data.items():
+            for (seq_name, cov), auc in data_2.items():
+                xs.append(str(seq_name) + " " + str(cov))
+                ys.append(str(sv_name))
+                cs.append(format(light_spec_approximation(auc)))
+                ds.append(str(round(auc * 100, 2)) + "%")
+        TOOLTIPS = [
+            ("dataset:", "@ys, @xs"),
+            ("AUC", "@desc"),
+        ]
+        plot = figure(title="AUC for " + aligner_name + " on " + dataset_name, toolbar_location=None,
+                      x_range=x_axis, y_range=y_axis,
+                      width=1000, height=300, tools="hover", tooltips=TOOLTIPS)
+        plot.rect("xs", "ys", color="cs", width=1, height=1, line_color="black", source=ColumnDataSource(data={
+            "xs":xs, "ys":ys, "cs":cs, "desc":ds
+        }))
+        plot.xgrid.grid_line_color = None
+        plot.ygrid.grid_line_color = None
+        auc_plots.append(plot)
+
+    auc_plots.sort(key=lambda x: x.title.text)
+
+    reset_output()
+    show(layout([[x, y] for x, y in zip(auc_plots[::2],auc_plots[1::2])]))
+
 
 def print_ground_truth(dataset_name):
     # decode hook for the json that decodes lists dicts and floats properly
@@ -279,7 +366,7 @@ def render_from_tsv(dataset_name):
     tsv_list.sort()
     tsv_list.insert(0, fist_line)
     #print(tsv_list)
-    render_from_list(tsv_list, json_dict)
+    render_from_list(tsv_list, json_dict, dataset_name)
 
 if __name__ == "__main__":
     render_from_tsv("minimal")
