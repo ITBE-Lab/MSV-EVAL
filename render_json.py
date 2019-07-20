@@ -267,15 +267,15 @@ if __name__ == "__main__":
     size = 10**6#10*10**4
 
     #sv_db = SV_DB("/MAdata/databases/sv_simulated", "open")
-    sv_db = SV_DB("/MAdata/sv_datasets/minimal/svs.db", "open")
+    sv_db = SV_DB("/MAdata/sv_datasets/pacBio/svs.db", "open")
     #out_dict = create_json_from_db(sv_db, "/MAdata/genome/human/GRCh38.p12/ma/genome")
     #out_dict = sv_jumps_to_dict(sv_db, [1, 45], pos, pos, size, size)
     #out_dict = sv_jumps_to_dict(sv_db, [1, 17])
     
-    out_dict = sv_jumps_to_dict(sv_db, [2, 9], only_supporting_jumps=False, min_score=0)
+    out_dict = sv_jumps_to_dict(sv_db, [3, 18], only_supporting_jumps=False, min_score=-1)
 
-    fm_index = FMIndex()
-    fm_index.load("/MAdata/genome/random_10_pow_6/ma/genome")
-    out_dict = render_seeds(sv_db, 1, fm_index, out_dict, pos, size)
+    #fm_index = FMIndex()
+    #fm_index.load("/MAdata/genome/random_10_pow_6/ma/genome")
+    #out_dict = render_seeds(sv_db, 1, fm_index, out_dict, pos, size)
 
     render_from_dict(out_dict)

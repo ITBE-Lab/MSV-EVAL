@@ -79,7 +79,7 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
 
 
     alignment_calls = {
-        "create_reads_survivor": [],#[mm2, ngmlr, pbmm2],
+        "create_reads_survivor": [mm2, ngmlr, pbmm2],
         "create_illumina_reads_dwgsim": [bwa, bowtie]
     }
 
@@ -100,8 +100,8 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
                     print("WARNING: unknown read simulator - using default parameters for sv jumps")
                 #params.by_name("Number of Threads").set(1)
                 #params.by_name("Use all Processor Cores").set(False)
-                #read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(params, fm_index, pack, db, 
-                #                                                        read_set["seq_id"])
+                read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(params, fm_index, pack, db, 
+                                                                        read_set["seq_id"])
             for alignment_call in alignment_calls[read_set["func_name"]]:
                 sam_file_path = "/MAdata/sv_datasets/" + dataset_name + "/alignments/" \
                             + read_set["name"] + "-" + alignment_call.__name__
@@ -279,7 +279,7 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None, create_sv_fun
             elif call["ALT"] == "<INV>": # pbsv
                 #print(call)
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                to_pos = from_pos + int(call["INFO"]["SVLEN"])
+                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["CHROM"])
                 call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, True, find_confidence(call), 1))
                 call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, True, find_confidence(call), 1))
             elif call["INFO"]["SVTYPE"] == "DEL": # Manta
@@ -304,6 +304,8 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None, create_sv_fun
                     to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_to/2)
                     save_as_inversion = create_sv_func == "sv_inversion"
                     call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, save_as_inversion,
+                                                     find_confidence(call), 1))
+                    call_inserter.insert_call(SvCall(from_pos, to_pos, std_to, std_from, save_as_inversion,
                                                      find_confidence(call), 1))
                     del bnd_mate_dict[call["INFO"]["MATEID"]]
                 else:
@@ -413,11 +415,11 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
 
 
     sv_calls = {
-        "bwa":    [manta],#[delly, smoove, manta],
-        "bowtie": [manta],#[delly, smoove, manta],
-        "mm2":    [],#[sniffles],
-        "pbmm2":  [],#[pbSv],
-        "ngmlr":  [],#[sniffles],
+        "bwa":    [delly, smoove, manta],
+        "bowtie": [delly, smoove, manta],
+        "mm2":    [sniffles],
+        "pbmm2":  [pbSv],
+        "ngmlr":  [sniffles],
         "blasr":  [] #pbHoney @note the vcf file reading seems to be broken anyways
     }
 
@@ -440,10 +442,10 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                     params.set_selected("SV-ONT")
                 else:
                     print("WARNING: unknown read simulator - using default parameters for sv jumps")
-                #sweep_sv_jumps.sweep_sv_jumps(params, db, read_set["jump_id"], 
-                #                            pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
-                #                            "ground_truth=" + str(dataset["ground_truth"]), [read_set["seq_id"]], 
-                #                            pack, fm_index)
+                sweep_sv_jumps.sweep_sv_jumps(params, db, read_set["jump_id"], 
+                                            pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
+                                            "ground_truth=" + str(dataset["ground_truth"]), [read_set["seq_id"]], 
+                                            pack, fm_index)
                 # other callers
                 for alignment in read_set["alignments"]:
                     for sv_call in sv_calls[alignment]:
@@ -461,7 +463,7 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                             continue
                         vcf_to_db(read_set["name"] + "-" + alignment + "-" + sv_call.__name__,
                                  "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack, error_file,
-                                 dataset["func_name"])
+                                 dataset["sv_func"])
 
                     for sv_call in sv_calls[alignment]:
                         if not sv_call.__name__ in read_set["calls"]:
@@ -486,6 +488,7 @@ def print_columns(data):
         last_row = row
 
 blur_amount = 10
+#blur_amount = 350
 
 def analyze_by_score(sv_db, id_a, id_b):
     num_calls_a = sv_db.get_num_calls(id_a, 0) # num calls made
@@ -529,7 +532,7 @@ def analyze_by_score(sv_db, id_a, id_b):
 
     #num_invalid_calls = sv_db.get_num_invalid_calls(id_a, 0, 0)
     num_invalid_calls_fuzzy = sv_db.get_num_invalid_calls(id_a, 0, blur_amount)
-    avg_blur = round(sv_db.get_blur_on_overlaps_between_calls(id_b, id_a, 0, blur_amount),1)
+    avg_blur = 0 #round(sv_db.get_blur_on_overlaps_between_calls(id_b, id_a, 0, blur_amount),1)
 
     return xs_2, ys_2, ps, num_invalid_calls_fuzzy, avg_blur
     #return xs, ys, xs_2, ys_2, ps, num_invalid_calls, num_invalid_calls_fuzzy, avg_blur
@@ -664,7 +667,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    #analyze_sample_dataset("comprehensive_human", True)
-    analyze_sample_dataset("minimal-2", True)
+    analyze_sample_dataset("minimal", True)
+    #analyze_sample_dataset("minimal-2", True)
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))

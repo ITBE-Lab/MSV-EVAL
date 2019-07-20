@@ -134,10 +134,14 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc, s
     call_inserter = SvCallInserter(sv_db, name, desc, run_id)
     print("creating sweep list...")
 
-    estimated_coverage = sum( sv_db.get_num_nts(sequencer_id) for sequencer_id in sequencer_ids ) \
-                           / pack.unpacked_size_single_strand
+    estimated_coverage_list = [0]*len(pack.contigLengths())
+    for sequencer_id in sequencer_ids:
+        for idx, cnt in enumerate(sv_db.get_num_nts(sequencer_id)):
+            estimated_coverage_list[idx] += cnt
+    for idx, cnt in enumerate(pack.contigLengths()):
+        estimated_coverage_list[idx] /= cnt
 
-    print(name, "- estimated_coverage:", estimated_coverage)
+    print(name, "- estimated_coverage per contig:", estimated_coverage_list)
 
     y_range_tree = WarpedBitVector(ref_size)
     cluster_dict = {}
@@ -160,7 +164,8 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc, s
             cluster.join(cluster_dict[key])
             #print("del", key, cluster_dict[key])
             del cluster_dict[key]
-        new_key = max(y_range_tree.set_to(sv_jmp.to_start(), sv_jmp.to_end(), 1, sv_jmp.from_start_same_strand()) - 1, 0)
+        new_key = max(y_range_tree.set_to(sv_jmp.to_start(), sv_jmp.to_end(), 1,
+                      sv_jmp.from_start_same_strand()) - 1, 0)
         if len(cluster_keys) > 0:
             new_key = min(new_key, min(cluster_keys))
         #print("insert", new_key, cluster)
@@ -187,6 +192,8 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc, s
             assert False
         cluster_dict[key].count -= 1
         if len(cluster_dict[key]) <= 0:
+            estimated_coverage = min(estimated_coverage_list[pack.seq_id_for_pos(cluster_dict[key].call.from_start)],
+                                     estimated_coverage_list[pack.seq_id_for_pos(cluster_dict[key].call.to_start)])
             # check for acceptance:
             # @note these parameters are hardcoded in two locations @todo
             if len(cluster_dict[key].call.supporing_jump_ids) >= max(estimated_coverage/8, 2):
@@ -221,7 +228,8 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc, s
     num_removed = sv_db.filter_short_edges_with_low_support(sv_caller_run_id, 500, 50)
     print("done filtering; removed", num_removed, "calls")
     print("filtering fuzzy calls calls...")
-    num_removed = sv_db.filter_fuzzy_calls(sv_caller_run_id, 50)
+    num_removed = sv_db.filter_fuzzy_calls(sv_caller_run_id,
+                                           parameter_set_manager.by_name("Max Fuzziness Filter").get())
     print("done filtering; removed", num_removed, "calls")
     print("overlapping...")
     num_combined = libMA.combine_overlapping_calls(parameter_set_manager, sv_db, sv_caller_run_id)

@@ -190,8 +190,8 @@ def render_from_list(tsv_list, json_dict, dataset_name, plot_category=(0,0), plo
             for name_3, sub_list in split_by_cat(3, 3, sub_lists_2):
                 legend = []
                 name = str([*name_1, *name_2, *name_3])
-                plot_3 = figure(title=name + " - 10nt blur - " + dataset_name, tooltips="@i",
-                                active_drag=None, width=500, height=300)
+                plot_3 = figure(title=name + " - 10nt blur - " + dataset_name, tooltips="@i", x_range=(-0.02,1.02),
+                                y_range=(-0.02,1.02), active_drag=None, width=500, height=300)
                 for idx, row in enumerate(sub_list):
                     x_every_2 = 1
                     x_every = 4
@@ -369,4 +369,4 @@ def render_from_tsv(dataset_name):
     render_from_list(tsv_list, json_dict, dataset_name)
 
 if __name__ == "__main__":
-    render_from_tsv("minimal")
+    render_from_tsv("pacBio")

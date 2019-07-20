@@ -9,8 +9,8 @@ import random
 supporting_nt = 10**6
 coverage = 0
 
-def create_illumina_reads_dwgsim(sequenced_genome_pack, sequenced_genome_path, database, reads_folder, json_info_file,
-                                 coverage, name, read_length):
+def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_genome_path, database, reads_folder,
+                                 json_info_file, coverage, name, read_length):
     json_info_file["read_length"] = read_length
     reads1 = reads_folder + name + ".bwa.read1.fastq.gz"
     reads2 = reads_folder + name + ".bwa.read2.fastq.gz"
@@ -27,7 +27,7 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, sequenced_genome_path, d
                               libMA.filePathVector([libMA.path(reads2)]))
 
     counter = 0
-    inserter = ReadInserter(database, name)
+    inserter = ReadInserter(database, name, ref_pack)
     json_info_file["seq_id"] = inserter.sequencer_id
     while not reader.is_finished():
         reads = reader.execute()
@@ -36,8 +36,8 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, sequenced_genome_path, d
         inserter.insert_paired_read(reads[0], reads[1])
         counter += 1
 
-def create_reads_survivor(sequenced_genome_pack, sequenced_genome_path, database, reads_folder, json_info_file,
-                          coverage, name, error_profile, technology):
+def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path, database, reads_folder, 
+                          json_info_file, coverage, name, error_profile, technology):
     json_info_file["error_profile"] = error_profile
     json_info_file["technology"] = technology
     reads1 = reads_folder + name + ".fasta"
@@ -52,7 +52,7 @@ def create_reads_survivor(sequenced_genome_pack, sequenced_genome_path, database
     reader = FileReader(ParameterSetManager(), libMA.path(reads1))
 
     counter = 0
-    inserter = ReadInserter(database, name)
+    inserter = ReadInserter(database, name, ref_pack)
     json_info_file["seq_id"] = inserter.sequencer_id
     while not reader.is_finished():
         read = reader.execute()
@@ -201,7 +201,7 @@ def create_dataset(reference_path, dataset_name, create_svs_funcs,
                     "name": name_c,
                     "coverage": coverage
                 }
-                create_reads_func(seq_pack, seq_gen_path + ".fasta",
+                create_reads_func(seq_pack, ref_pack, seq_gen_path + ".fasta",
                                 database, "/MAdata/sv_datasets/" + dataset_name + "/reads/", json_info_file_sub,
                                 coverage, name_c, *create_reads_args)
                 json_info_file_dataset_sub["create_reads_funcs"].append(json_info_file_sub)
@@ -221,10 +221,10 @@ if __name__ == "__main__":
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
     create_dataset("/MAdata/genome/random_10_pow_6",
-                   "minimal-2",
-                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),],
-                   [(create_illumina_reads_dwgsim, "ill_250", (250,)),],
-                   [300])
+                   "minimal",
+                   [( separate_svs, "del-0250", ( (sv_deletion, tuple()), 250, 10000 ) ),],
+                   [(create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+                   [5])
 
     #create_dataset("/MAdata/genome/random_10_pow_6",
     #               "comprehensive_random",
