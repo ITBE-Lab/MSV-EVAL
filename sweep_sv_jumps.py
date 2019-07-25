@@ -9,29 +9,33 @@ from compute_coverage import *
 
 
 def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, desc, sequencer_ids, pack, fm_index):
-    sink = libMA.SvCallSink(sv_db, name, desc, run_id)
-    section_fac = libMA.GenomeSectionFactory(parameter_set_manager, pack)
-    lock_module = Lock(parameter_set_manager)
-    sweep1 = CompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, run_id)
-    sweep2 = ExactCompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, run_id)
+    # creates scope so that deconstructor of call inserter is triggered (commits insert transaction)
+    def graph():
+        sink = libMA.SvCallSink(parameter_set_manager, sv_db, name, desc, run_id)
+        section_fac = libMA.GenomeSectionFactory(parameter_set_manager, pack)
+        lock_module = Lock(parameter_set_manager)
+        assert len(sequencer_ids) == 1
+        sweep1 = libMA.CompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
+        sweep2 = libMA.ExactCompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
 
-    res = VectorPledge()
-    sections_pledge = promise_me(section_fac) # @note this cannot be in the loop (synchronization!)
-    # graph for single reads
-    for _ in range(parameter_set_manager.get_num_threads()):
-        section_pledge = promise_me(lock_module, sections_pledge)
-        sweep1_pledge = promise_me(sweep1, section_pledge)
-        sweep2_pledge = promise_me(sweep2, sweep1_pledge)
-        write_to_db_pledge = promise_me(sink, sweep2_pledge)
-        unlock_pledge = promise_me(UnLock(parameter_set_manager, section_pledge), write_to_db_pledge)
-        res.append(unlock_pledge)
+        res = VectorPledge()
+        sections_pledge = promise_me(section_fac) # @note this cannot be in the loop (synchronization!)
+        # graph for single reads
+        for _ in range(parameter_set_manager.get_num_threads()):
+            section_pledge = promise_me(lock_module, sections_pledge)
+            sweep1_pledge = promise_me(sweep1, section_pledge)
+            sweep2_pledge = promise_me(sweep2, sweep1_pledge)
+            write_to_db_pledge = promise_me(sink, sweep2_pledge)
+            unlock_pledge = promise_me(UnLock(parameter_set_manager, section_pledge), write_to_db_pledge)
+            res.append(unlock_pledge)
 
-    # drain all sources
-    res.simultaneous_get( parameter_set_manager.get_num_threads() )
+        # drain all sources
+        res.simultaneous_get( parameter_set_manager.get_num_threads() )
 
+        return sink.cpp_module.call_inserter.sv_caller_run_id
+
+    sv_caller_run_id = graph()
     print("done sweeping")
-    sv_caller_run_id = call_inserter.sv_caller_run_id
-    del call_inserter # trigger deconstructor for call inserter (commits insert transaction)
     print("num calls:", sv_db.get_num_calls(sv_caller_run_id, 0))
     print("filtering low support short calls...")
     num_removed = sv_db.filter_short_edges_with_low_support(sv_caller_run_id, 500, 50)

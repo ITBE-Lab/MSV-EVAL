@@ -442,7 +442,7 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                     params.set_selected("SV-ONT")
                 else:
                     print("WARNING: unknown read simulator - using default parameters for sv jumps")
-                sweep_sv_jumps.sweep_sv_jumps(params, db, read_set["jump_id"], 
+                sweep_sv_jumps.sweep_sv_jumps_cpp(params, db, read_set["jump_id"], 
                                             pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
                                             "ground_truth=" + str(dataset["ground_truth"]), [read_set["seq_id"]], 
                                             pack, fm_index)
@@ -669,8 +669,8 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    #analyze_sample_dataset("minimal", True, True)
-    analyze_sample_dataset("del_human", True)
+    analyze_sample_dataset("minimal", True)
+    #analyze_sample_dataset("del_human", True)
     #analyze_sample_dataset("inv_human", True)
     #analyze_sample_dataset("dup_human", True)
     #analyze_sample_dataset("tra_human", True)
