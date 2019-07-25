@@ -7,6 +7,48 @@ from exact_sv_jump_sweep import *
 from svCallPy import *
 from compute_coverage import *
 
+
+def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, desc, sequencer_ids, pack, fm_index):
+    sink = libMA.SvCallSink(sv_db, name, desc, run_id)
+    section_fac = libMA.GenomeSectionFactory(parameter_set_manager, pack)
+    lock_module = Lock(parameter_set_manager)
+    sweep1 = CompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, run_id)
+    sweep2 = ExactCompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, run_id)
+
+    res = VectorPledge()
+    sections_pledge = promise_me(section_fac) # @note this cannot be in the loop (synchronization!)
+    # graph for single reads
+    for _ in range(parameter_set_manager.get_num_threads()):
+        section_pledge = promise_me(lock_module, sections_pledge)
+        sweep1_pledge = promise_me(sweep1, section_pledge)
+        sweep2_pledge = promise_me(sweep2, sweep1_pledge)
+        write_to_db_pledge = promise_me(sink, sweep2_pledge)
+        unlock_pledge = promise_me(UnLock(parameter_set_manager, section_pledge), write_to_db_pledge)
+        res.append(unlock_pledge)
+
+    # drain all sources
+    res.simultaneous_get( parameter_set_manager.get_num_threads() )
+
+    print("done sweeping")
+    sv_caller_run_id = call_inserter.sv_caller_run_id
+    del call_inserter # trigger deconstructor for call inserter (commits insert transaction)
+    print("num calls:", sv_db.get_num_calls(sv_caller_run_id, 0))
+    print("filtering low support short calls...")
+    num_removed = sv_db.filter_short_edges_with_low_support(sv_caller_run_id, 500, 50)
+    print("done filtering; removed", num_removed, "calls")
+    print("filtering fuzzy calls calls...")
+    num_removed = sv_db.filter_fuzzy_calls(sv_caller_run_id,
+                                           parameter_set_manager.by_name("Max Fuzziness Filter").get())
+    print("done filtering; removed", num_removed, "calls")
+    print("overlapping...")
+    num_combined = libMA.combine_overlapping_calls(parameter_set_manager, sv_db, sv_caller_run_id)
+    print("done overlapping; combined", num_combined, "calls")
+    print("num calls remaining:", sv_db.get_num_calls(sv_caller_run_id, 0))
+    print("computing coverage...")
+    compute_coverage(parameter_set_manager, fm_index, pack, sv_db, sv_caller_run_id, sequencer_ids)
+    print("done computing coverage")
+
+
 class YRangeTree:
     def __init__(self, size):
         self.bit_vec = BitVector(size=size)

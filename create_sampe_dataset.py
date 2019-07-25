@@ -7,7 +7,7 @@ import compare_callers
 import random
 
 supporting_nt = 10**6
-coverage = 0
+coverage = 1
 
 def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_genome_path, database, reads_folder,
                                  json_info_file, coverage, name, read_length):
@@ -117,7 +117,8 @@ def separate_svs(pack, database, json_info_file, sv_func, sv_size, sv_margin, ch
     return sv_inserter.sv_caller_run_id
 
 def no_svs(pack, database, json_info_file):
-    return 0
+    sv_inserter = SvCallInserter(database, json_info_file["name"] + "_simulated_sv", "the sv's that were simulated", -1)
+    return sv_inserter.sv_caller_run_id
 
 
 ##
@@ -128,6 +129,11 @@ def no_svs(pack, database, json_info_file):
 #
 def create_dataset(reference_path, dataset_name, create_svs_funcs,
                    create_reads_funcs, coverages, chromosome=None):
+    ref_pack = Pack()
+    ref_pack.load(reference_path + "/ma/genome")
+    if not chromosome is None:
+        print("picked contig:", ref_pack.contigNames()[chromosome])
+
     os.mkdir("/MAdata/sv_datasets/" + dataset_name) # this throws an error if the dataset already exists
     os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/reads")
     os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/genomes")
@@ -145,8 +151,6 @@ def create_dataset(reference_path, dataset_name, create_svs_funcs,
 
     # create the sv_db
     database = SV_DB("/MAdata/sv_datasets/" + dataset_name + "/svs.db", "create")
-    ref_pack = Pack()
-    ref_pack.load(reference_path + "/ma/genome")
     print(time.time() - start, "seconds")
 
     for create_svs_func, sv_func_name, create_svs_funcs_params in create_svs_funcs:
@@ -174,18 +178,21 @@ def create_dataset(reference_path, dataset_name, create_svs_funcs,
         if not chromosome is None:
             seq_pack_ = Pack()
             seq_pack_.append(seq_pack.contigNames()[chromosome], "no_description_given", 
-                            NucSeq(seq_pack.contigSeqs()[chromosome]))
+                             NucSeq(seq_pack.contigSeqs()[chromosome]))
             seq_pack = seq_pack_
         print("\tstoring sequenced genome")
         seq_pack.store(seq_gen_path)
         with open(seq_gen_path + ".fasta", "w") as fasta_out:
             for name, sequence in zip(seq_pack.contigNames(), seq_pack.contigSeqs()):
+                print("writing:", name, "len:", len(sequence))
                 fasta_out.write(">")
                 fasta_out.write(name)
                 fasta_out.write("\n")
-                for line in textwrap.wrap(sequence, 50):
-                    fasta_out.write(line)
+                idx = 0
+                while idx < len(sequence):
+                    fasta_out.write(sequence[idx:idx+50])
                     fasta_out.write("\n")
+                    idx += 50
         print(time.time() - start, "seconds")
 
         print("creating reads...")
@@ -220,11 +227,11 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = "~/workspace/SURVIVOR/HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset("/MAdata/genome/random_10_pow_6",
+    create_dataset("/MAdata/genome/random_w_mobile_ele",
                    "minimal",
-                   [( separate_svs, "del-0250", ( (sv_deletion, tuple()), 250, 10000 ) ),],
-                   [(create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
-                   [5])
+                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),],
+                   [(create_illumina_reads_dwgsim, "ill_150", (150,))],
+                   [5, 10, 25])
 
     #create_dataset("/MAdata/genome/random_10_pow_6",
     #               "comprehensive_random",
@@ -243,6 +250,31 @@ if __name__ == "__main__":
     #                (create_illumina_reads_dwgsim, "ill_100", (100,)),
     #                (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
     #               [5, 10, 25])
+
+    #for prefix, func in [ ("ins", sv_insertion), ("dup", sv_duplication), ("inv", sv_inversion) ]:
+    #    chrom = 20
+    #    create_dataset("/MAdata/genome/human/GRCh38.p12",
+    #                prefix + "_human",
+    #                [( separate_svs, prefix + "-0250", ( (func, tuple()), 250, 500000, chrom ) ),
+    #                    ( separate_svs, prefix + "-1000", ( (func, tuple()), 1000, 1000000, chrom ) ),],
+    #                [(create_illumina_reads_dwgsim, "ill_250", (250,)),
+    #                    (create_illumina_reads_dwgsim, "ill_150", (150,)),
+    #                    (create_illumina_reads_dwgsim, "ill_100", (100,)),
+    #                    (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+    #                [5, 10, 25],
+    #                chrom)
+
+    #chrom = 20
+    #create_dataset("/MAdata/genome/human/GRCh38.p12",
+    #               "del_human",
+    #               [( separate_svs, "del-0250", ( (sv_deletion, tuple()), 250, 500000, chrom ) ),
+    #                ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 1000000, chrom ) ),],
+    #               [(create_illumina_reads_dwgsim, "ill_250", (250,)),
+    #                (create_illumina_reads_dwgsim, "ill_150", (150,)),
+    #                (create_illumina_reads_dwgsim, "ill_100", (100,)),
+    #                (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+    #               [5, 10, 25],
+    #               chrom)
 
     #chrom = 20
     #create_dataset("/MAdata/genome/human/GRCh38.p12",

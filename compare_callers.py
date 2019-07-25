@@ -463,7 +463,7 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                             continue
                         vcf_to_db(read_set["name"] + "-" + alignment + "-" + sv_call.__name__,
                                  "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack, error_file,
-                                 dataset["sv_func"])
+                                 dataset["sv_func"] if "sv_func" in dataset else None)
 
                     for sv_call in sv_calls[alignment]:
                         if not sv_call.__name__ in read_set["calls"]:
@@ -532,16 +532,18 @@ def analyze_by_score(sv_db, id_a, id_b):
 
     #num_invalid_calls = sv_db.get_num_invalid_calls(id_a, 0, 0)
     num_invalid_calls_fuzzy = sv_db.get_num_invalid_calls(id_a, 0, blur_amount)
-    avg_blur = 0 #round(sv_db.get_blur_on_overlaps_between_calls(id_b, id_a, 0, blur_amount),1)
+    avg_blur = round(sv_db.get_blur_on_overlaps_between_calls(id_b, id_a, 0, blur_amount),1)
 
     return xs_2, ys_2, ps, num_invalid_calls_fuzzy, avg_blur
     #return xs, ys, xs_2, ys_2, ps, num_invalid_calls, num_invalid_calls_fuzzy, avg_blur
 
 def compare_caller(sv_db, id_a, id_b, min_score):
+    sv_db.add_score_index(id_a) # @todo this can be removed once index is in all databases
     num_calls_a = sv_db.get_num_calls(id_a, min_score) # num calls made
     num_calls_b = sv_db.get_num_calls(id_b, min_score) # num actual calls
     if num_calls_b == 0:
-        return (0, 0, 0, 0, 0, 0)
+        print("no calls")
+        return (0, 0, 0, 0, 0, 0, 0)
     call_area_a = sv_db.get_call_area(id_a, min_score)
     if num_calls_a > 0:
         rel_call_area_a = int(math.sqrt(call_area_a/num_calls_a)) # get the edge length
@@ -667,7 +669,11 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("minimal", True)
+    #analyze_sample_dataset("minimal", True, True)
+    analyze_sample_dataset("del_human", True)
+    #analyze_sample_dataset("inv_human", True)
+    #analyze_sample_dataset("dup_human", True)
+    #analyze_sample_dataset("tra_human", True)
     #analyze_sample_dataset("minimal-2", True)
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))
