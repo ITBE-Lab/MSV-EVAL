@@ -5,6 +5,7 @@ import time
 import json
 import compare_callers
 import random
+import subprocess
 
 supporting_nt = 10**6
 coverage = 1
@@ -17,24 +18,31 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_geno
     json_info_file["fasta_file"] = reads1
     json_info_file["fasta_file_mate"] = reads2
 
-    dwgsim = "~/workspace/DWGSIM/dwgsim"
-    command = dwgsim + " -1 " + str(read_length) + " -2 " + str(read_length) + \
-        " -C " + str(coverage) + " -r 0 " + sequenced_genome_path + " " + reads_folder + name
-    os.system(command + " >/dev/null 2>&1")
-    
-    reader = PairedFileReader(ParameterSetManager(), 
-                              libMA.filePathVector([libMA.path(reads1)]),
-                              libMA.filePathVector([libMA.path(reads2)]))
+    print("\tdwgsim...")
+    dwgsim_instances = []
+    file_names1 = ""
+    file_names2 = ""
+    for idx in range(32):
+        dwgsim = "/usr/home/markus/workspace/DWGSIM/dwgsim"
+        command = [dwgsim, "-1", str(read_length), "-2", str(read_length), "-C", str(coverage/32), "-r", "0", "-o", \
+                   "1", sequenced_genome_path, reads_folder + "part_" + str(idx) + name]
+        dwgsim_instances.append(subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE))
+        file_names1 += reads_folder + "part_" + str(idx) + name + ".bwa.read1.fastq.gz "
+        file_names2 += reads_folder + "part_" + str(idx) + name + ".bwa.read2.fastq.gz "
+    for proc in dwgsim_instances:
+        proc.wait()
 
-    counter = 0
+    print("\tcat...")
+    os.system("zcat " + file_names1 + " > " + reads1)
+    os.system("zcat " + file_names2 + " > " + reads2)
+
+    print("\tinserting into db...")
     inserter = ReadInserter(database, name, ref_pack)
     json_info_file["seq_id"] = inserter.sequencer_id
-    while not reader.is_finished():
-        reads = reader.execute()
-        reads[0].name += "_paired_read_prim_" + str(counter)
-        reads[1].name += "_paired_read_mate_" + str(counter)
-        inserter.insert_paired_read(reads[0], reads[1])
-        counter += 1
+    inserter.insert_paired_fasta_files(ParameterSetManager(),
+                                       libMA.filePathVector([libMA.path(reads1)]),
+                                       libMA.filePathVector([libMA.path(reads2)]))
+    print("\tdone")
 
 def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path, database, reads_folder, 
                           json_info_file, coverage, name, error_profile, technology):
@@ -48,17 +56,13 @@ def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path
               + reads1
 
     os.system(command + " >/dev/null 2>&1")
-    
-    reader = FileReader(ParameterSetManager(), libMA.path(reads1))
 
-    counter = 0
+    print("\tinserting into db...")
     inserter = ReadInserter(database, name, ref_pack)
     json_info_file["seq_id"] = inserter.sequencer_id
-    while not reader.is_finished():
-        read = reader.execute()
-        read.name += "_read_" + str(counter)
-        inserter.insert_read(read)
-        counter += 1
+    inserter.insert_fasta_files(ParameterSetManager(),
+                                       libMA.filePathVector([libMA.path(reads1)]))
+    print("\tdone")
 
 def sv_deletion(sv_inserter, position, sv_size):
     sv_inserter.insert_call(SvCall(position, position + sv_size, 1, 1, False, supporting_nt, coverage))
@@ -110,8 +114,8 @@ def separate_svs(pack, database, json_info_file, sv_func, sv_size, sv_margin, ch
         for s, l in zip(pack.contigStarts(), pack.contigLengths()):
             x(s, l)
     else:
-        s = pack.contigStarts()[chromosome]
-        l = pack.contigLengths()[chromosome]
+        s = pack.contigStarts()[pack.id_of_sequence(chromosome)]
+        l = pack.contigLengths()[pack.id_of_sequence(chromosome)]
         x(s, l)
 
     return sv_inserter.sv_caller_run_id
@@ -132,7 +136,7 @@ def create_dataset(reference_path, dataset_name, create_svs_funcs,
     ref_pack = Pack()
     ref_pack.load(reference_path + "/ma/genome")
     if not chromosome is None:
-        print("picked contig:", ref_pack.contigNames()[chromosome])
+        print("picked contig:", ref_pack.id_of_sequence(chromosome))
 
     os.mkdir("/MAdata/sv_datasets/" + dataset_name) # this throws an error if the dataset already exists
     os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/reads")
@@ -177,8 +181,8 @@ def create_dataset(reference_path, dataset_name, create_svs_funcs,
         seq_pack = database.reconstruct_sequenced_genome(ref_pack, caller_id)
         if not chromosome is None:
             seq_pack_ = Pack()
-            seq_pack_.append(seq_pack.contigNames()[chromosome], "no_description_given", 
-                             NucSeq(seq_pack.contigSeqs()[chromosome]))
+            seq_pack_.append(seq_pack.contigNames()[ref_pack.id_of_sequence(chromosome)], "no_description_given", 
+                             NucSeq(seq_pack.contigSeqs()[ref_pack.id_of_sequence(chromosome)]))
             seq_pack = seq_pack_
         print("\tstoring sequenced genome")
         seq_pack.store(seq_gen_path)
@@ -227,11 +231,11 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = "~/workspace/SURVIVOR/HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset("/MAdata/genome/random_w_mobile_ele",
-                   "minimal",
-                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),],
-                   [(create_illumina_reads_dwgsim, "ill_150", (150,))],
-                   [5, 10, 25])
+    #create_dataset("/MAdata/genome/random_w_mobile_ele",
+    #               "minimal",
+    #               [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),],
+    #               [(create_illumina_reads_dwgsim, "ill_150", (150,))],
+    #               [5, 10, 25])
 
     #create_dataset("/MAdata/genome/random_10_pow_6",
     #               "comprehensive_random",
@@ -251,32 +255,31 @@ if __name__ == "__main__":
     #                (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
     #               [5, 10, 25])
 
-    #for prefix, func in [ ("ins", sv_insertion), ("dup", sv_duplication), ("inv", sv_inversion) ]:
-    #    chrom = 20
-    #    create_dataset("/MAdata/genome/human/GRCh38.p12",
-    #                prefix + "_human",
-    #                [( separate_svs, prefix + "-0250", ( (func, tuple()), 250, 500000, chrom ) ),
-    #                    ( separate_svs, prefix + "-1000", ( (func, tuple()), 1000, 1000000, chrom ) ),],
-    #                [(create_illumina_reads_dwgsim, "ill_250", (250,)),
-    #                    (create_illumina_reads_dwgsim, "ill_150", (150,)),
-    #                    (create_illumina_reads_dwgsim, "ill_100", (100,)),
-    #                    (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
-    #                [5, 10, 25],
-    #                chrom)
+    for prefix, func in [ ("del", sv_deletion), ("ins", sv_insertion), ("dup", sv_duplication), ("inv", sv_inversion) ]:
+        chrom = "CM000683.2" # Chromosome 21 -> shortest chromosome
+        create_dataset("/MAdata/genome/human/GRCh38.p12",
+                    prefix + "_human",
+                    [( separate_svs, prefix + "-0250", ( (func, tuple()), 250, 500000, chrom ) ),
+                        ( separate_svs, prefix + "-1000", ( (func, tuple()), 1000, 1000000, chrom ) ),],
+                    [(create_illumina_reads_dwgsim, "ill_250", (250,)),
+                        #(create_illumina_reads_dwgsim, "ill_150", (150,)),
+                        (create_illumina_reads_dwgsim, "ill_100", (100,)),
+                        (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+                    [5, 10], # 25
+                    chrom)
 
-    #chrom = 20
-    #create_dataset("/MAdata/genome/human/GRCh38.p12",
-    #               "del_human",
-    #               [( separate_svs, "del-0250", ( (sv_deletion, tuple()), 250, 500000, chrom ) ),
-    #                ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 1000000, chrom ) ),],
-    #               [(create_illumina_reads_dwgsim, "ill_250", (250,)),
-    #                (create_illumina_reads_dwgsim, "ill_150", (150,)),
-    #                (create_illumina_reads_dwgsim, "ill_100", (100,)),
-    #                (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
-    #               [5, 10, 25],
-    #               chrom)
+    chrom = "CM000683.2" # Chromosome 21 -> shortest chromosome
+    create_dataset("/MAdata/genome/human/GRCh38.p12",
+                   "tra_human",
+                   [( separate_svs, "tra-10000", ( (sv_translocation, (500,)), 10000, 1000000, chrom ) ),],
+                   [(create_illumina_reads_dwgsim, "ill_250", (250,)),
+                    #(create_illumina_reads_dwgsim, "ill_150", (150,)),
+                    (create_illumina_reads_dwgsim, "ill_100", (100,)),
+                    (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+                   [5, 10], # 25
+                   chrom)
 
-    #chrom = 20
+    #chrom = "CM000683.2" # Chromosome 21 -> shortest chromosome
     #create_dataset("/MAdata/genome/human/GRCh38.p12",
     #               "comprehensive_human",
     #               [( separate_svs, "del-0250", ( (sv_deletion, tuple()), 250, 1000, chrom ) ),
