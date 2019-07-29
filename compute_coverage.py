@@ -155,15 +155,16 @@ def compute_coverage(parameter_set_manager, fm_index, pack, sv_db, caller_id, se
     pack_pledge.set(pack)
 
     for seq_id in seq_ids:
-        nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db, seq_id)
         print("\tconstructing interval tree...")
         coverage_module = libMA.ComputeCoverage(parameter_set_manager, sv_db, caller_id, seq_id)
         print("\tdone constructing interval tree")
 
         res = VectorPledge()
-        queries_pledge = promise_me(nuc_seq_getter) # @note this cannot be in the loop (synchronization!)
         # graph for single reads
-        for _ in range(parameter_set_manager.get_num_threads()):
+        for idx in range(parameter_set_manager.get_num_threads()):
+            nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db, seq_id, idx,
+                                              parameter_set_manager.get_num_threads())
+            queries_pledge = promise_me(nuc_seq_getter)
             query_pledge = promise_me(lock_module, queries_pledge)
             segments_pledge = promise_me(seeding_module, fm_pledge, query_pledge)
             cov_pledge = promise_me(coverage_module, fm_pledge, queries_pledge, segments_pledge)

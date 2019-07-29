@@ -11,17 +11,20 @@ from compute_coverage import *
 def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, desc, sequencer_ids, pack, fm_index):
     # creates scope so that deconstructor of call inserter is triggered (commits insert transaction)
     def graph():
-        sink = libMA.SvCallSink(parameter_set_manager, sv_db, name, desc, run_id)
+        print("\tsetting graph up...")
         section_fac = libMA.GenomeSectionFactory(parameter_set_manager, pack)
         lock_module = Lock(parameter_set_manager)
-        assert len(sequencer_ids) == 1
-        sweep1 = libMA.CompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
         sweep2 = libMA.ExactCompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
+        sink = libMA.SvCallSink(parameter_set_manager, sv_db, name, desc, run_id)
+        assert len(sequencer_ids) == 1
 
         res = VectorPledge()
         sections_pledge = promise_me(section_fac) # @note this cannot be in the loop (synchronization!)
         # graph for single reads
         for _ in range(parameter_set_manager.get_num_threads()):
+            # in order to allow multithreading this module needs individual db connections for each thread
+            sweep1 = libMA.CompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
+
             section_pledge = promise_me(lock_module, sections_pledge)
             sweep1_pledge = promise_me(sweep1, section_pledge)
             sweep2_pledge = promise_me(sweep2, sweep1_pledge)
@@ -30,9 +33,11 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
             res.append(unlock_pledge)
 
         # drain all sources
+        print("\texecuting graph...")
         res.simultaneous_get( parameter_set_manager.get_num_threads() )
+        print("\tdone")
 
-        return sink.cpp_module.call_inserter.sv_caller_run_id
+        return sink.cpp_module.run_id
 
     sv_caller_run_id = graph()
     print("done sweeping")

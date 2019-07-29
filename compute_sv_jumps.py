@@ -4,7 +4,6 @@ import sqlite3
 import math
 
 def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0):
-    nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db, seq_id)
     lock_module = Lock(parameter_set_manager)
     seeding_module = BinarySeeding(parameter_set_manager)
     jumps_to_db = SvDbInserter(parameter_set_manager, sv_db, "python built compt graph")
@@ -17,9 +16,11 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0):
     pack_pledge.set(pack)
 
     res = VectorPledge()
-    queries_pledge = promise_me(nuc_seq_getter) # @note this cannot be in the loop (synchronization!)
     # graph for single reads
-    for _ in range(parameter_set_manager.get_num_threads()):
+    for idx in range(parameter_set_manager.get_num_threads()):
+        nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db, seq_id, idx,
+                                          parameter_set_manager.get_num_threads())
+        queries_pledge = promise_me(nuc_seq_getter)
         query_pledge = promise_me(lock_module, queries_pledge)
         segments_pledge = promise_me(seeding_module, fm_pledge, query_pledge)
         jumps_pledge = promise_me(jumps_from_seeds, segments_pledge, pack_pledge, fm_pledge, query_pledge)
