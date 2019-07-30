@@ -9,7 +9,8 @@ from compute_coverage import *
 from analyze_runtimes import AnalyzeRuntimes
 
 
-def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, desc, sequencer_ids, pack, fm_index):
+def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, desc, sequencer_ids, pack, fm_index,
+                       out_file=None):
     # creates scope so that deconstructor of call inserter is triggered (commits insert transaction)
     def graph():
         print("\tsetting graph up...")
@@ -26,22 +27,26 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
         for _ in range(parameter_set_manager.get_num_threads()):
             # in order to allow multithreading this module needs individual db connections for each thread
             sweep1 = libMA.CompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
-            
 
             section_pledge = promise_me(lock_module, sections_pledge)
             sweep1_pledge = promise_me(sweep1, section_pledge)
-            analyze.register("CompleteBipartiteSubgraphSweep", sweep1_pledge)
+            analyze.register("[0] CompleteBipartiteSubgraphSweep", sweep1_pledge)
+            analyze.register("[0.1] CompleteBipartiteSubgraphSweep::init", sweep1, lambda x: x.cpp_module.time_init)
+            analyze.register("[0.2] CompleteBipartiteSubgraphSweep::outer_while", sweep1,
+                             lambda x: x.cpp_module.time_complete_while - x.cpp_module.time_inner_while)
+            analyze.register("[0.3] CompleteBipartiteSubgraphSweep::inner_while", sweep1,
+                             lambda x: x.cpp_module.time_inner_while)
             sweep2_pledge = promise_me(sweep2, sweep1_pledge)
-            analyze.register("ExactCompleteBipartiteSubgraphSweep", sweep2_pledge)
+            analyze.register("[1] ExactCompleteBipartiteSubgraphSweep", sweep2_pledge)
             write_to_db_pledge = promise_me(sink, sweep2_pledge)
-            analyze.register("SvCallSink", write_to_db_pledge)
+            analyze.register("[2] SvCallSink", write_to_db_pledge)
             unlock_pledge = promise_me(UnLock(parameter_set_manager, section_pledge), write_to_db_pledge)
             res.append(unlock_pledge)
 
         # drain all sources
         print("\texecuting graph...")
         res.simultaneous_get( parameter_set_manager.get_num_threads() )
-        analyze.analyze()
+        analyze.analyze(out_file)
         print("\tdone")
 
         return sink.cpp_module.run_id

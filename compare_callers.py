@@ -7,6 +7,7 @@ import sweep_sv_jumps
 import traceback
 from pathlib import Path
 from printColumns import print_columns
+import datetime
 
 def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, recompute_jumps=False):
     def bwa(read_set, sam_file_path):
@@ -84,51 +85,55 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
         "create_illumina_reads_dwgsim": [bwa, bowtie]
     }
 
-    for dataset in json_dict["datasets"]:
-        for read_set in dataset["create_reads_funcs"]:
-            if not "alignments" in read_set:
-                read_set["alignments"] = []
-            if not "jump_id" in read_set or recompute_jumps:
-                print("computing jumps for MA-SV on", read_set["name"])
-                params = ParameterSetManager()
-                if read_set["func_name"] == "create_illumina_reads_dwgsim":
-                    params.set_selected("SV-Illumina")
-                elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
-                    params.set_selected("SV-PacBio")
-                elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
-                    params.set_selected("SV-ONT")
-                else:
-                    print("WARNING: unknown read simulator - using default parameters for sv jumps")
-                #params.by_name("Number of Threads").set(1)
-                #params.by_name("Use all Processor Cores").set(False)
-                read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(params, fm_index, pack, db, 
-                                                                        read_set["seq_id"])
-            for alignment_call in alignment_calls[read_set["func_name"]]:
-                sam_file_path = "/MAdata/sv_datasets/" + dataset_name + "/alignments/" \
-                            + read_set["name"] + "-" + alignment_call.__name__
-                if not alignment_call.__name__ in read_set["alignments"]:
-                    read_set["alignments"].append(alignment_call.__name__)
-                if os.path.exists( sam_file_path + ".sam" ):
-                    continue
-                print("creating alignment files for", read_set["name"], alignment_call.__name__)
-                alignment_call(read_set, sam_file_path + ".sam")
+    with open("/MAdata/sv_datasets/" + dataset_name + "/runtimes.log", "a") as runtime_file:
+        for dataset in json_dict["datasets"]:
+            for read_set in dataset["create_reads_funcs"]:
+                if not "alignments" in read_set:
+                    read_set["alignments"] = []
+                if not "jump_id" in read_set or recompute_jumps:
+                    print("computing jumps for MA-SV on", read_set["name"])
+                    params = ParameterSetManager()
+                    if read_set["func_name"] == "create_illumina_reads_dwgsim":
+                        params.set_selected("SV-Illumina")
+                    elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
+                        params.set_selected("SV-PacBio")
+                    elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
+                        params.set_selected("SV-ONT")
+                    else:
+                        print("WARNING: unknown read simulator - using default parameters for sv jumps")
+                    #params.by_name("Number of Threads").set(1)
+                    #params.by_name("Use all Processor Cores").set(False)
+                    runtime_file.write(str(datetime.datetime.now()) + " " + dataset_name + " ")
+                    runtime_file.write(dataset["name"] + " " + read_set["name"] + " compute_sv_jumps")
+                    runtime_file.write("\n")
+                    read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(params, fm_index, pack, db,
+                                                                            read_set["seq_id"], runtime_file)
+                for alignment_call in alignment_calls[read_set["func_name"]]:
+                    sam_file_path = "/MAdata/sv_datasets/" + dataset_name + "/alignments/" \
+                                + read_set["name"] + "-" + alignment_call.__name__
+                    if not alignment_call.__name__ in read_set["alignments"]:
+                        read_set["alignments"].append(alignment_call.__name__)
+                    if os.path.exists( sam_file_path + ".sam" ):
+                        continue
+                    print("creating alignment files for", read_set["name"], alignment_call.__name__)
+                    alignment_call(read_set, sam_file_path + ".sam")
 
-                #if os.path.exists( sam_file_path + ".sam.sorted.bam "):
-                #    os.system("mv " + sam_file_path + ".sam.sorted.bam " + sam_file_path + ".sorted.bam ")
-                #    os.system("touch " + sam_file_path + ".sam")
-                if os.path.exists( sam_file_path + ".sam" ):
-                    # create sorted and indexed bam files
-                    sam_tools_pref = "~/workspace/samtools/samtools "
-                    to_bam_cmd = sam_tools_pref + "view -Sb " + sam_file_path + ".sam > " + sam_file_path + ".bam"
-                    os.system(to_bam_cmd)
-                    sort_cmd = sam_tools_pref + "sort -@ 32 -m 1G " + sam_file_path + ".bam > " \
-                                + sam_file_path + ".sorted.bam"
-                    os.system(sort_cmd + " 2> /dev/null")
-                    index_cmd = sam_tools_pref + "index " + sam_file_path + ".sorted.bam > " \
-                                + sam_file_path + ".sorted.bam.bai"
-                    os.system(index_cmd)
-                else:
-                    print("aligner did not create alignments:", alignment_call)
+                    #if os.path.exists( sam_file_path + ".sam.sorted.bam "):
+                    #    os.system("mv " + sam_file_path + ".sam.sorted.bam " + sam_file_path + ".sorted.bam ")
+                    #    os.system("touch " + sam_file_path + ".sam")
+                    if os.path.exists( sam_file_path + ".sam" ):
+                        # create sorted and indexed bam files
+                        sam_tools_pref = "~/workspace/samtools/samtools "
+                        to_bam_cmd = sam_tools_pref + "view -Sb " + sam_file_path + ".sam > " + sam_file_path + ".bam"
+                        os.system(to_bam_cmd)
+                        sort_cmd = sam_tools_pref + "sort -@ 32 -m 1G " + sam_file_path + ".bam > " \
+                                    + sam_file_path + ".sorted.bam"
+                        os.system(sort_cmd + " 2> /dev/null")
+                        index_cmd = sam_tools_pref + "index " + sam_file_path + ".sorted.bam > " \
+                                    + sam_file_path + ".sorted.bam.bai"
+                        os.system(index_cmd)
+                    else:
+                        print("aligner did not create alignments:", alignment_call)
 
 def vcf_parser(file_name):
     class VCFFile:
@@ -425,50 +430,54 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
     }
 
     with open("/MAdata/sv_datasets/" + dataset_name + "/vcf_errors.log", "a") as error_file:
-        for dataset in json_dict["datasets"]:
-            for read_set in dataset["create_reads_funcs"]:
-                if not "calls" in read_set:
-                    read_set["calls"] = []
+        with open("/MAdata/sv_datasets/" + dataset_name + "/runtimes.log", "a") as runtime_file:
+            for dataset in json_dict["datasets"]:
+                for read_set in dataset["create_reads_funcs"]:
+                    if not "calls" in read_set:
+                        read_set["calls"] = []
 
-                # MA-SV
-                if not "MA_SV" in read_set["calls"]:
-                    read_set["calls"].append("MA_SV")
-                print("creating calls for", read_set["name"], "MA_SV")
-                params = ParameterSetManager()
-                if read_set["func_name"] == "create_illumina_reads_dwgsim":
-                    params.set_selected("SV-Illumina")
-                elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
-                    params.set_selected("SV-PacBio")
-                elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
-                    params.set_selected("SV-ONT")
-                else:
-                    print("WARNING: unknown read simulator - using default parameters for sv jumps")
-                sweep_sv_jumps.sweep_sv_jumps_cpp(params, db, read_set["jump_id"], 
-                                            pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
-                                            "ground_truth=" + str(dataset["ground_truth"]), [read_set["seq_id"]], 
-                                            pack, fm_index)
-                # other callers
-                for alignment in read_set["alignments"]:
-                    for sv_call in sv_calls[alignment]:
-                        vcf_file_path = "/MAdata/sv_datasets/" + dataset_name + "/calls/" \
-                                + read_set["name"] + "-" + alignment + "-" + sv_call.__name__ + ".vcf"
-                        bam_file_path = "/MAdata/sv_datasets/" + dataset_name + "/alignments/" \
-                                + read_set["name"] + "-" + alignment + ".sorted.bam"
-                        if os.path.exists( vcf_file_path ):
-                            print("not creating calls for", read_set["name"], alignment, sv_call.__name__)
-                            continue
-                        print("creating calls for", read_set["name"], alignment, sv_call.__name__)
-                        sv_call(bam_file_path, vcf_file_path)
-                        if not os.path.exists( vcf_file_path ):
-                            print("caller did not create calls: ", read_set["name"], alignment, sv_call.__name__)
-                            continue
-                        vcf_to_db(read_set["name"] + "-" + alignment + "-" + sv_call.__name__,
-                                 "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack, error_file,
-                                 dataset["sv_func"] if "sv_func" in dataset else None)
+                    # MA-SV
+                    if not "MA_SV" in read_set["calls"]:
+                        read_set["calls"].append("MA_SV")
+                    print("creating calls for", read_set["name"], "MA_SV")
+                    params = ParameterSetManager()
+                    if read_set["func_name"] == "create_illumina_reads_dwgsim":
+                        params.set_selected("SV-Illumina")
+                    elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
+                        params.set_selected("SV-PacBio")
+                    elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
+                        params.set_selected("SV-ONT")
+                    else:
+                        print("WARNING: unknown read simulator - using default parameters for sv jumps")
+                    runtime_file.write(str(datetime.datetime.now()) + " " + dataset_name + " ")
+                    runtime_file.write(dataset["name"] + " " + read_set["name"] + " sweep_sv_jumps_cpp")
+                    runtime_file.write("\n")
+                    sweep_sv_jumps.sweep_sv_jumps_cpp(params, db, read_set["jump_id"], 
+                                                pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
+                                                "ground_truth=" + str(dataset["ground_truth"]), [read_set["seq_id"]], 
+                                                pack, fm_index, runtime_file)
+                    # other callers
+                    for alignment in read_set["alignments"]:
+                        for sv_call in sv_calls[alignment]:
+                            vcf_file_path = "/MAdata/sv_datasets/" + dataset_name + "/calls/" \
+                                    + read_set["name"] + "-" + alignment + "-" + sv_call.__name__ + ".vcf"
+                            bam_file_path = "/MAdata/sv_datasets/" + dataset_name + "/alignments/" \
+                                    + read_set["name"] + "-" + alignment + ".sorted.bam"
+                            if os.path.exists( vcf_file_path ):
+                                print("not creating calls for", read_set["name"], alignment, sv_call.__name__)
+                                continue
+                            print("creating calls for", read_set["name"], alignment, sv_call.__name__)
+                            sv_call(bam_file_path, vcf_file_path)
+                            if not os.path.exists( vcf_file_path ):
+                                print("caller did not create calls: ", read_set["name"], alignment, sv_call.__name__)
+                                continue
+                            vcf_to_db(read_set["name"] + "-" + alignment + "-" + sv_call.__name__,
+                                    "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack, error_file,
+                                    dataset["sv_func"] if "sv_func" in dataset else None)
 
-                    for sv_call in sv_calls[alignment]:
-                        if not sv_call.__name__ in read_set["calls"]:
-                            read_set["calls"].append(sv_call.__name__)
+                        for sv_call in sv_calls[alignment]:
+                            if not sv_call.__name__ in read_set["calls"]:
+                                read_set["calls"].append(sv_call.__name__)
 
 
 blur_amount = 10

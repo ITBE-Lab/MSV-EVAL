@@ -10,14 +10,19 @@ class AnalyzeRuntimes:
             self.times[name] = []
         self.times[name].append( (pledge, func) )
 
-    def analyze(self):
+    def analyze(self, out_file=None):
         print("runtime analysis:")
+        if not out_file is None:
+            out_file.write("runtime analysis:\n")
         data = []
         max_before_dot = 0
         for name, pledges in self.times.items():
             seconds = round(sum(func(pledge) for pledge, func in pledges), 3)
-            max_before_dot = max(max_before_dot, int(math.log10(seconds)) )
+            max_before_dot = max(max_before_dot, int(max(0,math.log10(abs(seconds))) ))
             data.append([name, seconds])
-        data = [(x, str(" "*int(max_before_dot-int(math.log10(y)))) + str(y) ) for x,y in data]
+        data = [(x, str(" "*int(max_before_dot-int(max(0,math.log10(abs(y)))))) + str(y) ) for x,y in data]
+        data.sort()
         data.insert(0, ["Module name", "runtime [s]"])
-        print_columns(data)
+        print_columns(data, out_file)
+        if not out_file is None:
+            out_file.write("\n")
