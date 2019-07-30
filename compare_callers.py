@@ -6,6 +6,7 @@ import compute_sv_jumps
 import sweep_sv_jumps
 import traceback
 from pathlib import Path
+from printColumns import print_columns
 
 def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, recompute_jumps=False):
     def bwa(read_set, sam_file_path):
@@ -470,23 +471,6 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                             read_set["calls"].append(sv_call.__name__)
 
 
-def print_columns(data):
-    col_width = [max([len(data[j][i]) for j in range(len(data))]) for i in range(len(data[0]))]
-    first = True
-    last_row = col_width
-    for row in data:
-        #if not first and cat != row[0]:
-        #    print("| " + "".join(" "*l + " | " for l in col_width))
-        #    cat = row[0]
-        print("| " + "".join(
-                (word.ljust(col_width[i]) if last_row[:i+1] != row[:i+1] \
-                                          else " "*col_width[i]) + " | " for i, word in enumerate(row)
-              ) )
-        if first:
-            print("-" * (sum(col_width) + len(col_width)*3 + 1))
-            first = False
-        last_row = row
-
 blur_amount = 10
 #blur_amount = 350
 
@@ -669,12 +653,12 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    #analyze_sample_dataset("minimal", True, True)
-    analyze_sample_dataset("del_human", True)
-    analyze_sample_dataset("inv_human", True)
-    analyze_sample_dataset("dup_human", True)
-    analyze_sample_dataset("tra_human", True)
-    analyze_sample_dataset("ins_human", True)
+    analyze_sample_dataset("minimal", True, True)
+    #analyze_sample_dataset("del_human", True)
+    #analyze_sample_dataset("inv_human", True)
+    #analyze_sample_dataset("dup_human", True)
+    #analyze_sample_dataset("tra_human", True)
+    #analyze_sample_dataset("ins_human", True)
     #analyze_sample_dataset("minimal-2", True)
     
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))

@@ -6,12 +6,14 @@ from MA import *
 from exact_sv_jump_sweep import *
 from svCallPy import *
 from compute_coverage import *
+from analyze_runtimes import AnalyzeRuntimes
 
 
 def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, desc, sequencer_ids, pack, fm_index):
     # creates scope so that deconstructor of call inserter is triggered (commits insert transaction)
     def graph():
         print("\tsetting graph up...")
+        analyze = AnalyzeRuntimes()
         section_fac = libMA.GenomeSectionFactory(parameter_set_manager, pack)
         lock_module = Lock(parameter_set_manager)
         sweep2 = libMA.ExactCompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
@@ -24,17 +26,22 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
         for _ in range(parameter_set_manager.get_num_threads()):
             # in order to allow multithreading this module needs individual db connections for each thread
             sweep1 = libMA.CompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
+            
 
             section_pledge = promise_me(lock_module, sections_pledge)
             sweep1_pledge = promise_me(sweep1, section_pledge)
+            analyze.register("CompleteBipartiteSubgraphSweep", sweep1_pledge)
             sweep2_pledge = promise_me(sweep2, sweep1_pledge)
+            analyze.register("ExactCompleteBipartiteSubgraphSweep", sweep2_pledge)
             write_to_db_pledge = promise_me(sink, sweep2_pledge)
+            analyze.register("SvCallSink", write_to_db_pledge)
             unlock_pledge = promise_me(UnLock(parameter_set_manager, section_pledge), write_to_db_pledge)
             res.append(unlock_pledge)
 
         # drain all sources
         print("\texecuting graph...")
         res.simultaneous_get( parameter_set_manager.get_num_threads() )
+        analyze.analyze()
         print("\tdone")
 
         return sink.cpp_module.run_id
