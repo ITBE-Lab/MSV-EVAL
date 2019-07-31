@@ -275,7 +275,7 @@ if __name__ == "__main__":
     #out_dict = sv_jumps_to_dict(sv_db, [1, 12], pos, pos, size, size)
     #out_dict = sv_jumps_to_dict(sv_db, [1, 17])
     
-    out_dict = sv_jumps_to_dict(sv_db, [1, 62], only_supporting_jumps=False, min_score=-1)
+    out_dict = sv_jumps_to_dict(sv_db, [1, 2], only_supporting_jumps=True, min_score=-1)
 
     #fm_index = FMIndex()
     #fm_index.load("/MAdata/genome/random_w_mobile_ele/ma/genome")

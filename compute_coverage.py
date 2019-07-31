@@ -176,8 +176,6 @@ def compute_coverage(parameter_set_manager, fm_index, pack, sv_db, caller_id, se
         res.simultaneous_get( parameter_set_manager.get_num_threads() )
         print("\tdone executing graph")
 
-        print("\tcommitting coverage...")
-        del coverage_module
-        print("\tdone committing coverage")
+    print("\tcommitting coverage...")
 
 

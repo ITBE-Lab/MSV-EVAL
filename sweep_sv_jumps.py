@@ -7,14 +7,15 @@ from exact_sv_jump_sweep import *
 from svCallPy import *
 from compute_coverage import *
 from analyze_runtimes import AnalyzeRuntimes
+import datetime
 
 
 def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, desc, sequencer_ids, pack, fm_index,
                        out_file=None):
+    analyze = AnalyzeRuntimes()
     # creates scope so that deconstructor of call inserter is triggered (commits insert transaction)
     def graph():
         print("\tsetting graph up...")
-        analyze = AnalyzeRuntimes()
         section_fac = libMA.GenomeSectionFactory(parameter_set_manager, pack)
         lock_module = Lock(parameter_set_manager)
         sweep2 = libMA.ExactCompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
@@ -46,7 +47,6 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
         # drain all sources
         print("\texecuting graph...")
         res.simultaneous_get( parameter_set_manager.get_num_threads() )
-        analyze.analyze(out_file)
         print("\tdone")
 
         return sink.cpp_module.run_id
@@ -54,20 +54,53 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
     sv_caller_run_id = graph()
     print("done sweeping")
     print("num calls:", sv_db.get_num_calls(sv_caller_run_id, 0))
+
     print("filtering low support short calls...")
+    start = datetime.datetime.now()
     num_removed = sv_db.filter_short_edges_with_low_support(sv_caller_run_id, 500, 50)
+    end = datetime.datetime.now()
+    delta = end - start
+    analyze.register("[3] filter_short_edges_with_low_support", delta.total_seconds(), lambda x: x)
     print("done filtering; removed", num_removed, "calls")
+
     print("filtering fuzzy calls calls...")
+    start = datetime.datetime.now()
     num_removed = sv_db.filter_fuzzy_calls(sv_caller_run_id,
                                            parameter_set_manager.by_name("Max Fuzziness Filter").get())
+    end = datetime.datetime.now()
+    delta = end - start
+    analyze.register("[4] filter_fuzzy_calls", delta.total_seconds(), lambda x: x)
     print("done filtering; removed", num_removed, "calls")
+
     print("overlapping...")
+    start = datetime.datetime.now()
     num_combined = libMA.combine_overlapping_calls(parameter_set_manager, sv_db, sv_caller_run_id)
+    end = datetime.datetime.now()
+    delta = end - start
+    analyze.register("[5] combine_overlapping_calls", delta.total_seconds(), lambda x: x)
     print("done overlapping; combined", num_combined, "calls")
+
     print("num calls remaining:", sv_db.get_num_calls(sv_caller_run_id, 0))
+
     print("computing coverage...")
+    start = datetime.datetime.now()
     compute_coverage(parameter_set_manager, fm_index, pack, sv_db, sv_caller_run_id, sequencer_ids)
+    end = datetime.datetime.now()
+    delta = end - start
+    analyze.register("[6] compute_coverage", delta.total_seconds(), lambda x: x)
     print("done computing coverage")
+
+    print("computing coverage index...")
+    start = datetime.datetime.now()
+    sv_db.add_score_index(sv_caller_run_id)
+    end = datetime.datetime.now()
+    delta = end - start
+    analyze.register("[7] compute_coverage_index", delta.total_seconds(), lambda x: x)
+    print("done computing coverage index")
+
+    analyze.analyze(out_file)
+    if not out_file is None:
+        out_file.write("run_id is " + str(sv_caller_run_id) + "\n")
 
 
 class YRangeTree:
@@ -303,7 +336,8 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc, s
     print("done computing coverage")
 
 
-def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_supporting_jumps=False, min_score=0):
+def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_supporting_jumps=False, min_score=0,
+                     max_render = 1000):
     forw_boxes_data = []
     unknown_boxes_data_a = []
     unknown_boxes_data_b = []
@@ -376,6 +410,7 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
                         [[f + 2.5, f - .5, f - .5],
                         [t + .5, t - 2.5, t + .5]])
 
+        cnt_render = 0
         if only_supporting_jumps:
             calls_from_db = None
             if not None in [x, y, w, h]:
@@ -383,6 +418,10 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
             else:
                 calls_from_db = SvCallsFromDb(params, sv_db, run_id)
             while calls_from_db.hasNext():
+                cnt_render += 1
+                if cnt_render >= max_render:
+                    print("hit max_render you wont see the full picture")
+                    break
                 call = calls_from_db.next()
                 if call.num_supp_nt > min_score * call.coverage:
                     for idx in range(len(call.supporing_jump_ids)):
@@ -394,7 +433,12 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
             else:
                 sweeper = SortedSvJumpFromSql(params, sv_db, sv_db.get_run_jump_id(run_id))
 
+            cnt_render = 0
             while sweeper.has_next_start():
+                cnt_render += 1
+                if cnt_render >= max_render:
+                    print("hit max_render you wont see the full picture")
+                    break
                 render_jump(sweeper.get_next_start())
 
     out_dict = {
@@ -476,7 +520,12 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
             calls_from_db = SvCallsFromDb(params, sv_db, run_id)
         accepted_boxes_data = []
         accepted_plus_data = []
+        cnt_render = 0
         while calls_from_db.hasNext():
+            cnt_render += 1
+            if cnt_render >= max_render:
+                print("hit max_render you wont see the full picture")
+                break
             def score(jump):
                 if jump.coverage == 0:
                     return ""

@@ -39,9 +39,16 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0, run
     res.simultaneous_get( parameter_set_manager.get_num_threads() )
 
     analyze.analyze(runtime_file)
-    
+    if not runtime_file is None:
+        runtime_file.write("sv_jump_run_id is " + str(jumps_to_db.cpp_module.jump_inserter.sv_jump_run_id) + "\n")
+
     sv_db.create_jump_indices( jumps_to_db.cpp_module.jump_inserter.sv_jump_run_id )
 
+    ret = jumps_to_db.cpp_module.jump_inserter.sv_jump_run_id
+
+    # end transaction
+    del jumps_to_db
+
     # return the run_id
-    return jumps_to_db.cpp_module.jump_inserter.sv_jump_run_id
+    return ret
 

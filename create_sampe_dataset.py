@@ -6,6 +6,7 @@ import json
 import compare_callers
 import random
 import subprocess
+import random
 
 supporting_nt = 10**6
 coverage = 1
@@ -24,8 +25,10 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_geno
     file_names2 = ""
     for idx in range(32):
         dwgsim = "/usr/home/markus/workspace/DWGSIM/dwgsim"
+        # we actually need to seed dwgsim otherwise each instance will create the same data (it uses the current time)
+        seed = random.randrange(0, 2**16)
         command = [dwgsim, "-1", str(read_length), "-2", str(read_length), "-C", str(coverage/32), "-r", "0", "-o", \
-                   "1", sequenced_genome_path, reads_folder + "part_" + str(idx) + name]
+                   "1", "-z", str(seed), sequenced_genome_path, reads_folder + "part_" + str(idx) + name]
         dwgsim_instances.append(subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE))
         file_names1 += reads_folder + "part_" + str(idx) + name + ".bwa.read1.fastq.gz "
         file_names2 += reads_folder + "part_" + str(idx) + name + ".bwa.read2.fastq.gz "
@@ -231,11 +234,13 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = "~/workspace/SURVIVOR/HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
-    #create_dataset("/MAdata/genome/random_w_mobile_ele",
+    #chrom = "CM000683.2" # Chromosome 21 -> shortest chromosome
+    #create_dataset("/MAdata/genome/human/GRCh38.p12",
     #               "minimal",
-    #               [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),],
-    #               [(create_illumina_reads_dwgsim, "ill_150", (150,))],
-    #               [5, 10, 25])
+    #               [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000, chrom ) ),],
+    #               [(create_illumina_reads_dwgsim, "ill_250", (250,))],
+    #               [25],
+    #               chrom)
 
     #create_dataset("/MAdata/genome/random_10_pow_6",
     #               "comprehensive_random",
@@ -255,29 +260,40 @@ if __name__ == "__main__":
     #                (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
     #               [5, 10, 25])
 
-    for prefix, func in [ ("del", sv_deletion), ("ins", sv_insertion), ("dup", sv_duplication), ("inv", sv_inversion) ]:
-        chrom = "CM000683.2" # Chromosome 21 -> shortest chromosome
-        create_dataset("/MAdata/genome/human/GRCh38.p12",
-                    prefix + "_human",
-                    [( separate_svs, prefix + "-0250", ( (func, tuple()), 250, 500000, chrom ) ),
-                        ( separate_svs, prefix + "-1000", ( (func, tuple()), 1000, 1000000, chrom ) ),],
-                    [(create_illumina_reads_dwgsim, "ill_250", (250,)),
-                        #(create_illumina_reads_dwgsim, "ill_150", (150,)),
-                        (create_illumina_reads_dwgsim, "ill_100", (100,)),
-                        (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
-                    [5, 10], # 25
-                    chrom)
-
     chrom = "CM000683.2" # Chromosome 21 -> shortest chromosome
     create_dataset("/MAdata/genome/human/GRCh38.p12",
-                   "tra_human",
-                   [( separate_svs, "tra-10000", ( (sv_translocation, (500,)), 10000, 1000000, chrom ) ),],
+                   "del_human",
+                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000, chrom ) ),],
                    [(create_illumina_reads_dwgsim, "ill_250", (250,)),
-                    #(create_illumina_reads_dwgsim, "ill_150", (150,)),
+                    (create_illumina_reads_dwgsim, "ill_150", (150,)),
                     (create_illumina_reads_dwgsim, "ill_100", (100,)),
                     (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
-                   [5, 10], # 25
+                   [5, 10, 25],
                    chrom)
+
+    #for prefix, func in [ ("del", sv_deletion), ("ins", sv_insertion), ("dup",sv_duplication), ("inv", sv_inversion) ]:
+    #    chrom = "CM000683.2" # Chromosome 21 -> shortest chromosome
+    #    create_dataset("/MAdata/genome/human/GRCh38.p12",
+    #                prefix + "_human",
+    #                [( separate_svs, prefix + "-0250", ( (func, tuple()), 250, 500000, chrom ) ),
+    #                    ( separate_svs, prefix + "-1000", ( (func, tuple()), 1000, 1000000, chrom ) ),],
+    #                [(create_illumina_reads_dwgsim, "ill_250", (250,)),
+    #                    #(create_illumina_reads_dwgsim, "ill_150", (150,)),
+    #                    (create_illumina_reads_dwgsim, "ill_100", (100,)),
+    #                    (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+    #                [5, 10], # 25
+    #                chrom)
+    #
+    #chrom = "CM000683.2" # Chromosome 21 -> shortest chromosome
+    #create_dataset("/MAdata/genome/human/GRCh38.p12",
+    #               "tra_human",
+    #               [( separate_svs, "tra-10000", ( (sv_translocation, (500,)), 10000, 1000000, chrom ) ),],
+    #               [(create_illumina_reads_dwgsim, "ill_250", (250,)),
+    #                #(create_illumina_reads_dwgsim, "ill_150", (150,)),
+    #                (create_illumina_reads_dwgsim, "ill_100", (100,)),
+    #                (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+    #               [5, 10], # 25
+    #               chrom)
 
     #chrom = "CM000683.2" # Chromosome 21 -> shortest chromosome
     #create_dataset("/MAdata/genome/human/GRCh38.p12",
