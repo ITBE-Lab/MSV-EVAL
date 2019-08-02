@@ -158,21 +158,24 @@ def render_seeds(sv_db, seq_id, fm_index, out_dict, start, size):
     #parameter_set_manager.set_selected("SV-PacBio")
     #parameter_set_manager.set_selected("SV-ONT")
 
-    nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db, seq_id)
     lock_module = Lock(parameter_set_manager)
     seeding_module = BinarySeeding(parameter_set_manager)
-    collector = libMA.NucSeqSegmentCollector(parameter_set_manager)
+    seeds_filter = libMA.FilterSeedsByArea(parameter_set_manager, start, size)
+    collector = libMA.SeedsCollector(parameter_set_manager)
 
     fm_pledge = Pledge()
     fm_pledge.set(fm_index)
 
     res = VectorPledge()
-    queries_pledge = promise_me(nuc_seq_getter) # @note this cannot be in the loop (synchronization!)
     # graph for single reads
-    for _ in range(parameter_set_manager.get_num_threads()):
+    for idx in range(parameter_set_manager.get_num_threads()):
+        nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db, seq_id, idx,
+                                          parameter_set_manager.get_num_threads())
+        queries_pledge = promise_me(nuc_seq_getter)
         query_pledge = promise_me(lock_module, queries_pledge)
         segments_pledge = promise_me(seeding_module, fm_pledge, query_pledge)
-        empty = promise_me(collector, query_pledge, segments_pledge)
+        seeds_pledge = promise_me(seeds_filter, segments_pledge, fm_pledge, query_pledge)
+        empty = promise_me(collector, seeds_pledge)
         unlock_pledge = promise_me(UnLock(parameter_set_manager, query_pledge), empty)
         res.append(unlock_pledge)
 
@@ -180,21 +183,13 @@ def render_seeds(sv_db, seq_id, fm_index, out_dict, start, size):
     res.simultaneous_get( parameter_set_manager.get_num_threads() )
     
     seeds = []
-    seeds_total = 0
-    for nuc_seq, segments in collector.cpp_module.collection:
-        curr_seeds = [s for s in segments.extract_seeds(fm_index,
-                                            parameter_set_manager.by_name("Maximal Ambiguity SV").get(),
-                                            parameter_set_manager.by_name("Minimal Seed Size SV").get(),
-                                            len(nuc_seq),
-                                            True)]
-        curr_seeds.sort(key=lambda x: x.start)
-        seeds_total += len(curr_seeds)
-        for idx, s in enumerate(curr_seeds):
-            if s.start_ref + s.size >= start and s.start_ref - s.size <= start + size:
-                seeds.append((s, nuc_seq.id, idx))
+    curr_seeds = [s for s in collector.cpp_module.collection]
+    curr_seeds.sort(key=lambda x: x.start)
+    seeds_total = len(curr_seeds)
+    print("rendering", seeds_total, "seeds")
+    for idx, s in enumerate(curr_seeds):
+        seeds.append((s, s.delta, idx))
     seeds.sort(key=lambda x: x[0].start_ref)
-    print("total number of seeds on genome:", seeds_total, "in selected_area:", len(seeds))
-    
     ends_list = []
 
     render_list = [[] for _ in range(100)]
@@ -266,21 +261,22 @@ def render_from_json(json_file_name, start, end, on_y_aswell=False):
 
 if __name__ == "__main__":
 
-    pos = 0#13*10**8
-    size = 10**6
+    pos = 0# int(2.7835 * 10**9)
+    size = int(10**10)# int(0.002 * 10**9)
+    print(pos, size)
 
     #sv_db = SV_DB("/MAdata/databases/sv_simulated", "open")
     sv_db = SV_DB("/MAdata/sv_datasets/minimal/svs.db", "open")
     #out_dict = create_json_from_db(sv_db, "/MAdata/genome/human/GRCh38.p12/ma/genome")
     #out_dict = sv_jumps_to_dict(sv_db, [1, 12], pos, pos, size, size)
-    #out_dict = sv_jumps_to_dict(sv_db, [1, 17])
-    
-    out_dict = sv_jumps_to_dict(sv_db, [1, 2], only_supporting_jumps=True, min_score=-1)
+    out_dict = sv_jumps_to_dict(sv_db, [1, 2])
 
-    #fm_index = FMIndex()
+    #out_dict = sv_jumps_to_dict(sv_db, [1, 2], pos, pos, size, size, min_score=-1)
+
+    fm_index = FMIndex()
     #fm_index.load("/MAdata/genome/random_w_mobile_ele/ma/genome")
     #fm_index.load("/MAdata/genome/random_10_pow_6/ma/genome")
-    #fm_index.load("/MAdata/genome/human/GRCh38.p12/ma/genome")
-    #out_dict = render_seeds(sv_db, 1, fm_index, out_dict, pos, size)
+    fm_index.load("/MAdata/genome/human/GRCh38.p12/ma/genome")
+    out_dict = render_seeds(sv_db, 1, fm_index, out_dict, pos, size)
 
     render_from_dict(out_dict)

@@ -426,6 +426,7 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
                 if call.num_supp_nt > min_score * call.coverage:
                     for idx in range(len(call.supporing_jump_ids)):
                         render_jump(call.get_jump(idx))
+            print("rendered", cnt_render, "calls")
         else:
             sweeper = None
             if not None in [x, y, w, h]:
@@ -440,6 +441,7 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
                     print("hit max_render you wont see the full picture")
                     break
                 render_jump(sweeper.get_next_start())
+            print("rendered", cnt_render, "jumps")
 
     out_dict = {
         "x_offset": 0,

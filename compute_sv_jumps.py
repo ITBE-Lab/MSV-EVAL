@@ -8,8 +8,7 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0, run
     lock_module = Lock(parameter_set_manager)
     seeding_module = BinarySeeding(parameter_set_manager)
     jumps_to_db = SvDbInserter(parameter_set_manager, sv_db, "python built compt graph")
-    jumps_from_seeds = SvJumpsFromSeeds(parameter_set_manager, jumps_to_db.cpp_module.jump_inserter.sv_jump_run_id,
-                                        sv_db)
+    jumps_from_seeds = SvJumpsFromSeeds(parameter_set_manager, seq_id, sv_db)
 
     fm_pledge = Pledge()
     fm_pledge.set(fm_index)

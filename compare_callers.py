@@ -591,7 +591,7 @@ def compare_all_callers_against(sv_db, json_info_file, out_file_name=None, outfi
             date_a = sv_db.get_run_date(id_a)
             print("analyzing", id_a, name_a, date_a)
             out.append([dataset_name, dataset_size, seq, cov, caller, aligner, str(id_a),
-                        *(str(x) for x in compare_caller(sv_db, id_a, id_b, 60 if caller == "MA_SV" else 0))])
+                        *(str(x) for x in compare_caller(sv_db, id_a, id_b, 0))]) # 60 if caller == "MA_SV" else 0
             if str(name_a[:4]) not in out_2:
                 out_2[str(name_a[:4])] = {}
             out_2[str(name_a[:4])][str((aligner, caller))] = analyze_by_score(sv_db, id_a, id_b)
@@ -662,8 +662,8 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    #analyze_sample_dataset("minimal", True)
-    analyze_sample_dataset("del_human", True)
+    analyze_sample_dataset("minimal", True, True)
+    #analyze_sample_dataset("del_human", True)
     #analyze_sample_dataset("inv_human", True)
     #analyze_sample_dataset("dup_human", True)
     #analyze_sample_dataset("tra_human", True)
