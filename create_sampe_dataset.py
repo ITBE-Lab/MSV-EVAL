@@ -264,13 +264,11 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = "~/workspace/SURVIVOR/HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
-    chrom = "CM000663.2" # Chromosome 1
-    create_dataset("/MAdata/genome/human/GRCh38.p12",
-                   "minimal",
-                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000, chrom ) ),],
+    create_dataset("/MAdata/genome/random_10_pow_6",
+                   "minimal-2",
+                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),],
                    [(create_illumina_reads_dwgsim, "ill_250", (250,))],
-                   [25],
-                   chrom)
+                   [10])
 
     #create_dataset("/MAdata/genome/random_10_pow_6",
     #               "comprehensive_random",
@@ -302,7 +300,7 @@ if __name__ == "__main__":
     #               chrom)
 
     #for prefix, func in [ ("del", sv_deletion), ("ins", sv_insertion), ("dup",sv_duplication), ("inv", sv_inversion) ]:
-    #    chrom = "CM000683.2" # Chromosome 21 -> shortest chromosome
+    #    chrom = "CM000663.2" # Chromosome 1
     #    create_dataset("/MAdata/genome/human/GRCh38.p12",
     #                prefix + "_human",
     #                [( separate_svs, prefix + "-0250", ( (func, tuple()), 250, 1000, chrom ) ),
@@ -314,7 +312,7 @@ if __name__ == "__main__":
     #                [5, 10, 25],
     #                chrom)
     #
-    #chrom = "CM000683.2" # Chromosome 21 -> shortest chromosome
+    #chrom = "CM000663.2" # Chromosome 1
     #create_dataset("/MAdata/genome/human/GRCh38.p12",
     #               "tra_human",
     #               [( separate_svs, "tra-10000", ( (sv_translocation, (200,)), 1000, 5000, chrom ) ),],

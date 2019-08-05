@@ -19,15 +19,21 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
         section_fac = libMA.GenomeSectionFactory(parameter_set_manager, pack)
         lock_module = Lock(parameter_set_manager)
         sweep2 = libMA.ExactCompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
-        sink = libMA.SvCallSink(parameter_set_manager, sv_db, name, desc, run_id)
+
+        sv_caller_run_id = sv_db.insert_sv_caller_run(name, desc, run_id)
+        filter1 = libMA.FilterLowSupportShortCalls(parameter_set_manager)
+        filter2 = libMA.FilterFuzzyCalls(parameter_set_manager)
         assert len(sequencer_ids) == 1
 
         res = VectorPledge()
         sections_pledge = promise_me(section_fac) # @note this cannot be in the loop (synchronization!)
+        sinks = []
         # graph for single reads
         for _ in range(parameter_set_manager.get_num_threads()):
             # in order to allow multithreading this module needs individual db connections for each thread
             sweep1 = libMA.CompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
+            sink = libMA.BufferedSvCallSink(parameter_set_manager, sv_db, sv_caller_run_id)
+            sinks.append(sink)
 
             section_pledge = promise_me(lock_module, sections_pledge)
             sweep1_pledge = promise_me(sweep1, section_pledge)
@@ -39,38 +45,30 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
                              lambda x: x.cpp_module.time_inner_while)
             sweep2_pledge = promise_me(sweep2, sweep1_pledge)
             analyze.register("[1] ExactCompleteBipartiteSubgraphSweep", sweep2_pledge)
-            write_to_db_pledge = promise_me(sink, sweep2_pledge)
-            analyze.register("[2] SvCallSink", write_to_db_pledge)
+            #filters
+            filter1_pledge = promise_me(filter1, sweep2_pledge)
+            analyze.register("[2] filter_short_edges_with_low_support", filter1_pledge)
+            filter2_pledge = promise_me(filter2, filter1_pledge)
+            analyze.register("[3] filter_fuzzy_calls", filter2_pledge)
+
+            write_to_db_pledge = promise_me(sink, filter2_pledge)
+            analyze.register("[4] SvCallSink", write_to_db_pledge)
             unlock_pledge = promise_me(UnLock(parameter_set_manager, section_pledge), write_to_db_pledge)
             res.append(unlock_pledge)
 
         # drain all sources
         print("\texecuting graph...")
         res.simultaneous_get( parameter_set_manager.get_num_threads() )
+        print("\tcommiting calls...")
+        for sink in sinks:
+            sink.cpp_module.commit()
         print("\tdone")
 
-        return sink.cpp_module.run_id
+        return sv_caller_run_id
 
     sv_caller_run_id = graph()
     print("done sweeping")
     print("num calls:", sv_db.get_num_calls(sv_caller_run_id, 0))
-
-    print("filtering low support short calls...")
-    start = datetime.datetime.now()
-    num_removed = sv_db.filter_short_edges_with_low_support(sv_caller_run_id, 500, 50)
-    end = datetime.datetime.now()
-    delta = end - start
-    analyze.register("[3] filter_short_edges_with_low_support", delta.total_seconds(), lambda x: x)
-    print("done filtering; removed", num_removed, "calls")
-
-    print("filtering fuzzy calls calls...")
-    start = datetime.datetime.now()
-    num_removed = sv_db.filter_fuzzy_calls(sv_caller_run_id,
-                                           parameter_set_manager.by_name("Max Fuzziness Filter").get())
-    end = datetime.datetime.now()
-    delta = end - start
-    analyze.register("[4] filter_fuzzy_calls", delta.total_seconds(), lambda x: x)
-    print("done filtering; removed", num_removed, "calls")
 
     print("overlapping...")
     start = datetime.datetime.now()
@@ -79,8 +77,6 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
     delta = end - start
     analyze.register("[5] combine_overlapping_calls", delta.total_seconds(), lambda x: x)
     print("done overlapping; combined", num_combined, "calls")
-
-    print("num calls remaining:", sv_db.get_num_calls(sv_caller_run_id, 0))
 
     print("computing coverage...")
     start = datetime.datetime.now()
