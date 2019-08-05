@@ -260,16 +260,18 @@ def render_from_json(json_file_name, start, end, on_y_aswell=False):
     render_from_dict(json_dict, start, end, on_y_aswell)
 
 if __name__ == "__main__":
+    pack = Pack()
+    pack.load("/MAdata/genome/human/GRCh38.p12/ma/genome")
 
     pos = 0# int(2.7835 * 10**9)
     size = int(10**10)# int(0.002 * 10**9)
     print(pos, size)
 
     #sv_db = SV_DB("/MAdata/databases/sv_simulated", "open")
-    sv_db = SV_DB("/MAdata/sv_datasets/minimal-2/svs.db", "open")
+    sv_db = SV_DB("/MAdata/sv_datasets/minimal/svs.db", "open")
     #out_dict = create_json_from_db(sv_db, "/MAdata/genome/human/GRCh38.p12/ma/genome")
     #out_dict = sv_jumps_to_dict(sv_db, [1, 12], pos, pos, size, size)
-    out_dict = sv_jumps_to_dict(sv_db, [1, 2], only_supporting_jumps=True)
+    out_dict = sv_jumps_to_dict(sv_db, [1, 2], only_supporting_jumps=True, min_score=500, pack=pack)
 
     #out_dict = sv_jumps_to_dict(sv_db, [1, 2], pos, pos, size, size, min_score=-1)
 

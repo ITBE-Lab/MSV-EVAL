@@ -333,7 +333,7 @@ def sweep_sv_jumps(parameter_set_manager, sv_db, run_id, ref_size, name, desc, s
 
 
 def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_supporting_jumps=False, min_score=0,
-                     max_render = 1000):
+                     max_render = 2000, pack=None):
     forw_boxes_data = []
     unknown_boxes_data_a = []
     unknown_boxes_data_b = []
@@ -341,6 +341,7 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
     accepted_lines_data = []
     plus_data = []
     patch_data = []
+    contig_borders = []
 
     min_ = float("inf")
     max_ = 0
@@ -412,7 +413,7 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
             if not None in [x, y, w, h]:
                 calls_from_db = SvCallsFromDb(params, sv_db, run_id, x, y, w, h)
             else:
-                calls_from_db = SvCallsFromDb(params, sv_db, run_id)
+                calls_from_db = SvCallsFromDb(params, sv_db, run_id, min_score)
             while calls_from_db.hasNext():
                 cnt_render += 1
                 if cnt_render >= max_render:
@@ -438,12 +439,22 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
                     break
                 render_jump(sweeper.get_next_start())
             print("rendered", cnt_render, "jumps")
+    if not pack is None:
+        for start in pack.contigStarts():
+            contig_borders.append([min_, start, max_ - min_, 0])
+            contig_borders.append([start, min_, 0, max_ - min_])
 
     out_dict = {
         "x_offset": 0,
         "panels": [
             {
                 "items": [
+                    {
+                        "type": "line",
+                        "color": "lightgray",
+                        "group": "contig_borders",
+                        "data": contig_borders
+                    },
                     {
                         "type": "box-alpha",
                         "color": "blue",
@@ -515,21 +526,21 @@ def sv_jumps_to_dict(sv_db, run_ids=None, x=None, y=None, w=None, h=None, only_s
         if not None in [x, y, w, h]:
             calls_from_db = SvCallsFromDb(params, sv_db, run_id, x, y, w, h)
         else:
-            calls_from_db = SvCallsFromDb(params, sv_db, run_id)
+            calls_from_db = SvCallsFromDb(params, sv_db, run_id, min_score)
         accepted_boxes_data = []
         accepted_plus_data = []
         cnt_render = 0
         while calls_from_db.hasNext():
-            cnt_render += 1
-            if cnt_render >= max_render:
-                print("hit max_render you wont see the full picture")
-                break
             def score(jump):
                 if jump.coverage == 0:
                     return ""
                 return " score: " + str(jump.num_supp_nt / jump.coverage)
             jump = calls_from_db.next()
             if jump.num_supp_nt > min_score * jump.coverage:
+                cnt_render += 1
+                if cnt_render >= max_render:
+                    print("hit max_render you wont see the full picture")
+                    break
                 if jump.from_size == 1 and jump.to_size == 1:
                     accepted_plus_data.append([jump.from_start,
                                                 jump.to_start,

@@ -7,7 +7,7 @@ from analyze_runtimes import AnalyzeRuntimes
 def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0, runtime_file=None):
     lock_module = Lock(parameter_set_manager)
     seeding_module = BinarySeeding(parameter_set_manager)
-    jumps_to_db = SvDbInserter(parameter_set_manager, sv_db, "python built compt graph")
+    run_id = sv_db.insert_sv_jump_run("MS-SV", "python built compt graph")
     jumps_from_seeds = SvJumpsFromSeeds(parameter_set_manager, seq_id, sv_db)
 
     fm_pledge = Pledge()
@@ -18,10 +18,13 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0, run
     analyze = AnalyzeRuntimes()
 
     res = VectorPledge()
+    jump_to_dbs = []
     # graph for single reads
     for idx in range(parameter_set_manager.get_num_threads()):
         nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db, seq_id, idx,
                                           parameter_set_manager.get_num_threads())
+        jumps_to_db = BufferedSvDbInserter(parameter_set_manager, sv_db, run_id)
+        jump_to_dbs.append(jumps_to_db)
         queries_pledge = promise_me(nuc_seq_getter)
         analyze.register("[0] AllNucSeqFromSql", queries_pledge)
         query_pledge = promise_me(lock_module, queries_pledge)
@@ -37,17 +40,15 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0, run
     # drain all sources
     res.simultaneous_get( parameter_set_manager.get_num_threads() )
 
+    for jump_to_db in jump_to_dbs:
+        jump_to_db.cpp_module.commit()
+
     analyze.analyze(runtime_file)
     if not runtime_file is None:
-        runtime_file.write("sv_jump_run_id is " + str(jumps_to_db.cpp_module.jump_inserter.sv_jump_run_id) + "\n")
+        runtime_file.write("sv_jump_run_id is " + str(run_id) + "\n")
 
-    sv_db.create_jump_indices( jumps_to_db.cpp_module.jump_inserter.sv_jump_run_id )
-
-    ret = jumps_to_db.cpp_module.jump_inserter.sv_jump_run_id
-
-    # end transaction
-    del jumps_to_db
+    sv_db.create_jump_indices( run_id )
 
     # return the run_id
-    return ret
+    return run_id
 

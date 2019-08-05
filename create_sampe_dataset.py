@@ -264,11 +264,11 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = "~/workspace/SURVIVOR/HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset("/MAdata/genome/random_10_pow_6",
-                   "minimal-2",
-                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),],
-                   [(create_illumina_reads_dwgsim, "ill_250", (250,))],
-                   [10])
+    #create_dataset("/MAdata/genome/random_10_pow_6",
+    #               "minimal-2",
+    #               [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),],
+    #               [(create_illumina_reads_dwgsim, "ill_250", (250,))],
+    #               [10])
 
     #create_dataset("/MAdata/genome/random_10_pow_6",
     #               "comprehensive_random",
@@ -288,16 +288,13 @@ if __name__ == "__main__":
     #                (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
     #               [5, 10, 25])
 
-    #chrom = "CM000683.2" # Chromosome 21 -> shortest chromosome
-    #create_dataset("/MAdata/genome/human/GRCh38.p12",
-    #               "del_human",
-    #               [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000, chrom ) ),],
-    #               [(create_illumina_reads_dwgsim, "ill_250", (250,)),
-    #                (create_illumina_reads_dwgsim, "ill_150", (150,)),
-    #                (create_illumina_reads_dwgsim, "ill_100", (100,)),
-    #                (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
-    #               [5, 10, 25],
-    #               chrom)
+    chrom = "CM000679.2" # Chromosome 17
+    create_dataset("/MAdata/genome/human/GRCh38.p12",
+                   "del_human-17",
+                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 50000, chrom ) ),],
+                   [(create_illumina_reads_dwgsim, "ill_250", (250,))],
+                   [10],
+                   chrom)
 
     #for prefix, func in [ ("del", sv_deletion), ("ins", sv_insertion), ("dup",sv_duplication), ("inv", sv_inversion) ]:
     #    chrom = "CM000663.2" # Chromosome 1
