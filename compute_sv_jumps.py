@@ -5,10 +5,14 @@ import math
 from analyze_runtimes import AnalyzeRuntimes
 
 def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0, runtime_file=None):
+    #parameter_set_manager.by_name("Number of Threads").set(1)
+    #parameter_set_manager.by_name("Use all Processor Cores").set(False)
+    #assert parameter_set_manager.get_num_threads() == 1
+
     lock_module = Lock(parameter_set_manager)
     seeding_module = BinarySeeding(parameter_set_manager)
     run_id = sv_db.insert_sv_jump_run("MS-SV", "python built compt graph")
-    jumps_from_seeds = SvJumpsFromSeeds(parameter_set_manager, seq_id, sv_db)
+    jumps_from_seeds = SvJumpsFromSeeds(parameter_set_manager, seq_id, sv_db, pack)
 
     fm_pledge = Pledge()
     fm_pledge.set(fm_index)
@@ -23,7 +27,7 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0, run
     for idx in range(parameter_set_manager.get_num_threads()):
         nuc_seq_getter = AllNucSeqFromSql(parameter_set_manager, sv_db, seq_id, idx,
                                           parameter_set_manager.get_num_threads())
-        jumps_to_db = BufferedSvDbInserter(parameter_set_manager, sv_db, run_id)
+        jumps_to_db = libMA.BufferedSvDbInserter(parameter_set_manager, sv_db, run_id)
         jump_to_dbs.append(jumps_to_db)
         queries_pledge = promise_me(nuc_seq_getter)
         analyze.register("[0] AllNucSeqFromSql", queries_pledge)
@@ -40,6 +44,7 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0, run
     # drain all sources
     res.simultaneous_get( parameter_set_manager.get_num_threads() )
 
+    jumps_from_seeds.cpp_module.commit()
     for jump_to_db in jump_to_dbs:
         jump_to_db.cpp_module.commit()
 

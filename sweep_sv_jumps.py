@@ -16,6 +16,10 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
     # creates scope so that deconstructor of call inserter is triggered (commits insert transaction)
     def graph():
         print("\tsetting graph up...")
+        
+        pack_pledge = Pledge()
+        pack_pledge.set(pack)
+
         section_fac = libMA.GenomeSectionFactory(parameter_set_manager, pack)
         lock_module = Lock(parameter_set_manager)
         sweep2 = libMA.ExactCompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
@@ -33,6 +37,7 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
             # in order to allow multithreading this module needs individual db connections for each thread
             sweep1 = libMA.CompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
             sink = libMA.BufferedSvCallSink(parameter_set_manager, sv_db, sv_caller_run_id)
+            filter3 = libMA.ConnectorPatternFilter(parameter_set_manager, sv_db)
             sinks.append(sink)
 
             section_pledge = promise_me(lock_module, sections_pledge)
@@ -47,12 +52,14 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
             analyze.register("[1] ExactCompleteBipartiteSubgraphSweep", sweep2_pledge)
             #filters
             filter1_pledge = promise_me(filter1, sweep2_pledge)
-            analyze.register("[2] filter_short_edges_with_low_support", filter1_pledge)
+            analyze.register("[2] FilterLowSupportShortCalls", filter1_pledge)
             filter2_pledge = promise_me(filter2, filter1_pledge)
-            analyze.register("[3] filter_fuzzy_calls", filter2_pledge)
+            analyze.register("[3] FilterFuzzyCalls", filter2_pledge)
+            #filter3_pledge = promise_me(filter3, filter2_pledge, pack_pledge)
+            #analyze.register("[4] ConnectorPatternFilter", filter3_pledge)
 
-            write_to_db_pledge = promise_me(sink, filter2_pledge)
-            analyze.register("[4] SvCallSink", write_to_db_pledge)
+            write_to_db_pledge = promise_me(sink, filter2_pledge) # -> filter3_pledge
+            analyze.register("[5] SvCallSink", write_to_db_pledge)
             unlock_pledge = promise_me(UnLock(parameter_set_manager, section_pledge), write_to_db_pledge)
             res.append(unlock_pledge)
 
@@ -75,7 +82,7 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
     num_combined = libMA.combine_overlapping_calls(parameter_set_manager, sv_db, sv_caller_run_id)
     end = datetime.datetime.now()
     delta = end - start
-    analyze.register("[5] combine_overlapping_calls", delta.total_seconds(), lambda x: x)
+    analyze.register("[6] combine_overlapping_calls", delta.total_seconds(), lambda x: x)
     print("done overlapping; combined", num_combined, "calls")
 
     print("computing coverage...")
@@ -83,7 +90,7 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
     compute_coverage(parameter_set_manager, fm_index, pack, sv_db, sv_caller_run_id, sequencer_ids)
     end = datetime.datetime.now()
     delta = end - start
-    analyze.register("[6] compute_coverage", delta.total_seconds(), lambda x: x)
+    analyze.register("[7] compute_coverage", delta.total_seconds(), lambda x: x)
     print("done computing coverage")
 
     print("computing coverage index...")
@@ -91,7 +98,7 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
     sv_db.add_score_index(sv_caller_run_id)
     end = datetime.datetime.now()
     delta = end - start
-    analyze.register("[7] compute_coverage_index", delta.total_seconds(), lambda x: x)
+    analyze.register("[8] compute_coverage_index", delta.total_seconds(), lambda x: x)
     print("done computing coverage index")
 
     analyze.analyze(out_file)

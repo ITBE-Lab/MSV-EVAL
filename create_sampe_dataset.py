@@ -25,12 +25,13 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_geno
     file_names2 = ""
     # we actually need to seed dwgsim otherwise each instance will create the same data (it uses the current time)
     seed = random.randrange(0, 2**6)
-    for idx in range(32):
+    num_instances = 32
+    for idx in range(num_instances):
         dwgsim = "/usr/home/markus/workspace/DWGSIM/dwgsim"
         #command = [dwgsim, "-1", str(read_length), "-2", str(read_length), "-e", "from 0.000 to 0.000 by 0.000", \
         #           "-E", "from 0.000 to 0.000 by 0.000", "-y", "0", "-C", str(coverage/32), "-r", "0", "-o", \
         #           "1", "-z", str(seed), sequenced_genome_path, reads_folder + "part_" + str(idx) + name]
-        command = [dwgsim, "-1", str(read_length), "-2", str(read_length), "-C", str(coverage/32), "-r", "0", "-o", \
+        command = [dwgsim, "-1", str(read_length), "-2", str(read_length), "-C", str(coverage/num_instances), "-r", "0", "-o", \
                    "1", "-z", str(seed), sequenced_genome_path, reads_folder + "part_" + str(idx) + name]
         dwgsim_instances.append(subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE))
         seed += 42 # increment the seed so that we have some different number every time
@@ -264,11 +265,13 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = "~/workspace/SURVIVOR/HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
-    #create_dataset("/MAdata/genome/random_10_pow_6",
-    #               "minimal-2",
-    #               [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),],
-    #               [(create_illumina_reads_dwgsim, "ill_250", (250,))],
-    #               [10])
+    chrom = "CM002885.2" # Chromosome 1
+    create_dataset("/MAdata/genome/zebrafish",
+                   "minimal-z",
+                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000, chrom ) ),],
+                   [(create_illumina_reads_dwgsim, "ill_250", (250,))],
+                   [25],
+                   chrom)
 
     #create_dataset("/MAdata/genome/random_10_pow_6",
     #               "comprehensive_random",
@@ -288,13 +291,13 @@ if __name__ == "__main__":
     #                (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
     #               [5, 10, 25])
 
-    chrom = "CM000679.2" # Chromosome 17
-    create_dataset("/MAdata/genome/human/GRCh38.p12",
-                   "del_human-17",
-                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 50000, chrom ) ),],
-                   [(create_illumina_reads_dwgsim, "ill_250", (250,))],
-                   [10],
-                   chrom)
+    #chrom = "CM000679.2" # Chromosome 17
+    #create_dataset("/MAdata/genome/human/GRCh38.p12",
+    #               "del_human-17",
+    #               [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 50000, chrom ) ),],
+    #               [(create_illumina_reads_dwgsim, "ill_250", (250,))],
+    #               [10],
+    #               chrom)
 
     #for prefix, func in [ ("del", sv_deletion), ("ins", sv_insertion), ("dup",sv_duplication), ("inv", sv_inversion) ]:
     #    chrom = "CM000663.2" # Chromosome 1
