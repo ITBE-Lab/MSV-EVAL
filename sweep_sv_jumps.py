@@ -36,6 +36,7 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
         for _ in range(parameter_set_manager.get_num_threads()):
             # in order to allow multithreading this module needs individual db connections for each thread
             sweep1 = libMA.CompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
+            filter4 = libMA.FilterLowCoverageCalls(parameter_set_manager, sv_db, pack, sequencer_ids[0])
             sink = libMA.BufferedSvCallSink(parameter_set_manager, sv_db, sv_caller_run_id)
             filter3 = libMA.ConnectorPatternFilter(parameter_set_manager, sv_db)
             sinks.append(sink)
@@ -57,8 +58,10 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
             analyze.register("[3] FilterFuzzyCalls", filter2_pledge)
             #filter3_pledge = promise_me(filter3, filter2_pledge, pack_pledge)
             #analyze.register("[4] ConnectorPatternFilter", filter3_pledge)
+            #filter3_pledge = promise_me(filter4, filter2_pledge, pack_pledge)
+            #analyze.register("[4] FilterLowCoverageCalls", filter3_pledge)
 
-            write_to_db_pledge = promise_me(sink, filter2_pledge) # -> filter3_pledge
+            write_to_db_pledge = promise_me(sink, filter2_pledge)
             analyze.register("[5] SvCallSink", write_to_db_pledge)
             unlock_pledge = promise_me(UnLock(parameter_set_manager, section_pledge), write_to_db_pledge)
             res.append(unlock_pledge)

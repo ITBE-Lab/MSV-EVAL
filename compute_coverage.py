@@ -157,7 +157,7 @@ def compute_coverage(parameter_set_manager, fm_index, pack, sv_db, caller_id, se
     for seq_id in seq_ids:
         print("\tconstructing interval tree...")
         # @todo the interval tree should be done via sql...
-        coverage_module = libMA.ComputeCoverage(parameter_set_manager, sv_db, caller_id, seq_id)
+        coverage_module = libMA.ComputeCoverage(parameter_set_manager, sv_db, caller_id, seq_id, pack)
         print("\tdone constructing interval tree")
 
         res = VectorPledge()

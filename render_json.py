@@ -277,8 +277,7 @@ if __name__ == "__main__":
     sv_db = SV_DB("/MAdata/sv_datasets/minimal-z/svs.db", "open")
     #out_dict = create_json_from_db(sv_db, "/MAdata/genome/human/GRCh38.p12/ma/genome")
     #out_dict = sv_jumps_to_dict(sv_db, [1, 12], pos, pos, size, size)
-    out_dict = sv_jumps_to_dict(sv_db, [1, 5], int(5.1734*10**7), 0, int(0.001*10**7), int(3.5*10**8), 
-                                only_supporting_jumps=True, pack=pack, min_score=10000)
+    out_dict = sv_jumps_to_dict(sv_db, [1, 6], only_supporting_jumps=True, pack=pack, min_score=200)
 
     #out_dict = sv_jumps_to_dict(sv_db, [1, 2], pos, pos, size, size, min_score=-1)
 
