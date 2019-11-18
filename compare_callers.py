@@ -8,6 +8,8 @@ import traceback
 from pathlib import Path
 from printColumns import print_columns
 import datetime
+from bokeh.plotting import figure, show
+from bokeh.models.formatters import PrintfTickFormatter
 
 def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, recompute_jumps=False):
     def bwa(read_set, sam_file_path):
@@ -525,10 +527,77 @@ def analyze_by_score(sv_db, id_a, id_b):
 
     #num_invalid_calls = sv_db.get_num_invalid_calls(id_a, 0, 0)
     num_invalid_calls_fuzzy = sv_db.get_num_invalid_calls(id_a, 0, blur_amount)
-    avg_blur = round(sv_db.get_blur_on_overlaps_between_calls(id_b, id_a, 0, blur_amount),1)
+    avg_blur = round(sv_db.get_blur_on_overlaps_between_calls(id_b, id_a, 0, blur_amount), 1)
 
     return xs_2, ys_2, ps, num_invalid_calls_fuzzy, avg_blur
     #return xs, ys, xs_2, ys_2, ps, num_invalid_calls, num_invalid_calls_fuzzy, avg_blur
+
+def compute_diagonal_threshold_picture(sv_db, id_a, id_b):
+    parameter_set_manager = ParameterSetManager()
+    true_positives = SvCallsFromDb(parameter_set_manager, sv_db, id_a, id_b, True, blur_amount)
+    false_positives = SvCallsFromDb(parameter_set_manager, sv_db, id_a, id_b, False, blur_amount)
+
+    def get_std(l):
+        l.sort()
+        c = len(l) // 2
+        if len(l) % 2 == 1:
+            mean = l[c]
+        else:
+            mean = (l[c-1] + l[c]) // 2
+        sq_diff = 0
+        for x in l:
+            sq_diff += int((mean - x) ** 2)
+        return sq_diff // len(l)
+
+    def get_diagonal_value(call):
+        diagonalA = []
+        diagonalB = []
+        for idx in range(len(call.supporing_jump_ids)):
+            jump = call.get_jump(idx)
+            x = jump.from_pos
+            y = jump.to_pos
+            diagonalA.append(y - x)
+            diagonalB.append(y + x)
+        return get_std(diagonalA) // max(get_std(diagonalB), 1)
+
+
+    values_true = []
+    while true_positives.hasNext():
+        call = true_positives.next()
+        values_true.append(get_diagonal_value(call))
+    values_false = []
+    while false_positives.hasNext():
+        call = false_positives.next()
+        #values_false.append(get_diagonal_value(call))
+        values_false.append(0)
+
+    values_true.sort()
+    values_false.sort()
+
+    num_buckets = 100
+    min_ = min(values_true[0], values_false[0])
+    max_ = max(values_true[-1], values_false[-1]) + 1
+    div = max_ - min_
+    def to_buckets(l):
+        buckets = [0]*num_buckets
+        for val in l:
+            idx = num_buckets*(val - min_) // div
+            #print(val, min_, max_, div, idx)
+            assert idx < num_buckets
+            buckets[idx] += 1
+        return buckets
+    
+    buckets_true = to_buckets(values_true)
+    buckets_false = to_buckets(values_false)
+
+    plot = figure()
+    plot.vbar(x=[x*div/num_buckets+min_ for x in range(num_buckets)], top=buckets_false, bottom=0,
+              width=div*3/(4*num_buckets), legend="False positives", color="red", fill_alpha=0.5)
+    plot.vbar(x=[x*div/num_buckets+min_ for x in range(num_buckets)], top=buckets_true, bottom=0,
+              width=div*3/(4*num_buckets), legend="True positives", color="green", fill_alpha=0.5)
+    plot.xaxis[0].formatter = PrintfTickFormatter(format="%d")
+    show(plot)
+
 
 def compare_caller(sv_db, id_a, id_b, min_score):
     sv_db.add_score_index(id_a) # @todo this can be removed once index is in all databases
@@ -595,6 +664,7 @@ def compare_all_callers_against(sv_db, json_info_file, out_file_name=None, outfi
             if str(name_a[:4]) not in out_2:
                 out_2[str(name_a[:4])] = {}
             out_2[str(name_a[:4])][str((aligner, caller))] = analyze_by_score(sv_db, id_a, id_b)
+            compute_diagonal_threshold_picture(sv_db, id_a, id_b)
 
     out.sort()
     out.insert(0, ["dataset", "size", "sequencer", "coverage", "caller", "aligner", "id", "#calls", "#found", "#almost",
@@ -662,7 +732,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("minimal-z", True)
+    analyze_sample_dataset("minimal-z", False)
     #analyze_sample_dataset("del_human", True)
     #analyze_sample_dataset("inv_human", True)
     #analyze_sample_dataset("dup_human", True)

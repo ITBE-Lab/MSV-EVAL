@@ -27,6 +27,7 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
         sv_caller_run_id = sv_db.insert_sv_caller_run(name, desc, run_id)
         filter1 = libMA.FilterLowSupportShortCalls(parameter_set_manager)
         filter2 = libMA.FilterFuzzyCalls(parameter_set_manager)
+        filter5 = libMA.FilterDiagonalLineCalls(parameter_set_manager)
         assert len(sequencer_ids) == 1
 
         res = VectorPledge()
@@ -60,8 +61,10 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
             #analyze.register("[4] ConnectorPatternFilter", filter3_pledge)
             #filter3_pledge = promise_me(filter4, filter2_pledge, pack_pledge)
             #analyze.register("[4] FilterLowCoverageCalls", filter3_pledge)
+            filter3_pledge = promise_me(filter5, filter2_pledge)
+            analyze.register("[4] FilterDiagonalLineCalls", filter3_pledge)
 
-            write_to_db_pledge = promise_me(sink, filter2_pledge)
+            write_to_db_pledge = promise_me(sink, filter3_pledge)
             analyze.register("[5] SvCallSink", write_to_db_pledge)
             unlock_pledge = promise_me(UnLock(parameter_set_manager, section_pledge), write_to_db_pledge)
             res.append(unlock_pledge)

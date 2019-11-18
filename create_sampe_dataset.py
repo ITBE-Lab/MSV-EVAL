@@ -266,7 +266,7 @@ if __name__ == "__main__":
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
     chrom = "CM002885.2" # Chromosome 1
-    create_dataset("/MAdata/genome/zebrafish",
+    create_dataset("/MAdata/genome/human/GRCh38.p12-chr1",
                    "minimal-z",
                    [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000, chrom ) ),],
                    [(create_illumina_reads_dwgsim, "ill_250", (250,))],

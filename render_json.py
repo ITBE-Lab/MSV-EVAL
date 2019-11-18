@@ -265,7 +265,8 @@ def render_from_json(json_file_name, start, end, on_y_aswell=False):
         json_dict = json.loads(json_file.read(), object_hook=_decode)
     render_from_dict(json_dict, start, end, on_y_aswell)
 
-if __name__ == "__main__":
+## old main
+if False:
     pack = Pack()
     pack.load("/MAdata/genome/zebrafish/ma/genome") # human/GRCh38.p12
 
@@ -277,7 +278,7 @@ if __name__ == "__main__":
     sv_db = SV_DB("/MAdata/sv_datasets/minimal-z/svs.db", "open")
     #out_dict = create_json_from_db(sv_db, "/MAdata/genome/human/GRCh38.p12/ma/genome")
     #out_dict = sv_jumps_to_dict(sv_db, [1, 12], pos, pos, size, size)
-    out_dict = sv_jumps_to_dict(sv_db, [1, 6], only_supporting_jumps=True, pack=pack, min_score=200)
+    out_dict = sv_jumps_to_dict(sv_db, [1, 22], only_supporting_jumps=True, pack=pack, min_score=230)
 
     #out_dict = sv_jumps_to_dict(sv_db, [1, 2], pos, pos, size, size, min_score=-1)
 
@@ -290,3 +291,10 @@ if __name__ == "__main__":
     #out_dict = render_seeds(sv_db, 1, fm_index, out_dict, int(2.84538*10**8), int(0.00002*10**8))
 
     render_from_dict(out_dict)
+
+if __name__ == "__main__":
+    pack = Pack()
+    pack.load("/MAdata/genome/human/GRCh38.p12-chr1/ma/genome")
+
+    sv_db = SV_DB("/MAdata/sv_datasets/minimal/svs.db", "open")
+    out_dict = sv_jumps_to_dict(sv_db, [1, 1], only_supporting_jumps=True, pack=pack, min_score=230)
