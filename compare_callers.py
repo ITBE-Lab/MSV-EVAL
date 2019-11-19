@@ -532,6 +532,13 @@ def analyze_by_score(sv_db, id_a, id_b):
     return xs_2, ys_2, ps, num_invalid_calls_fuzzy, avg_blur
     #return xs, ys, xs_2, ys_2, ps, num_invalid_calls, num_invalid_calls_fuzzy, avg_blur
 
+##
+# prints a bar plot that shows the ratio of false and true positives with respect the the diagonal shape filter of
+# sv calls. 
+# Diagonal shape filter:
+#  - get standard deviation of sv jumps from mean delta value
+#  - get standard deviation of sv jumps from mean r+q value
+#  - divide values and filer calls based on that ratio
 def compute_diagonal_threshold_picture(sv_db, id_a, id_b):
     parameter_set_manager = ParameterSetManager()
     true_positives = SvCallsFromDb(parameter_set_manager, sv_db, id_a, id_b, True, blur_amount)
@@ -664,7 +671,7 @@ def compare_all_callers_against(sv_db, json_info_file, out_file_name=None, outfi
             if str(name_a[:4]) not in out_2:
                 out_2[str(name_a[:4])] = {}
             out_2[str(name_a[:4])][str((aligner, caller))] = analyze_by_score(sv_db, id_a, id_b)
-            compute_diagonal_threshold_picture(sv_db, id_a, id_b)
+            #compute_diagonal_threshold_picture(sv_db, id_a, id_b)
 
     out.sort()
     out.insert(0, ["dataset", "size", "sequencer", "coverage", "caller", "aligner", "id", "#calls", "#found", "#almost",
@@ -732,7 +739,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("minimal-z", False)
+    analyze_sample_dataset("minimal", True)
     #analyze_sample_dataset("del_human", True)
     #analyze_sample_dataset("inv_human", True)
     #analyze_sample_dataset("dup_human", True)

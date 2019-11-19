@@ -294,7 +294,7 @@ if False:
 
 if __name__ == "__main__":
     pack = Pack()
-    pack.load("/MAdata/genome/human/GRCh38.p12-chr1/ma/genome")
+    pack.load("/MAdata/genome/human/GRCh38.p12/ma/genome")
 
     sv_db = SV_DB("/MAdata/sv_datasets/minimal/svs.db", "open")
     out_dict = sv_jumps_to_dict(sv_db, [1, 1], only_supporting_jumps=True, pack=pack, min_score=230)

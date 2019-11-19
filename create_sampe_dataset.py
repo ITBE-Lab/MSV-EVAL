@@ -47,9 +47,7 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_geno
     print("\tinserting into db...")
     inserter = ReadInserter(database, name, ref_pack)
     json_info_file["seq_id"] = inserter.sequencer_id
-    inserter.insert_paired_fasta_files(ParameterSetManager(),
-                                       libMA.filePathVector([libMA.path(reads1)]),
-                                       libMA.filePathVector([libMA.path(reads2)]))
+    inserter.insert_paired_fasta_files(ParameterSetManager(), [libMA.path(reads1)], [libMA.path(reads2)])
     print("\tdone")
 
 def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path, database, reads_folder, 
@@ -68,8 +66,7 @@ def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path
     print("\tinserting into db...")
     inserter = ReadInserter(database, name, ref_pack)
     json_info_file["seq_id"] = inserter.sequencer_id
-    inserter.insert_fasta_files(ParameterSetManager(),
-                                       libMA.filePathVector([libMA.path(reads1)]))
+    inserter.insert_fasta_files(ParameterSetManager(), [libMA.path(reads1)])
     print("\tdone")
 
 def sv_deletion(sv_inserter, position, sv_size):
@@ -265,13 +262,11 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = "~/workspace/SURVIVOR/HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
-    chrom = "CM002885.2" # Chromosome 1
     create_dataset("/MAdata/genome/human/GRCh38.p12-chr1",
-                   "minimal-z",
-                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000, chrom ) ),],
-                   [(create_illumina_reads_dwgsim, "ill_250", (250,))],
-                   [25],
-                   chrom)
+                   "minimal",
+                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),],
+                   [(create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+                   [25])
 
     #create_dataset("/MAdata/genome/random_10_pow_6",
     #               "comprehensive_random",
