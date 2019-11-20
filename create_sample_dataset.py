@@ -263,8 +263,8 @@ if __name__ == "__main__":
     survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
 
     create_dataset("/MAdata/genome/human/GRCh38.p12-chr1",
-                   "minimal",
-                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 5000 ) ),],
+                   "minimal-2",
+                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 100, 500 ) ),],
                    [(create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
                    [25])
 

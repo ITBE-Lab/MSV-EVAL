@@ -54,20 +54,20 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
             analyze.register("[1] ExactCompleteBipartiteSubgraphSweep", sweep2_pledge)
             #filters
 
-            #filter1_pledge = promise_me(filter1, sweep2_pledge)
-            #analyze.register("[2] FilterLowSupportShortCalls", filter1_pledge)
-            #filter2_pledge = promise_me(filter2, filter1_pledge)
-            #analyze.register("[3] FilterFuzzyCalls", filter2_pledge)
+            filter1_pledge = promise_me(filter1, sweep2_pledge)
+            analyze.register("[2] FilterLowSupportShortCalls", filter1_pledge)
+            filter2_pledge = promise_me(filter2, filter1_pledge)
+            analyze.register("[3] FilterFuzzyCalls", filter2_pledge)
 
             #filter3_pledge = promise_me(filter3, filter2_pledge, pack_pledge) # this filter was off already
             #analyze.register("[4] ConnectorPatternFilter", filter3_pledge)
             #filter3_pledge = promise_me(filter4, filter2_pledge, pack_pledge) # this filter was off already
             #analyze.register("[4] FilterLowCoverageCalls", filter3_pledge)
 
-            #filter3_pledge = promise_me(filter5, filter2_pledge)
-            #analyze.register("[4] FilterDiagonalLineCalls", filter3_pledge)
+            filter3_pledge = promise_me(filter5, filter2_pledge)
+            analyze.register("[4] FilterDiagonalLineCalls", filter3_pledge)
 
-            write_to_db_pledge = promise_me(sink, sweep2_pledge)
+            write_to_db_pledge = promise_me(sink, filter3_pledge)
             analyze.register("[5] SvCallSink", write_to_db_pledge)
             unlock_pledge = promise_me(UnLock(parameter_set_manager, section_pledge), write_to_db_pledge)
             res.append(unlock_pledge)
