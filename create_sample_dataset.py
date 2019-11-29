@@ -11,6 +11,8 @@ import random
 supporting_nt = 10**6
 coverage = 1
 
+global_prefix = "C:/MAdata/"
+
 # AKFIX
 """Markus @ Zeus""" 
 # svdb_dir = "/MAdata/sv_datasets/" # AKFIX
@@ -20,10 +22,10 @@ coverage = 1
 # OS_is_MSWIN = False
 
 """Arne @ home """
-survivor = "C:/Users/Markus/Desktop/MA-Database/tools/Survivor.exe simreads " # Arne @ desktop at home
-svdb_dir = "C:/Users/Markus/Desktop/MA-Database/sv_datasets/" 
-genome_dir = "C:/Users/Markus/Desktop/MA-Database/genome/GRCh38.p12-chr1"
-survivor_error_profile_dir = "C:/Users/Markus/Desktop/MA-Database/survivor/"
+survivor = global_prefix + "tools/Survivor.exe simreads " # Arne @ desktop at home
+svdb_dir = global_prefix + "sv_datasets/" 
+genome_dir = global_prefix + "genome/GRCh38.p12-chr1"
+survivor_error_profile_dir = global_prefix + "tools/"
 OS_is_MSWIN = True
 
 
@@ -63,7 +65,12 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_geno
     print("\tinserting into db...")
     inserter = ReadInserter(database, name, ref_pack)
     json_info_file["seq_id"] = inserter.sequencer_id
-    inserter.insert_paired_fasta_files(ParameterSetManager(), [libMA.path(reads1)], [libMA.path(reads2)])
+    f_path_vec = None
+    if OS_is_MSWIN:
+        f_path_vec = libMA.filePathVector([libMA.path(reads1)], [libMA.path(reads2)])
+    else:
+        f_path_vec = [libMA.path(reads1)], [libMA.path(reads2)]
+    inserter.insert_paired_fasta_files(ParameterSetManager(), OS_is_MSWIN)
     print("\tdone")
 
 def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path, database, reads_folder, 
@@ -85,7 +92,12 @@ def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path
     print("\tinserting into db...")
     inserter = ReadInserter(database, name, ref_pack)
     json_info_file["seq_id"] = inserter.sequencer_id
-    inserter.insert_fasta_files(ParameterSetManager(), [libMA.path(reads1)])
+    f_path_vec = None
+    if OS_is_MSWIN:
+        f_path_vec = libMA.filePathVector([libMA.path(reads1)])
+    else:
+        f_path_vec = [libMA.path(reads1)]
+    inserter.insert_fasta_files(ParameterSetManager(), f_path_vec)
     print("\tdone")
 
 def sv_deletion(sv_inserter, position, sv_size):

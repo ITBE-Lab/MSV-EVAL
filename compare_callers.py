@@ -11,12 +11,14 @@ import datetime
 from bokeh.plotting import figure, show
 from bokeh.models.formatters import PrintfTickFormatter
 
+global_prefix = "C:/MAdata/"
+
 # Setup the appropriate environment
 """Markus @ Zeus""" 
 # svdb_dir = "/MAdata/sv_datasets/" # AKFIX
 
 """Arne @ home """
-svdb_dir = "C:/Users/Markus/Desktop/MA-Database/sv_datasets/" 
+svdb_dir = global_prefix + "sv_datasets/" 
 
 def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, recompute_jumps=False):
     def bwa(read_set, sam_file_path):
