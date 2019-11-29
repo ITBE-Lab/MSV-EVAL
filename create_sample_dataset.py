@@ -11,6 +11,22 @@ import random
 supporting_nt = 10**6
 coverage = 1
 
+# AKFIX
+"""Markus @ Zeus""" 
+# svdb_dir = "/MAdata/sv_datasets/" # AKFIX
+# survivor = "~/workspace/SURVIVOR/Debug/SURVIVOR simreads "  
+# genome_dir = "/MAdata/genome/human/GRCh38.p12-chr1"
+# survivor_error_profile_dir = "~/workspace/SURVIVOR/"
+# OS_is_MSWIN = False
+
+"""Arne @ home """
+survivor = "C:/Users/Markus/Desktop/MA-Database/tools/Survivor.exe simreads " # Arne @ desktop at home
+svdb_dir = "C:/Users/Markus/Desktop/MA-Database/sv_datasets/" 
+genome_dir = "C:/Users/Markus/Desktop/MA-Database/genome/GRCh38.p12-chr1"
+survivor_error_profile_dir = "C:/Users/Markus/Desktop/MA-Database/survivor/"
+OS_is_MSWIN = True
+
+
 def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_genome_path, database, reads_folder,
                                  json_info_file, coverage, name, read_length):
     json_info_file["read_length"] = read_length
@@ -57,11 +73,14 @@ def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path
     reads1 = reads_folder + name + ".fasta"
     json_info_file["fasta_file"] = reads1
 
-    survivor = "~/workspace/SURVIVOR/Debug/SURVIVOR simreads "
     command = survivor + sequenced_genome_path + " " + error_profile + " " + str(coverage) + " " \
               + reads1
+    print("Command:", command)
 
-    os.system(command + " >/dev/null 2>&1")
+    if OS_is_MSWIN:
+        os.system(command)
+    else:
+        os.system(command + " >/dev/null 2>&1")
 
     print("\tinserting into db...")
     inserter = ReadInserter(database, name, ref_pack)
@@ -136,7 +155,8 @@ def no_svs(pack, database, json_info_file):
 #       def create_reads_func(sequenced_genome_pack, sequenced_genome_path, database, reads_folder,
 #                             json_info_file, coverage, name)
 #
-def create_dataset(reference_path, dataset_name, create_svs_funcs,
+def create_dataset(reference_path, # dir with reference 
+                   dataset_name, create_svs_funcs,
                    create_reads_funcs, coverages, chromosome=None):
     ref_pack = Pack()
     ref_pack.load(reference_path + "/ma/genome")
@@ -148,11 +168,11 @@ def create_dataset(reference_path, dataset_name, create_svs_funcs,
         print("startindex, endindex: ", ref_pack.start_of_sequence_id(idx), 
                                       ref_pack.start_of_sequence_id(idx) + ref_pack.length_of_sequence(chromosome))
 
-    os.mkdir("/MAdata/sv_datasets/" + dataset_name) # this throws an error if the dataset already exists
-    os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/reads")
-    os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/genomes")
-    os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/alignments")
-    os.mkdir("/MAdata/sv_datasets/" + dataset_name + "/calls")
+    os.mkdir(svdb_dir + dataset_name) # this throws an error if the dataset already exists
+    os.mkdir(svdb_dir + dataset_name + "/reads")
+    os.mkdir(svdb_dir + dataset_name + "/genomes")
+    os.mkdir(svdb_dir + dataset_name + "/alignments")
+    os.mkdir(svdb_dir + dataset_name + "/calls")
 
     json_info_file = {
         "reference_path": reference_path,
@@ -164,11 +184,11 @@ def create_dataset(reference_path, dataset_name, create_svs_funcs,
     start = time.time()
 
     # create the sv_db
-    database = SV_DB("/MAdata/sv_datasets/" + dataset_name + "/svs.db", "create")
+    database = SV_DB(svdb_dir + dataset_name + "/svs.db", "create")
     print(time.time() - start, "seconds")
 
     for create_svs_func, sv_func_name, create_svs_funcs_params in create_svs_funcs:
-        seq_gen_path = "/MAdata/sv_datasets/" + dataset_name + "/genomes/sequenced_genome_" + sv_func_name
+        seq_gen_path = svdb_dir + dataset_name + "/genomes/sequenced_genome_" + sv_func_name
         print("creating", sv_func_name, "dataset ...")
         start = time.time()
         # create the svs
@@ -244,14 +264,14 @@ def create_dataset(reference_path, dataset_name, create_svs_funcs,
                     "coverage": coverage
                 }
                 create_reads_func(seq_pack, ref_pack, seq_gen_path + ".fasta",
-                                database, "/MAdata/sv_datasets/" + dataset_name + "/reads/", json_info_file_sub,
+                                database, svdb_dir + dataset_name + "/reads/", json_info_file_sub,
                                 coverage, name_c, *create_reads_args)
                 json_info_file_dataset_sub["create_reads_funcs"].append(json_info_file_sub)
         json_info_file["datasets"].append(json_info_file_dataset_sub)
         print(time.time() - start, "seconds")
 
     # save the info.json file
-    with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "w") as json_out:
+    with open(svdb_dir + dataset_name + "/info.json", "w") as json_out:
         json.dump(json_info_file, json_out)
 
     print("done creating dataset:")
@@ -259,10 +279,10 @@ def create_dataset(reference_path, dataset_name, create_svs_funcs,
 
 
 if __name__ == "__main__":
-    survivor_error_profile_pac_b = "~/workspace/SURVIVOR/HG002_Pac_error_profile_bwa.txt"
-    survivor_error_profile_ont = "~/workspace/SURVIVOR/NA12878_nano_error_profile_bwa.txt"
+    survivor_error_profile_pac_b = survivor_error_profile_dir + "HG002_Pac_error_profile_bwa.txt"
+    survivor_error_profile_ont = survivor_error_profile_dir + "NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset("/MAdata/genome/human/GRCh38.p12-chr1",
+    create_dataset(genome_dir,
                    "minimal-2",
                    [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 100, 500 ) ),],
                    [(create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
