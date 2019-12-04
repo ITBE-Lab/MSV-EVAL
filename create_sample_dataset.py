@@ -15,18 +15,18 @@ global_prefix = "C:/MAdata/"
 
 # AKFIX
 """Markus @ Zeus""" 
-# svdb_dir = "/MAdata/sv_datasets/" # AKFIX
-# survivor = "~/workspace/SURVIVOR/Debug/SURVIVOR simreads "  
-# genome_dir = "/MAdata/genome/human/GRCh38.p12-chr1"
-# survivor_error_profile_dir = "~/workspace/SURVIVOR/"
-# OS_is_MSWIN = False
+svdb_dir = "/MAdata/sv_datasets/" # AKFIX
+survivor = "~/workspace/SURVIVOR/Debug/SURVIVOR simreads "  
+genome_dir = "/MAdata/genome/human/GRCh38.p12-chr1"
+survivor_error_profile_dir = "~/workspace/SURVIVOR/"
+OS_is_MSWIN = False
 
 """Arne @ home """
-survivor = global_prefix + "tools/Survivor.exe simreads " # Arne @ desktop at home
-svdb_dir = global_prefix + "sv_datasets/" 
-genome_dir = global_prefix + "genome/GRCh38.p12-chr1"
-survivor_error_profile_dir = global_prefix + "tools/"
-OS_is_MSWIN = True
+# survivor = global_prefix + "tools/Survivor.exe simreads " # Arne @ desktop at home
+# svdb_dir = global_prefix + "sv_datasets/" 
+# genome_dir = global_prefix + "genome/GRCh38.p12-chr1"
+# survivor_error_profile_dir = global_prefix + "tools/"
+# OS_is_MSWIN = True
 
 
 def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_genome_path, database, reads_folder,
@@ -65,11 +65,7 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_geno
     print("\tinserting into db...")
     inserter = ReadInserter(database, name, ref_pack)
     json_info_file["seq_id"] = inserter.sequencer_id
-    f_path_vec = None
-    if OS_is_MSWIN:
-        f_path_vec = libMA.filePathVector([libMA.path(reads1)], [libMA.path(reads2)])
-    else:
-        f_path_vec = [libMA.path(reads1)], [libMA.path(reads2)]
+    f_path_vec = libMA.filePathVector([libMA.path(reads1)], [libMA.path(reads2)])
     inserter.insert_paired_fasta_files(ParameterSetManager(), OS_is_MSWIN)
     print("\tdone")
 
@@ -92,11 +88,7 @@ def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path
     print("\tinserting into db...")
     inserter = ReadInserter(database, name, ref_pack)
     json_info_file["seq_id"] = inserter.sequencer_id
-    f_path_vec = None
-    if OS_is_MSWIN:
-        f_path_vec = libMA.filePathVector([libMA.path(reads1)])
-    else:
-        f_path_vec = [libMA.path(reads1)]
+    f_path_vec = libMA.filePathVector([libMA.path(reads1)])
     inserter.insert_fasta_files(ParameterSetManager(), f_path_vec)
     print("\tdone")
 
@@ -295,7 +287,7 @@ if __name__ == "__main__":
     survivor_error_profile_ont = survivor_error_profile_dir + "NA12878_nano_error_profile_bwa.txt"
 
     create_dataset(genome_dir,
-                   "minimal-2",
+                   "minimal-3",
                    [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 100, 500 ) ),],
                    [(create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
                    [25])
@@ -320,11 +312,10 @@ if __name__ == "__main__":
 
     #chrom = "CM000679.2" # Chromosome 17
     #create_dataset("/MAdata/genome/human/GRCh38.p12",
-    #               "del_human-17",
-    #               [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 50000, chrom ) ),],
-    #               [(create_illumina_reads_dwgsim, "ill_250", (250,))],
-    #               [10],
-    #               chrom)
+    #               "del_human",
+    #               [( separate_svs, "del-100", ( (sv_deletion, tuple()), 100, 500 ) ),],
+    #               [(create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+    #               [25])
 
     #for prefix, func in [ ("del", sv_deletion), ("ins", sv_insertion), ("dup",sv_duplication), ("inv", sv_inversion) ]:
     #    chrom = "CM000663.2" # Chromosome 1

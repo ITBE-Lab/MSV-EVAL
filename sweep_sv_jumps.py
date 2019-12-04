@@ -36,7 +36,7 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
         # graph for single reads
         for _ in range(parameter_set_manager.get_num_threads()):
             # in order to allow multithreading this module needs individual db connections for each thread
-            sweep1 = libMA.CompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, sequencer_ids[0])
+            sweep1 = libMA.CompleteBipartiteSubgraphSweep(parameter_set_manager, sv_db, pack, run_id, sequencer_ids[0])
             filter4 = libMA.FilterLowCoverageCalls(parameter_set_manager, sv_db, pack, sequencer_ids[0])
             sink = libMA.BufferedSvCallSink(parameter_set_manager, sv_db, sv_caller_run_id)
             filter3 = libMA.ConnectorPatternFilter(parameter_set_manager, sv_db)

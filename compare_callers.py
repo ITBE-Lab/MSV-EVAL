@@ -11,14 +11,15 @@ import datetime
 from bokeh.plotting import figure, show
 from bokeh.models.formatters import PrintfTickFormatter
 
-global_prefix = "C:/MAdata/"
 
 # Setup the appropriate environment
 """Markus @ Zeus""" 
-# svdb_dir = "/MAdata/sv_datasets/" # AKFIX
+global_prefix = "/MAdata/"
+svdb_dir = global_prefix + "sv_datasets/" # AKFIX
 
 """Arne @ home """
-svdb_dir = global_prefix + "sv_datasets/" 
+#global_prefix = "C:/MAdata/"
+# svdb_dir = global_prefix + "sv_datasets/" 
 
 def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, recompute_jumps=False):
     def bwa(read_set, sam_file_path):
@@ -92,8 +93,8 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
 
 
     alignment_calls = {
-        "create_reads_survivor": [], #mm2, ngmlr, pbmm2],
-        "create_illumina_reads_dwgsim": []#bwa, bowtie]
+        "create_reads_survivor": [mm2, ngmlr, pbmm2],
+        "create_illumina_reads_dwgsim": [bwa, bowtie]
     }
 
     with open(svdb_dir + dataset_name + "/runtimes.log", "a") as runtime_file:
@@ -748,7 +749,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("minimal-2", True, True)
+    analyze_sample_dataset("minimal-3", True, True)
     #analyze_sample_dataset("del_human", True)
     #analyze_sample_dataset("inv_human", True)
     #analyze_sample_dataset("dup_human", True)
