@@ -28,6 +28,7 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
         filter1 = libMA.FilterLowSupportShortCalls(parameter_set_manager)
         filter2 = libMA.FilterFuzzyCalls(parameter_set_manager)
         filter5 = libMA.FilterDiagonalLineCalls(parameter_set_manager)
+        call_ambiguity = libMA.ComputeCallAmbiguity(parameter_set_manager)
         assert len(sequencer_ids) == 1
 
         res = VectorPledge()
@@ -44,20 +45,20 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
 
             section_pledge = promise_me(lock_module, sections_pledge)
             sweep1_pledge = promise_me(sweep1, section_pledge)
-            analyze.register("[0] CompleteBipartiteSubgraphSweep", sweep1_pledge)
-            analyze.register("[0.1] CompleteBipartiteSubgraphSweep::init", sweep1, lambda x: x.cpp_module.time_init)
-            analyze.register("[0.2] CompleteBipartiteSubgraphSweep::outer_while", sweep1,
+            analyze.register("CompleteBipartiteSubgraphSweep", sweep1_pledge)
+            analyze.register("CompleteBipartiteSubgraphSweep::init", sweep1, lambda x: x.cpp_module.time_init)
+            analyze.register("CompleteBipartiteSubgraphSweep::outer_while", sweep1,
                              lambda x: x.cpp_module.time_complete_while - x.cpp_module.time_inner_while)
-            analyze.register("[0.3] CompleteBipartiteSubgraphSweep::inner_while", sweep1,
+            analyze.register("CompleteBipartiteSubgraphSweep::inner_while", sweep1,
                              lambda x: x.cpp_module.time_inner_while)
             sweep2_pledge = promise_me(sweep2, sweep1_pledge)
-            analyze.register("[1] ExactCompleteBipartiteSubgraphSweep", sweep2_pledge)
+            analyze.register("ExactCompleteBipartiteSubgraphSweep", sweep2_pledge)
             #filters
 
             filter1_pledge = promise_me(filter1, sweep2_pledge)
-            analyze.register("[2] FilterLowSupportShortCalls", filter1_pledge)
+            analyze.register("FilterLowSupportShortCalls", filter1_pledge)
             filter2_pledge = promise_me(filter2, filter1_pledge)
-            analyze.register("[3] FilterFuzzyCalls", filter2_pledge)
+            analyze.register("FilterFuzzyCalls", filter2_pledge)
 
             #filter3_pledge = promise_me(filter3, filter2_pledge, pack_pledge) # this filter was off already
             #analyze.register("[4] ConnectorPatternFilter", filter3_pledge)
@@ -65,10 +66,13 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
             #analyze.register("[4] FilterLowCoverageCalls", filter3_pledge)
 
             filter3_pledge = promise_me(filter5, filter2_pledge)
-            analyze.register("[4] FilterDiagonalLineCalls", filter3_pledge)
+            analyze.register("FilterDiagonalLineCalls", filter3_pledge)
 
-            write_to_db_pledge = promise_me(sink, filter3_pledge)
-            analyze.register("[5] SvCallSink", write_to_db_pledge)
+            call_ambiguity_pledge = promise_me(call_ambiguity, filter3_pledge, pack_pledge)
+            analyze.register("ComputeCallAmbiguity", call_ambiguity_pledge)
+
+            write_to_db_pledge = promise_me(sink, call_ambiguity_pledge)
+            analyze.register("SvCallSink", write_to_db_pledge)
             unlock_pledge = promise_me(UnLock(parameter_set_manager, section_pledge), write_to_db_pledge)
             res.append(unlock_pledge)
 
@@ -91,24 +95,25 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
     num_combined = libMA.combine_overlapping_calls(parameter_set_manager, sv_db, sv_caller_run_id)
     end = datetime.datetime.now()
     delta = end - start
-    analyze.register("[6] combine_overlapping_calls", delta.total_seconds(), lambda x: x)
+    analyze.register("combine_overlapping_calls", delta.total_seconds(), lambda x: x)
     print("done overlapping; combined", num_combined, "calls")
 
-    print("computing coverage...")
-    start = datetime.datetime.now()
-    compute_coverage(parameter_set_manager, fm_index, pack, sv_db, sv_caller_run_id, sequencer_ids)
-    end = datetime.datetime.now()
-    delta = end - start
-    analyze.register("[7] compute_coverage", delta.total_seconds(), lambda x: x)
-    print("done computing coverage")
+    if False:
+        print("computing coverage...")
+        start = datetime.datetime.now()
+        compute_coverage(parameter_set_manager, fm_index, pack, sv_db, sv_caller_run_id, sequencer_ids)
+        end = datetime.datetime.now()
+        delta = end - start
+        analyze.register("compute_coverage", delta.total_seconds(), lambda x: x)
+        print("done computing coverage")
 
-    print("computing coverage index...")
+    print("computing score index...")
     start = datetime.datetime.now()
     sv_db.add_score_index(sv_caller_run_id)
     end = datetime.datetime.now()
     delta = end - start
-    analyze.register("[8] compute_coverage_index", delta.total_seconds(), lambda x: x)
-    print("done computing coverage index")
+    analyze.register("compute_score_index", delta.total_seconds(), lambda x: x)
+    print("done computing score index")
 
     analyze.analyze(out_file)
     if not out_file is None:

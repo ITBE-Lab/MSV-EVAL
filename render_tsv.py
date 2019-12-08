@@ -369,4 +369,4 @@ def render_from_tsv(dataset_name):
     render_from_list(tsv_list, json_dict, dataset_name)
 
 if __name__ == "__main__":
-    render_from_tsv("minimal-z")
+    render_from_tsv("minimal-2")
