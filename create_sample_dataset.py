@@ -17,7 +17,7 @@ global_prefix = "C:/MAdata/"
 """Markus @ Zeus""" 
 svdb_dir = "/MAdata/sv_datasets/" # AKFIX
 survivor = "~/workspace/SURVIVOR/Debug/SURVIVOR simreads "  
-genome_dir = "/MAdata/genome/human/GRCh38.p12-chr1"
+genome_dir = "/MAdata/genome/human"
 survivor_error_profile_dir = "~/workspace/SURVIVOR/"
 OS_is_MSWIN = False
 
@@ -65,8 +65,9 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_geno
     print("\tinserting into db...")
     inserter = ReadInserter(database, name, ref_pack)
     json_info_file["seq_id"] = inserter.sequencer_id
-    f_path_vec = libMA.filePathVector([libMA.path(reads1)], [libMA.path(reads2)])
-    inserter.insert_paired_fasta_files(ParameterSetManager(), OS_is_MSWIN)
+    f_path_vec_1 = libMA.filePathVector([libMA.path(reads1)])
+    f_path_vec_2 = libMA.filePathVector([libMA.path(reads2)])
+    inserter.insert_paired_fasta_files(ParameterSetManager(), f_path_vec_1, f_path_vec_2)
     print("\tdone")
 
 def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path, database, reads_folder, 
@@ -93,29 +94,29 @@ def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path
     print("\tdone")
 
 def sv_deletion(sv_inserter, position, sv_size):
-    sv_inserter.insert_call(SvCall(position, position + sv_size, 1, 1, False, supporting_nt, coverage))
+    sv_inserter.insert_call(SvCall(position, position + sv_size, 0, 0, False, supporting_nt, coverage))
 
 def sv_duplication(sv_inserter, position, sv_size):
-    sv_inserter.insert_call(SvCall(position + sv_size, position, 1, 1, False, supporting_nt, coverage))
+    sv_inserter.insert_call(SvCall(position + sv_size, position, 0, 0, False, supporting_nt, coverage))
 
 def sv_inversion(sv_inserter, position, sv_size):
-    sv_inserter.insert_call(SvCall(position + sv_size, position, 1, 1, True, supporting_nt, coverage))
-    sv_inserter.insert_call(SvCall(position, position + sv_size, 1, 1, True, supporting_nt, coverage))
+    sv_inserter.insert_call(SvCall(position + sv_size, position, 0, 0, True, supporting_nt, coverage))
+    sv_inserter.insert_call(SvCall(position, position + sv_size, 0, 0, True, supporting_nt, coverage))
 
 def sv_translocation(sv_inserter, position, sv_size, gap_size):
     assert gap_size < sv_size # sanity check
-    assert gap_size > 30 # otherwise (1) & (2) combine & we need a special case for that
+    assert gap_size > 10 # otherwise (1) & (2) combine & we need a special case for that
     start_a = position
     end_a = position + int((sv_size - gap_size) / 2)
     start_b = end_a + gap_size
     end_b = position + sv_size
-    sv_inserter.insert_call(SvCall(start_a, start_b, 1, 1, False, supporting_nt, coverage))
-    sv_inserter.insert_call(SvCall(end_b, end_a, 1, 1, False, supporting_nt, coverage)) # (1)
-    sv_inserter.insert_call(SvCall(start_b - 1, start_a + 1, 1, 1, False, supporting_nt, coverage)) # (2)
-    sv_inserter.insert_call(SvCall(end_a - 1, end_b + 1, 1, 1, False, supporting_nt, coverage))
+    sv_inserter.insert_call(SvCall(start_a, start_b, 0, 0, False, supporting_nt, coverage))
+    sv_inserter.insert_call(SvCall(end_b, end_a, 0, 0, False, supporting_nt, coverage)) # (1)
+    sv_inserter.insert_call(SvCall(start_b - 1, start_a + 1, 0, 0, False, supporting_nt, coverage)) # (2)
+    sv_inserter.insert_call(SvCall(end_a - 1, end_b + 1, 0, 0, False, supporting_nt, coverage))
 
 def sv_insertion(sv_inserter, position, sv_size):
-    call = SvCall(position, position + 1, 1, 1, False, supporting_nt, coverage)
+    call = SvCall(position, position + 1, 0, 0, False, supporting_nt, coverage)
 
     ins = ""
     for _ in range(sv_size):
@@ -286,15 +287,27 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = survivor_error_profile_dir + "HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = survivor_error_profile_dir + "NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset(genome_dir,
-                   "minimal-2",
-                   [( separate_svs, "del-1000", ( (sv_deletion, tuple()), 100, 500 ) ),],
-                   [(create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
-                   [25])
+    create_dataset(genome_dir + "/GRCh38.p12-chr1",
+                   "minimal",
+                   [
+                    #( separate_svs, "del-0250", ( (sv_deletion, tuple()), 250, 1000 ) ),
+                    ( separate_svs, "inv-0250", ( (sv_inversion, tuple()), 250, 1000 ) ),
+                    #( separate_svs, "dup-0250", ( (sv_duplication, tuple()), 250, 1000 ) ),
+                    #( separate_svs, "trans-0250", ( (sv_translocation, (50,)), 250, 1000 ) ),
+                    #( separate_svs, "ins-0250", ( (sv_insertion, tuple()), 250, 1000 ) ),
+                    ],
+                   [(create_illumina_reads_dwgsim, "ill_250", (250,)),
+                    (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+                   [5, 10])
 
-    #create_dataset("/MAdata/genome/random_10_pow_6",
-    #               "comprehensive_random",
-    #               [( separate_svs, "del-0250", ( (sv_deletion, tuple()), 250, 1000 ) ),
+    #create_dataset(genome_dir + "/GRCh38.p12-chr1",
+    #               "minimal-comprehensive",
+    #               [( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 500 ) ),
+    #                ( separate_svs, "inv-0100", ( (sv_inversion, tuple()), 100, 500 ) ),
+    #                ( separate_svs, "dup-0100", ( (sv_duplication, tuple()), 100, 500 ) ),
+    #                ( separate_svs, "trans-0100", ( (sv_translocation, (25,)), 100, 500 ) ),
+    #                ( separate_svs, "ins-0100", ( (sv_insertion, tuple()), 100, 500 ) ),
+    #                ( separate_svs, "del-0250", ( (sv_deletion, tuple()), 250, 1000 ) ),
     #                ( separate_svs, "inv-0250", ( (sv_inversion, tuple()), 250, 1000 ) ),
     #                ( separate_svs, "dup-0250", ( (sv_duplication, tuple()), 250, 1000 ) ),
     #                ( separate_svs, "trans-0250", ( (sv_translocation, (50,)), 250, 1000 ) ),
@@ -307,7 +320,9 @@ if __name__ == "__main__":
     #               [(create_illumina_reads_dwgsim, "ill_250", (250,)),
     #                (create_illumina_reads_dwgsim, "ill_150", (150,)),
     #                (create_illumina_reads_dwgsim, "ill_100", (100,)),
-    #                (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb"))],
+    #                (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb")),
+    #                #(create_reads_survivor, "ont", (survivor_error_profile_ont, "ont"))
+    #                ],
     #               [5, 10, 25])
 
     #chrom = "CM000679.2" # Chromosome 17

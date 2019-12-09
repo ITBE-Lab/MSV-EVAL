@@ -9,6 +9,7 @@ import json
 from MA import SV_DB, ParameterSetManager
 from sweep_sv_jumps import sv_jumps_to_dict
 from bokeh.models import Legend
+import math
 
 def light_spec_approximation(x):
     #map input [0, 1] to wavelength [350, 645]
@@ -290,7 +291,7 @@ def render_from_list(tsv_list, json_dict, dataset_name, plot_category=(0,0), plo
             for (seq_name, cov), auc in data_2.items():
                 xs.append(str(seq_name) + " " + str(cov))
                 ys.append(str(sv_name))
-                cs.append(format(light_spec_approximation(auc)))
+                cs.append( format( light_spec_approximation( 1 - math.log10((1-auc)*10+1) / math.log10(11) ) ) )
                 ds.append(str(round(auc * 100, 2)) + "%")
         TOOLTIPS = [
             ("dataset:", "@ys, @xs"),
@@ -369,4 +370,4 @@ def render_from_tsv(dataset_name):
     render_from_list(tsv_list, json_dict, dataset_name)
 
 if __name__ == "__main__":
-    render_from_tsv("minimal-2")
+    render_from_tsv("minimal")

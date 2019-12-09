@@ -10,7 +10,7 @@ from printColumns import print_columns
 import datetime
 from bokeh.plotting import figure, show
 from bokeh.models.formatters import PrintfTickFormatter
-
+import vcf_interpreters
 
 # Setup the appropriate environment
 """Markus @ Zeus""" 
@@ -149,8 +149,9 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
 
 def vcf_parser(file_name):
     class VCFFile:
-        def __init__(self, d):
+        def __init__(self, d, names):
             self.data = d
+            self.names = names
 
         def __getitem__(self, name):
             if not name in self.data:
@@ -181,180 +182,33 @@ def vcf_parser(file_name):
                 for name, field in zip(names, line.split("\t")):
                     if name == "INFO":
                         d2 = {}
+                        keys = []
                         for key_value in field.split(";"):
                             if "=" in key_value:
                                 key, value = key_value.split("=")
+                                keys.append(key)
                                 d2[key] = value
                             else:
                                 d2[key_value] = True
-                        d[name] = VCFFile(d2)
+                        d[name] = VCFFile(d2, keys)
                     else:
                         d[name] = field
-                yield VCFFile(d)
+                yield VCFFile(d, names)
 
-def vcf_to_db(name, desc, sv_db, file_name, pack, error_file=None, create_sv_func=None):
+def vcf_to_db(name, desc, sv_db, file_name, pack, vcf_interpreter, error_file=None, create_sv_func=None):
     call_inserter = SvCallInserter(sv_db, name, desc, -1) # -1 since there are no related sv jumps...
-    def find_confidence(call):
-        if "coverage" in call["INFO"]:
-            return int(float(call["INFO"]["coverage"]) * 10)
-        if "RE" in call["INFO"]: # sniffles
-            return int(float(call["INFO"]["RE"]))
-        if "PE" in call["INFO"] and "SR" in call["INFO"]: # pbHoney
-            return int(call["INFO"]["PE"]) + int(call["INFO"]["SR"])
-        if "PE" in call["INFO"]: # pbHoney
-            return int(call["INFO"]["PE"])
-        if call["QUAL"] != ".": # vcf...
-            return int(float(call["QUAL"]))
-        return 0
-    def find_std_from_std_to(call):
-        std_from = None
-        std_to = None
-        if "STD_quant_start" in call["INFO"]:
-            std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
-        if "CIPOS" in call["INFO"]: # delly
-            x = call["INFO"]["CIPOS"].split(",")
-            std_from = math.ceil(float(x[1]) - float(x[0]))
-        if "STD_quant_stop" in call["INFO"]:
-            std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
-        if "CIEND" in call["INFO"]: # delly
-            x = call["INFO"]["CIEND"].split(",")
-            std_to = math.ceil(float(x[1]) - float(x[0]))
-        return std_from, std_to
     num_calls = 0
-    bnd_mate_dict = {}
     for call in vcf_parser(file_name):
         num_calls += 1
-        try:
-            if call["FILTER"] != "PASS": # @todo verify that this is correct
-                continue
-            #print("quality:", find_confidence(call))
-            if call["TYPE"] == "DEL":
-                #print(call)
-                from_pos = int(call["START"]) + pack.start_of_sequence(call["CHROM"])
-                to_pos = int(call["END"]) + pack.start_of_sequence(call["CHROM"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call), 1))
-            elif call["ALT"] == "<DEL>" and "PRECISE" in call["INFO"]:
-                #print(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call), 1))
-            elif call["ALT"] == "<DEL>" and "IMPRECISE" in call["INFO"]:
-                #print(call)
-                std_from, std_to = find_std_from_std_to(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
-                if "CHR2" in call["INFO"]:
-                    to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
-                else:
-                    to_pos = from_pos - int(call["INFO"]["SVLEN"]) - int(std_to/2)
-                call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
-            elif call["ALT"] == "<DUP>" and "PRECISE" in call["INFO"]:
-                #print(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, find_confidence(call), 1))
-            elif call["ALT"] == "<DUP>" and "IMPRECISE" in call["INFO"]:
-                #print(call)
-                std_from, std_to = find_std_from_std_to(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
-                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
-                call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
-            elif call["ALT"] == "<DUP>": # pbsv
-                #print(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                to_pos = from_pos + int(call["INFO"]["SVLEN"])
-                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, find_confidence(call), 1))
-            elif call["ALT"] == "<INS>" and "PRECISE" in call["INFO"]:
-                #print(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, find_confidence(call), 1))
-            elif call["TYPE"] == "INS":
-                #print(call)
-                from_pos = int(call["START"]) + pack.start_of_sequence(call["CHROM"])
-                call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, find_confidence(call), 1))
-            elif call["ALT"] == "<INS>" and "IMPRECISE" in call["INFO"]:
-                #print(call)
-                from_start = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                from_end = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(from_start, from_start, from_end - from_start,
-                                                    from_end - from_start, False, find_confidence(call), 1))
-            elif call["INFO"]["SVTYPE"] == "INS": #pbsv
-                #print(call)
-                from_start = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                call_inserter.insert_call(SvCall(from_start, from_start, 1, 1, False, find_confidence(call), 1))
-            elif call["ALT"] == "<INV>" and "PRECISE" in call["INFO"]:
-                #print(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, True, find_confidence(call), 1))
-                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, True, find_confidence(call), 1))
-            elif call["ALT"] == "<INV>" and "IMPRECISE" in call["INFO"]:
-                #print(call)
-                std_from, std_to = find_std_from_std_to(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
-                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
-                call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, to_pos, True, find_confidence(call), 1))
-                call_inserter.insert_call(SvCall(to_pos, from_pos, from_pos, to_pos, True, find_confidence(call), 1))
-            elif call["ALT"] == "<INV>": # pbsv
-                #print(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["CHROM"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, True, find_confidence(call), 1))
-                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, True, find_confidence(call), 1))
-            elif call["INFO"]["SVTYPE"] == "DEL": # Manta
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                to_pos = from_pos - int(call["INFO"]["SVLEN"])
-                call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call), 1))
-            elif call["INFO"]["SVTYPE"] == "DUP" and "IMPRECISE" in call["INFO"]: # Manta
-                std_from, std_to = find_std_from_std_to(call)
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
-                to_pos = from_pos + int(call["INFO"]["SVLEN"]) - int(std_to/2)
-                call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
-            elif call["INFO"]["SVTYPE"] == "DUP": # Manta
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                to_pos = from_pos + int(call["INFO"]["SVLEN"])
-                call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, find_confidence(call), 1))
-            elif call["INFO"]["SVTYPE"] == "BND" and "IMPRECISE" in call["INFO"]: # Manta
-                if call["INFO"]["MATEID"] in bnd_mate_dict:
-                    mate = bnd_mate_dict[call["INFO"]["MATEID"]]
-                    std_from, _ = find_std_from_std_to(mate)
-                    std_to, _ = find_std_from_std_to(call)
-                    from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"]) - int(std_from/2)
-                    to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_to/2)
-                    save_as_inversion = create_sv_func == "sv_inversion"
-                    call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, save_as_inversion,
-                                                     find_confidence(call), 1))
-                    call_inserter.insert_call(SvCall(from_pos, to_pos, std_to, std_from, save_as_inversion,
-                                                     find_confidence(call), 1))
-                    del bnd_mate_dict[call["INFO"]["MATEID"]]
-                else:
-                    bnd_mate_dict[call["ID"]] = call
-            else:
-                print("unrecognized sv:", call)
-                error_file.write("unrecognized sv: \n")
-                error_file.write(str(call))
-                error_file.write("\n\n\n")
-                #exit(0)
-        except Exception as e:
-            print("error while handeling sv:", call)
-            error_file.write("error while handeling sv: \n")
-            error_file.write(str(call))
-            error_file.write("\n")
-            error_file.write(str(e))
-            error_file.write(traceback.format_exc())
-            error_file.write("\n\n\n")
-    for key, value in bnd_mate_dict.items():
-        print("WARNING did not find mate for call", value)
-        error_file.write("WARNING did not find mate for call: \n")
-        error_file.write(str(value))
-        error_file.write("\n\n\n")
+        vcf_interpreter(call, call_inserter, pack, error_file)
     print("number of calls:", num_calls)
-    del call_inserter # trigger deconstructor
+    del call_inserter # trigger destructor
 
 def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
     def sniffles(bam_file, vcf_file):
         # threads: -t
         # Minimum number of reads that support a SV: -s
-        os.system("~/workspace/Sniffles/bin/sniffles-core-1.0.8/sniffles -t 32 -s 3 -m " + bam_file + " -v " + vcf_file
+        os.system("~/workspace/Sniffles/bin/sniffles-core-1.0.8/sniffles -t 32 -s 2 -m " + bam_file + " -v " + vcf_file
                   + " >/dev/null 2>&1")
 
     def pbHoney(bam_file, vcf_file):
@@ -432,6 +286,7 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                   vcf_file + ".svsig.gz " + vcf_file)
 
 
+    # @todo svim?
     sv_calls = {
         "bwa":    [delly, smoove, manta],
         "bowtie": [delly, smoove, manta],
@@ -439,6 +294,14 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
         "pbmm2":  [pbSv],
         "ngmlr":  [sniffles],
         "blasr":  [] #pbHoney @note the vcf file reading seems to be broken anyways
+    }
+
+    call_interpreters = {
+        "delly": vcf_interpreters.delly_interpreter,
+        "smoove": vcf_interpreters.default_vcf_interpreter,
+        "manta": vcf_interpreters.default_vcf_interpreter,
+        "sniffles": vcf_interpreters.sniffles_vcf_interpreter,
+        "pbSv": vcf_interpreters.pb_sv_interpreter
     }
 
     with open(svdb_dir + dataset_name + "/vcf_errors.log", "a") as error_file:
@@ -484,7 +347,7 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                                 print("caller did not create calls: ", read_set["name"], alignment, sv_call.__name__)
                                 continue
                             vcf_to_db(read_set["name"] + "-" + alignment + "-" + sv_call.__name__,
-                                    "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack, error_file,
+                                    "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack, call_interpreters[sv_call.__name__], error_file,
                                     dataset["sv_func"] if "sv_func" in dataset else None)
 
                         for sv_call in sv_calls[alignment]:
@@ -749,7 +612,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("minimal-2", True, True)
+    analyze_sample_dataset("minimal", True, True)
     #analyze_sample_dataset("del_human", True)
     #analyze_sample_dataset("inv_human", True)
     #analyze_sample_dataset("dup_human", True)
