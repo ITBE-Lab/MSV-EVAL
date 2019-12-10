@@ -2,9 +2,31 @@ from MA import *
 import math
 import traceback
 
+logged_errors = set()
+def log_error(call, error_file, interpreter_name, e=None):
+    # don't log an error twice
+    key = interpreter_name + call["ALT"]
+    if "SVTYPE" in call["INFO"]:
+        key = interpreter_name + call["INFO"]["SVTYPE"]
+    if key in logged_errors:
+        return
+    logged_errors.add(key)
+
+    print("unrecognized sv:", call)
+    error_file.write("============== unrecognized sv ==============\n")
+    error_file.write("in interpreter: " + interpreter_name + "\n")
+    error_file.write(str(call))
+    if not e is None:
+        error_file.write("\n")
+        error_file.write(str(e))
+        error_file.write(traceback.format_exc())
+    error_file.write("\n\n\n")
+
 bnd_mate_dict = {}
 def default_vcf_interpreter(call, call_inserter, pack, error_file):
     def find_confidence(call):
+        if call["FILTER"] != "PASS":
+            return 0
         if "coverage" in call["INFO"]:
             return int(float(call["INFO"]["coverage"]) * 10)
         if "RE" in call["INFO"]: # sniffles
@@ -133,69 +155,184 @@ def default_vcf_interpreter(call, call_inserter, pack, error_file):
             else:
                 bnd_mate_dict[call["ID"]] = call
         else:
-            print("unrecognized sv:", call)
-            error_file.write("unrecognized sv: \n")
-            error_file.write(str(call))
-            error_file.write("\n\n\n")
+            log_error(call, error_file, "default")
             #exit(0)
     except Exception as e:
-        print("error while handeling sv:", call)
-        error_file.write("error while handeling sv: \n")
-        error_file.write(str(call))
-        error_file.write("\n")
-        error_file.write(str(e))
-        error_file.write(traceback.format_exc())
-        error_file.write("\n\n\n")
+        log_error(call, error_file, "default", e)
 
-def sniffles_vcf_interpreter(call, call_inserter, pack, error_file):
-    if call["ALT"] == "<DEL>" and "PRECISE" in call["INFO"]:
-        #print(call)
+def sniffles_interpreter(call, call_inserter, pack, error_file):
+    def find_confidence(call):
+        if call["FILTER"] != "PASS":
+            return 0
+        return int(float(call["INFO"]["RE"]))
+
+    def find_from_and_to_pos(call):
         from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
         to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-        call_inserter.insert_call(SvCall(from_pos, to_pos, 0, 0, False, int(float(call["INFO"]["RE"])), 1))
-    elif call["ALT"] == "<DEL>" and "IMPRECISE" in call["INFO"]:
-        #print(call)
-        std_from, std_to = find_std_from_std_to(call)
-        from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
-        if "CHR2" in call["INFO"]:
-            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
-        else:
-            to_pos = from_pos - int(call["INFO"]["SVLEN"]) - int(std_to/2)
-        call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, int(float(call["INFO"]["RE"])), 1))
-    else:
-        print("unrecognized sv:", call)
+        return from_pos, to_pos
 
+    def find_std_from_std_to(call):
+        std_from = math.ceil(float(call["INFO"]["STD_quant_start"]))
+        std_to = math.ceil(float(call["INFO"]["STD_quant_stop"]))
+        return std_from, std_to
+
+    try:
+        from_pos, to_pos = find_from_and_to_pos(call)
+        if "PRECISE" in call["INFO"]:
+            std_from, std_to = (0, 0)
+        elif "IMPRECISE" in call["INFO"]:
+            std_from, std_to = find_std_from_std_to(call)
+            from_pos -= int(std_from/2)
+            to_pos -= int(std_to/2)
+        else:
+            raise Exception("found neither precise nor imprecise in INFO")
+
+        to_recognize = 1
+        if "/" in call["ALT"]:
+            to_recognize = 2
+        if "DEL" in call["ALT"]:
+            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
+            to_recognize -= 1
+        if "INV" in call["ALT"]:
+            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, True, find_confidence(call), 1))
+            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, True, find_confidence(call), 1))
+            to_recognize -= 1
+        if "INS" in call["ALT"]:
+            call_inserter.insert_call(SvCall(from_pos, from_pos + 1, std_from, std_from, False,
+                                      find_confidence(call), 1))
+            to_recognize -= 1
+        if "DUP" in call["ALT"]:
+            call_inserter.insert_call(SvCall(to_pos, from_pos, std_to, std_from, False, find_confidence(call), 1))
+            to_recognize -= 1
+        if "TRA" in call["ALT"]:
+            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
+            to_recognize -= 1
+
+        if to_recognize != 0:
+            raise Exception("could not classify call")
+    except Exception as e:
+        log_error(call, error_file, "sniffles", e)
+
+bnd_mate_dict_pb_sv = {}
 def pb_sv_interpreter(call, call_inserter, pack, error_file):
     def find_confidence(call):
-        idx = call["FORMAT"].split(":").index("SAC")
-        return sum([int(x) for x in call[call.names[-1]].split(":")[idx].split(",")])
-
-    if call["INFO"]["SVTYPE"] == "DEL":
+        if call["FILTER"] != "PASS":
+            return 0
+        if call.has_format("SAC"):
+            sac = call.from_format("SAC")
+            if "," in sac:
+                return sum([int(x) for x in sac.split(",")])
+            return int(sac)
+        elif call.has_format("DP"):
+            return int(call.from_format("DP"))
+        return 0
+    def find_from_and_to_pos(call):
         from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-        to_pos = from_pos - int(call["INFO"]["SVLEN"])
-        call_inserter.insert_call(SvCall(from_pos, to_pos, 0, 0, False, find_confidence(call), 1))
-    else:
-        print("unrecognized sv:", call)
+        if "END" in call["INFO"]:
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["CHROM"])
+        else:
+            to_pos = None
+        return from_pos, to_pos
+    def find_std_from(call):
+        std_from = call["INFO"]["CIPOS"].split(",")
+        return math.ceil(float(std_from[1]) - float(std_from[0]))
+
+    try:
+        from_pos, to_pos = find_from_and_to_pos(call)
+        if call["INFO"]["SVTYPE"] == "DEL":
+            call_inserter.insert_call(SvCall(from_pos, to_pos, 0, 0, False, find_confidence(call), 1))
+            return
+        if call["INFO"]["SVTYPE"] == "INS":
+            call_inserter.insert_call(SvCall(from_pos, from_pos + 1, 0, 0, False, find_confidence(call), 1))
+            return
+        if call["INFO"]["SVTYPE"] == "INV":
+            call_inserter.insert_call(SvCall(from_pos, to_pos, 0, 0, True, find_confidence(call), 1))
+            call_inserter.insert_call(SvCall(to_pos, from_pos, 0, 0, True, find_confidence(call), 1))
+            return
+        if call["INFO"]["SVTYPE"] == "DUP":
+            call_inserter.insert_call(SvCall(to_pos, from_pos, 0, 0, False, find_confidence(call), 1))
+            return
+        if call["INFO"]["SVTYPE"] == "BND":
+            if call["INFO"]["MATEID"] in bnd_mate_dict_pb_sv:
+                mate = bnd_mate_dict_pb_sv[call["INFO"]["MATEID"]]
+                std_from = find_std_from(call)
+                std_to = find_std_from(mate)
+                from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"]) - std_from//2
+                to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - std_to//2
+                call_inserter.insert_call(SvCall(from_pos, to_pos, from_pos, std_to, False, find_confidence(call), 1))
+                call_inserter.insert_call(SvCall(to_pos, from_pos, std_to, from_pos, False, find_confidence(mate), 1))
+                del bnd_mate_dict_pb_sv[call["INFO"]["MATEID"]]
+            else:
+                bnd_mate_dict_pb_sv[call["ID"]] = call
+            return
+        raise Exception("could not classify call")
+    except Exception as e:
+        log_error(call, error_file, "pb_sv", e)
 
 def delly_interpreter(call, call_inserter, pack, error_file):
     def find_confidence(call):
-        return int(call["INFO"]["PE"]) + int(call["INFO"]["SR"])
+        if call["FILTER"] != "PASS":
+            return 0
+        conf = 0
+        if "PE" in call["INFO"]:
+            conf += int(call["INFO"]["PE"])
+        if "SR" in call["INFO"]:
+            conf += int(call["INFO"]["SR"])
+        return conf
 
     def find_std_from_std_to(call):
         std_from = call["INFO"]["CIPOS"].split(",")
         std_to = call["INFO"]["CIEND"].split(",")
         return math.ceil(float(std_from[1]) - float(std_from[0])), math.ceil(float(std_to[1]) - float(std_to[0]))
 
-    if call["ALT"] == "<DEL>" and "PRECISE" in call["INFO"]:
-        #print(call)
-        from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-        to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-        call_inserter.insert_call(SvCall(from_pos, to_pos, 0, 0, False, find_confidence(call), 1))
-    elif call["ALT"] == "<DEL>" and "IMPRECISE" in call["INFO"]:
-        #print(call)
-        std_from, std_to = find_std_from_std_to(call)
-        from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
-        to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
-        call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
-    else:
-        print("unrecognized sv:", call)
+    def find_from_and_to_pos(call):
+        from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - 1
+        to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - 1
+        return from_pos, to_pos
+
+    try:
+        from_pos, to_pos = find_from_and_to_pos(call)
+        if "PRECISE" in call["INFO"]:
+            std_from, std_to = (0, 0)
+        elif "IMPRECISE" in call["INFO"]:
+            std_from, std_to = find_std_from_std_to(call)
+            from_pos -= int(std_from/2)
+            to_pos -= int(std_to/2)
+        else:
+            raise Exception("found neither precise nor imprecise in INFO")
+
+        if call["ALT"] == "<DEL>":
+            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
+            return
+        if call["ALT"] == "<INV>" and False:
+            from_pos, to_pos = find_from_and_to_pos(call)
+            # delly calls inversion twice once 3t3 once 5t5 (or heat to head and tail to tail) of reads
+            call_inserter.insert_call(SvCall(from_pos, to_pos, 0, 0, True, find_confidence(call), 1))
+            call_inserter.insert_call(SvCall(to_pos, from_pos, 0, 0, True, find_confidence(call), 1))
+            return
+        if call["ALT"] == "<INV>":
+            # delly calls inversion twice once 3t3 once 5t5 (or heat to head and tail to tail) of reads
+            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, True, find_confidence(call), 1))
+            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, True, find_confidence(call), 1))
+            return
+        if call["ALT"] == "<DUP>":
+            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            return
+        raise Exception("could not classify call")
+
+    except Exception as e:
+        log_error(call, error_file, "delly", e)
+
+def manta_interpreter(call, call_inserter, pack, error_file):
+    try:
+        raise Exception("could not classify call")
+
+    except Exception as e:
+        log_error(call, error_file, "manta", e)
+
+def smoove_interpreter(call, call_inserter, pack, error_file):
+    try:
+        raise Exception("could not classify call")
+
+    except Exception as e:
+        log_error(call, error_file, "smoove", e)

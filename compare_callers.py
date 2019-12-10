@@ -21,7 +21,7 @@ svdb_dir = global_prefix + "sv_datasets/" # AKFIX
 #global_prefix = "C:/MAdata/"
 # svdb_dir = global_prefix + "sv_datasets/" 
 
-def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, recompute_jumps=False):
+def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, recompute_jumps=False, run_ma=True):
     def bwa(read_set, sam_file_path):
         index_str = json_dict["reference_path"] + "/bwa/genome"
         os.system("~/workspace/bwa/bwa mem -R \"@RG\\tID:1\\tSM:" + read_set["name"] + "\" -t 32 " + index_str + " "
@@ -118,8 +118,9 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
                     runtime_file.write(str(datetime.datetime.now()) + " " + dataset_name + " ")
                     runtime_file.write(dataset["name"] + " " + read_set["name"] + " compute_sv_jumps")
                     runtime_file.write("\n")
-                    read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(params, fm_index, pack, db,
-                                                                            read_set["seq_id"], runtime_file)
+                    if run_ma:
+                        read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(params, fm_index, pack, db,
+                                                                                read_set["seq_id"], runtime_file)
                 for alignment_call in alignment_calls[read_set["func_name"]]:
                     sam_file_path = svdb_dir + dataset_name + "/alignments/" \
                                 + read_set["name"] + "-" + alignment_call.__name__
@@ -149,9 +150,11 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
 
 def vcf_parser(file_name):
     class VCFFile:
-        def __init__(self, d, names):
+        def __init__(self, d, names, layer, info):
             self.data = d
             self.names = names
+            self.layer = layer
+            self.info = info
 
         def __getitem__(self, name):
             if not name in self.data:
@@ -162,19 +165,33 @@ def vcf_parser(file_name):
             return name in self.data
 
         def __str__(self):
-            s = " {"
+            s = ""
+            for info_line in self.info:
+                s += info_line + "\n"
+            s += "{\n"
             for key, val in self.data.items():
-                s += str(key) + ": " + str(val) + "; "
-            return s + " }"
+                for _ in range(self.layer + 1):
+                    s += "\t"
+                s += str(key) + ": " + str(val) + "\n"
+            for _ in range(self.layer):
+                s += "\t"
+            return s + "}"
+
+        def from_format(self, key, value_list_idx=-1):
+            idx = self["FORMAT"].split(":").index(key)
+            return self[self.names[value_list_idx]].split(":")[idx]
+
+        def has_format(self, key):
+            return key in self["FORMAT"].split(":")
 
     with open(file_name, "r") as vcf_file:
         names = []
+        info = []
         for line in vcf_file:
             if line[-1] == "\n":
                 line = line[:-1]
             if line[:2] == "##":
-                pass
-                #info.append(line)
+                info.append(line)
             elif line[0] == "#":
                 names = line[1:].split("\t")
             else:
@@ -190,10 +207,10 @@ def vcf_parser(file_name):
                                 d2[key] = value
                             else:
                                 d2[key_value] = True
-                        d[name] = VCFFile(d2, keys)
+                        d[name] = VCFFile(d2, keys, 1, [])
                     else:
                         d[name] = field
-                yield VCFFile(d, names)
+                yield VCFFile(d, names, 0, info)
 
 def vcf_to_db(name, desc, sv_db, file_name, pack, vcf_interpreter, error_file=None, create_sv_func=None):
     call_inserter = SvCallInserter(sv_db, name, desc, -1) # -1 since there are no related sv jumps...
@@ -255,7 +272,7 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
         os.system("rm -r " + vcf_file + ".manta") # clean up folder
         os.system("python2 ~/workspace/manta/manta-1.5.0.centos6_x86_64/bin/configManta.py --referenceFasta " + json_dict["reference_path"] + "/fasta/genome.fna --bam " + bam_file + " --runDir " + vcf_file + ".manta" )
         # actually run manta
-        os.system("python2 " + vcf_file + ".manta/runWorkflow.py -j 32 -m local > /dev/null" )
+        os.system("python2 " + vcf_file + ".manta/runWorkflow.py -j 32 -m local > /dev/null 2&>1" )
 
         os.system("cp " + vcf_file + ".manta/results/variants/diploidSV.vcf.gz" + " " + vcf_file + ".gz")
         os.system("gunzip -f " + vcf_file + ".gz")
@@ -271,8 +288,8 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
             s = "docker run -v " + bam_folder + ":/bam_folder/ -v " + json_dict["reference_path"] + \
                 "/fasta:/genome_folder/ -v " + vcf_folder + \
                 ":/vcf_folder/ -it brentp/smoove smoove call -o /vcf_folder/ --name " + vcf_filename + \
-                " --noextrafilters --fasta /genome_folder/genome.fna -p 32 --genotype /bam_folder/" + bam_filename \
-                + " > /dev/null"
+                " --noextrafilters --fasta /genome_folder/genome.fna -p 32 -S 2 --genotype /bam_folder/" + \
+                bam_filename #+ " > /dev/null"
             #print(s)
             os.system( s )
         else:
@@ -298,9 +315,9 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
 
     call_interpreters = {
         "delly": vcf_interpreters.delly_interpreter,
-        "smoove": vcf_interpreters.default_vcf_interpreter,
-        "manta": vcf_interpreters.default_vcf_interpreter,
-        "sniffles": vcf_interpreters.sniffles_vcf_interpreter,
+        "smoove": vcf_interpreters.smoove_interpreter,
+        "manta": vcf_interpreters.manta_interpreter,
+        "sniffles": vcf_interpreters.sniffles_interpreter,
         "pbSv": vcf_interpreters.pb_sv_interpreter
     }
 
@@ -327,10 +344,11 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                     runtime_file.write(str(datetime.datetime.now()) + " " + dataset_name + " ")
                     runtime_file.write(dataset["name"] + " " + read_set["name"] + " sweep_sv_jumps_cpp")
                     runtime_file.write("\n")
-                    sweep_sv_jumps.sweep_sv_jumps_cpp(params, db, read_set["jump_id"], 
-                                                pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
-                                                "ground_truth=" + str(dataset["ground_truth"]), [read_set["seq_id"]], 
-                                                pack, fm_index, runtime_file)
+                    if "jump_id" in read_set:
+                        sweep_sv_jumps.sweep_sv_jumps_cpp(params, db, read_set["jump_id"], 
+                                                    pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
+                                                    "ground_truth=" + str(dataset["ground_truth"]),
+                                                    [read_set["seq_id"]], pack, fm_index, runtime_file)
                     # other callers
                     for alignment in read_set["alignments"]:
                         for sv_call in sv_calls[alignment]:
@@ -563,7 +581,7 @@ def compare_all_callers_against(sv_db, json_info_file, out_file_name=None, outfi
             json.dump(out_2, file_out)
 
 
-def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False, out_file_name=None):
+def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False, out_file_name=None, run_ma=True):
     # decode hook for the json that decodes lists dicts and floats properly
     def _decode(o):
         if isinstance(o, str):
@@ -591,7 +609,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         fm_index.load(json_info_file["reference_path"] + "/ma/genome")
 
         # create alignment files if they do not exist
-        create_alignments_if_necessary(dataset_name, json_info_file, db, pack, fm_index, recompute_jumps)
+        create_alignments_if_necessary(dataset_name, json_info_file, db, pack, fm_index, recompute_jumps, run_ma)
         # save the info.json file
         print(json_info_file)
         with open(svdb_dir + dataset_name + "/info.json", "w") as json_out:
@@ -612,7 +630,8 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("minimal", True, True)
+    analyze_sample_dataset("comprehensive", True, run_ma=False)
+    analyze_sample_dataset("comprehensive", True)
     #analyze_sample_dataset("del_human", True)
     #analyze_sample_dataset("inv_human", True)
     #analyze_sample_dataset("dup_human", True)
