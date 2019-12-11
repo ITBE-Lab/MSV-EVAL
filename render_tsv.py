@@ -1,4 +1,4 @@
-from bokeh.layouts import layout
+from bokeh.layouts import layout, column, grid
 from bokeh.plotting import figure, show, reset_output, ColumnDataSource
 from bokeh.models import Arrow, VeeHead, FactorRange, LabelSet
 from bokeh.palettes import Category20, Category10
@@ -154,8 +154,8 @@ def render_from_list(tsv_list, json_dict, dataset_name, plot_category=(0,0), plo
             #plot.y_range.range_padding = 0.1
             plot.xaxis.major_label_orientation = 1
             plot.xgrid.grid_line_color = None
-            plot.legend.location = "top_center"
-            plot.legend.orientation = "horizontal"
+            #plot.legend.location = "top_center"
+            #plot.legend.orientation = "horizontal"
             plots.append(plot)
 
 
@@ -204,7 +204,7 @@ def render_from_list(tsv_list, json_dict, dataset_name, plot_category=(0,0), plo
                         auc = get_auc(x_2, y_2)
                         if not aligner_name_disp in auc_mat:
                             auc_mat[aligner_name_disp] = {}
-                        sv_desc = name_1[0] + " " + str(name_1[1]) + "nt"
+                        sv_desc = (name_1[0], str(name_1[1]) + "nt")
                         if not sv_desc in auc_mat[aligner_name_disp]:
                             auc_mat[aligner_name_disp][sv_desc] = {}
                         auc_mat[aligner_name_disp][sv_desc][(*name_2, *name_3)] = auc
@@ -271,10 +271,10 @@ def render_from_list(tsv_list, json_dict, dataset_name, plot_category=(0,0), plo
     y_axis = []
     for aligner_name, data in auc_mat.items():
         for sv_name, data_2 in data.items():
-            if not str(sv_name) in y_axis:
-                y_axis.append(str(sv_name))
+            if not sv_name in y_axis:
+                y_axis.append(sv_name)
             for (seq_name, cov), auc in data_2.items():
-                n = str(seq_name) + " " + str(cov)
+                n = (str(seq_name), str(cov))
                 if not n in x_axis:
                     x_axis.append(n)
 
@@ -287,22 +287,29 @@ def render_from_list(tsv_list, json_dict, dataset_name, plot_category=(0,0), plo
         ys = []
         cs = []
         ds = []
+        ls = []
         for sv_name, data_2 in data.items():
             for (seq_name, cov), auc in data_2.items():
-                xs.append(str(seq_name) + " " + str(cov))
-                ys.append(str(sv_name))
+                xs.append((str(seq_name), str(cov)))
+                ys.append(sv_name)
                 cs.append( format( light_spec_approximation( 1 - math.log10((1-auc)*10+1) / math.log10(11) ) ) )
                 ds.append(str(round(auc * 100, 2)) + "%")
+                ls.append(str(int(auc * 100)))
         TOOLTIPS = [
             ("dataset:", "@ys, @xs"),
             ("AUC", "@desc"),
         ]
         plot = figure(title="AUC for " + aligner_name + " on " + dataset_name, toolbar_location=None,
-                      x_range=x_axis, y_range=y_axis,
-                      width=1000, height=300, tools="hover", tooltips=TOOLTIPS)
+                      x_range=FactorRange(*x_axis), y_range=FactorRange(*y_axis),
+                      width=1000, height=500, tools="hover", tooltips=TOOLTIPS)
         plot.rect("xs", "ys", color="cs", width=1, height=1, line_color="black", source=ColumnDataSource(data={
             "xs":xs, "ys":ys, "cs":cs, "desc":ds
         }))
+        labels = LabelSet(x='xs', y='ys', text='ls', text_align="center", text_baseline="middle",
+                          render_mode='canvas', source=ColumnDataSource(data={
+            "xs":xs, "ys":ys, "ls":ls
+        }))
+        plot.add_layout(labels)
         plot.xgrid.grid_line_color = None
         plot.ygrid.grid_line_color = None
         auc_plots.append(plot)
@@ -310,7 +317,7 @@ def render_from_list(tsv_list, json_dict, dataset_name, plot_category=(0,0), plo
     auc_plots.sort(key=lambda x: x.title.text)
 
     reset_output()
-    show(layout([[x, y] for x, y in zip(auc_plots[::2],auc_plots[1::2])]))
+    show(grid(auc_plots, ncols=2))
 
 
 def print_ground_truth(dataset_name):
