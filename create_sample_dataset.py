@@ -327,8 +327,6 @@ if __name__ == "__main__":
                     (create_reads_survivor, "ont", (survivor_error_profile_ont, "ont"))
                     ],
                    [5, 10, 25, 50])
-    analyze_sample_dataset("comprehensive", True, run_ma=False)
-    analyze_sample_dataset("comprehensive", True)
 
     #chrom = "CM000679.2" # Chromosome 17
     #create_dataset("/MAdata/genome/human/GRCh38.p12",

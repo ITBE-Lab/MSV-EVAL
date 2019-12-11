@@ -182,8 +182,14 @@ def sniffles_interpreter(call, call_inserter, pack, error_file):
             std_from, std_to = (0, 0)
         elif "IMPRECISE" in call["INFO"]:
             std_from, std_to = find_std_from_std_to(call)
-            from_pos -= int(std_from/2)
-            to_pos -= int(std_to/2)
+            #underflow protection
+            if from_pos < std_from//2:
+                std_from = from_pos//2
+            #underflow protection
+            if to_pos < std_to//2:
+                std_to = to_pos//2
+            from_pos -= std_from//2
+            to_pos -= std_to//2
         else:
             raise Exception("found neither precise nor imprecise in INFO")
 
@@ -252,6 +258,8 @@ def pb_sv_interpreter(call, call_inserter, pack, error_file):
         if call["INFO"]["SVTYPE"] == "DUP":
             call_inserter.insert_call(SvCall(to_pos, from_pos, 0, 0, False, find_confidence(call), 1))
             return
+        if call["INFO"]["SVTYPE"] == "cnv":
+            return
         if call["INFO"]["SVTYPE"] == "BND":
             if call["INFO"]["MATEID"] in bnd_mate_dict_pb_sv:
                 mate = bnd_mate_dict_pb_sv[call["INFO"]["MATEID"]]
@@ -296,6 +304,12 @@ def delly_interpreter(call, call_inserter, pack, error_file):
             std_from, std_to = (0, 0)
         elif "IMPRECISE" in call["INFO"]:
             std_from, std_to = find_std_from_std_to(call)
+            #underflow protection
+            if from_pos < std_from//2:
+                std_from = from_pos//2
+            #underflow protection
+            if to_pos < std_to//2:
+                std_to = to_pos//2
             from_pos -= int(std_from/2)
             to_pos -= int(std_to/2)
         else:
@@ -317,6 +331,13 @@ def delly_interpreter(call, call_inserter, pack, error_file):
             return
         if call["ALT"] == "<DUP>":
             call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            return
+        if call["ALT"] == "<INS>":
+            call_inserter.insert_call(SvCall(from_pos, from_pos + 1, std_from, std_to, False, find_confidence(call), 1))
+            return
+        if call["INFO"]["SVTYPE"] == "BND":
+            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert_call(SvCall(from_pos, to_pos, std_to, std_from, False, find_confidence(call), 1))
             return
         raise Exception("could not classify call")
 
