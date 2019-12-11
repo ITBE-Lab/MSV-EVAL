@@ -283,12 +283,15 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
             bam_folder = bam_file[:bam_file.rfind("/")]
             bam_filename = bam_file[bam_file.rfind("/")+1:]
             vcf_folder = vcf_file[:vcf_file.rfind("/")]
+            print(vcf_folder)
             os.system( "rm -f " + vcf_folder + "/*.disc.*" )
             vcf_filename = vcf_file[vcf_file.rfind("/")+1:]
+            # set: -e SMOOVE_KEEP_ALL=KEEP otherwise homozygous variants are discarded
             s = "docker run -v " + bam_folder + ":/bam_folder/ -v " + json_dict["reference_path"] + \
                 "/fasta:/genome_folder/ -v " + vcf_folder + \
-                ":/vcf_folder/ -it brentp/smoove smoove call -o /vcf_folder/ --name " + vcf_filename + \
-                " --noextrafilters --fasta /genome_folder/genome.fna -p 32 -S 2 --genotype /bam_folder/" + \
+                ":/vcf_folder/ -e SMOOVE_KEEP_ALL=KEEP -it brentp/smoove smoove call -o /vcf_folder/ --name " + \
+                vcf_filename + \
+                " --excludechroms dummy --fasta /genome_folder/genome.fna -p 32 -S 2 --genotype /bam_folder/" + \
                 bam_filename #+ " > /dev/null"
             #print(s)
             os.system( s )
@@ -296,6 +299,7 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
             os.system( "smoove call -o " + vcf_file + " --noextrafilters --fasta " + json_dict["reference_path"] 
                        + "/fasta/genome.fna -p 32 --genotype " + bam_file )
         os.system("gunzip -f " + vcf_file + "-smoove.genotyped.vcf.gz")
+        os.system("mv " + vcf_file + "-smoove.genotyped.vcf " + vcf_file)
 
     def pbSv(bam_file, vcf_file):
         os.system("~/miniconda2/bin/pbsv discover " + bam_file + " " + vcf_file + ".svsig.gz")
@@ -305,8 +309,8 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
 
     # @todo svim?
     sv_calls = {
-        "bwa":    [manta], # delly, smoove,
-        "bowtie": [manta], # delly, smoove,
+        "bwa":    [smoove], # delly, , manta
+        "bowtie": [smoove], # delly, , manta
         "mm2":    [sniffles],
         "pbmm2":  [pbSv],
         "ngmlr":  [sniffles],

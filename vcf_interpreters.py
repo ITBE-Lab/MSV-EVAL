@@ -385,6 +385,9 @@ def manta_interpreter(call, call_inserter, pack, error_file):
         if call["ALT"] == "<DUP:TANDEM>":
             call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
             return
+        if call["ALT"] == "<DUP>":
+            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            return
         if call["INFO"]["SVTYPE"] == "DEL":
             call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
             return
@@ -406,7 +409,61 @@ def manta_interpreter(call, call_inserter, pack, error_file):
         log_error(call, error_file, "manta", e)
 
 def smoove_interpreter(call, call_inserter, pack, error_file):
+    def find_confidence(call):
+        return int(float(call["QUAL"])*100)
+
+    def find_std_from_std_to(call):
+        std_from = call["INFO"]["CIPOS"].split(",")
+        if "CIEND" in call["INFO"]:
+            std_to = call["INFO"]["CIEND"].split(",")
+        else:
+            std_to = (0, 0)
+        return math.ceil(float(std_from[1]) - float(std_from[0])), math.ceil(float(std_to[1]) - float(std_to[0]))
+
+    def find_from_and_to_pos(call):
+        from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+        if "END" in call["INFO"]:
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["CHROM"])
+        else:
+            to_pos = 0
+        return from_pos, to_pos
+
     try:
+        from_pos, to_pos = find_from_and_to_pos(call)
+        if "IMPRECISE" in call["INFO"]:
+            std_from, std_to = find_std_from_std_to(call)
+            #underflow protection
+            if from_pos < std_from//2:
+                std_from = from_pos//2
+            #underflow protection
+            if to_pos < std_to//2:
+                std_to = to_pos//2
+            from_pos -= int(std_from/2)
+            to_pos -= int(std_to/2)
+        else:
+            std_from, std_to = (0, 0)
+
+        if call["ALT"] == "<DUP:TANDEM>":
+            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            return
+        if call["ALT"] == "<DUP>":
+            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            return
+        if call["INFO"]["SVTYPE"] == "DEL":
+            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
+            return
+        if call["INFO"]["SVTYPE"] == "BND":
+            if call["INFO"]["MATEID"] in bnd_mate_dict_manta:
+                mate = bnd_mate_dict_manta[call["INFO"]["MATEID"]]
+                std_from = find_std_from(call)
+                std_to = find_std_from(mate)
+                from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"]) - std_from//2
+                to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - std_to//2
+                call_inserter.insert_call(SvCall(from_pos, to_pos, from_pos, std_to, False, find_confidence(call), 1))
+                call_inserter.insert_call(SvCall(to_pos, from_pos, std_to, from_pos, False, find_confidence(mate), 1))
+                del bnd_mate_dict_manta[call["INFO"]["MATEID"]]
+            else:
+                bnd_mate_dict_manta[call["ID"]] = call
         raise Exception("could not classify call")
 
     except Exception as e:
