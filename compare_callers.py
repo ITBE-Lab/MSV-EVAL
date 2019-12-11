@@ -272,7 +272,7 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
         os.system("rm -r " + vcf_file + ".manta") # clean up folder
         os.system("python2 ~/workspace/manta/manta-1.5.0.centos6_x86_64/bin/configManta.py --referenceFasta " + json_dict["reference_path"] + "/fasta/genome.fna --bam " + bam_file + " --runDir " + vcf_file + ".manta" )
         # actually run manta
-        os.system("python2 " + vcf_file + ".manta/runWorkflow.py -j 32 -m local > /dev/null 2&>1" )
+        os.system("python2 " + vcf_file + ".manta/runWorkflow.py -j 32 -m local" )
 
         os.system("cp " + vcf_file + ".manta/results/variants/diploidSV.vcf.gz" + " " + vcf_file + ".gz")
         os.system("gunzip -f " + vcf_file + ".gz")
@@ -305,8 +305,8 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
 
     # @todo svim?
     sv_calls = {
-        "bwa":    [delly, smoove, manta],
-        "bowtie": [delly, smoove, manta],
+        "bwa":    [manta], # delly, smoove,
+        "bowtie": [manta], # delly, smoove,
         "mm2":    [sniffles],
         "pbmm2":  [pbSv],
         "ngmlr":  [sniffles],
@@ -630,13 +630,8 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("comprehensive", True, run_ma=False)
-    analyze_sample_dataset("comprehensive", True)
-    #analyze_sample_dataset("del_human", True)
-    #analyze_sample_dataset("inv_human", True)
-    #analyze_sample_dataset("dup_human", True)
-    #analyze_sample_dataset("ins_human", True)
-    #analyze_sample_dataset("tra_human", True)
-    #analyze_sample_dataset("minimal-2", True)
-    
+    analyze_sample_dataset("minimal", True, run_ma=False)
+
+    #analyze_sample_dataset("comprehensive", True)
+
     #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))
