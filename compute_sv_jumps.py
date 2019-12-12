@@ -44,7 +44,6 @@ def compute_sv_jumps(parameter_set_manager, fm_index, pack, sv_db, seq_id=0, run
     # drain all sources
     res.simultaneous_get( parameter_set_manager.get_num_threads() )
 
-    jumps_from_seeds.cpp_module.commit()
     for jump_to_db in jump_to_dbs:
         jump_to_db.cpp_module.commit()
 

@@ -62,8 +62,6 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
 
             #filter3_pledge = promise_me(filter3, filter2_pledge, pack_pledge) # this filter was off already
             #analyze.register("[4] ConnectorPatternFilter", filter3_pledge)
-            #filter3_pledge = promise_me(filter4, filter2_pledge, pack_pledge) # this filter was off already
-            #analyze.register("[4] FilterLowCoverageCalls", filter3_pledge)
 
             filter3_pledge = promise_me(filter5, filter2_pledge)
             analyze.register("FilterDiagonalLineCalls", filter3_pledge)
@@ -97,15 +95,6 @@ def sweep_sv_jumps_cpp(parameter_set_manager, sv_db, run_id, ref_size, name, des
     delta = end - start
     analyze.register("combine_overlapping_calls", delta.total_seconds(), lambda x: x)
     print("done overlapping; combined", num_combined, "calls")
-
-    if False:
-        print("computing coverage...")
-        start = datetime.datetime.now()
-        compute_coverage(parameter_set_manager, fm_index, pack, sv_db, sv_caller_run_id, sequencer_ids)
-        end = datetime.datetime.now()
-        delta = end - start
-        analyze.register("compute_coverage", delta.total_seconds(), lambda x: x)
-        print("done computing coverage")
 
     print("computing score index...")
     start = datetime.datetime.now()
