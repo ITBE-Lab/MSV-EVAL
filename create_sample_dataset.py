@@ -291,13 +291,13 @@ if __name__ == "__main__":
                    "minimal",
                    [
                     ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 5000 ) ),
-                    ( separate_svs, "inv-0100", ( (sv_inversion, tuple()), 100, 5000 ) ),
-                    ( separate_svs, "dup-1000", ( (sv_duplication, tuple()), 1000, 5000 ) ),
-                    ( separate_svs, "trans-1000", ( (sv_translocation, (200,)), 1000, 5000 ) ),
-                    ( separate_svs, "ins-0100", ( (sv_insertion, tuple()), 100, 5000 ) )
+                    #( separate_svs, "inv-0100", ( (sv_inversion, tuple()), 100, 5000 ) ),
+                    #( separate_svs, "dup-1000", ( (sv_duplication, tuple()), 1000, 5000 ) ),
+                    #( separate_svs, "trans-1000", ( (sv_translocation, (200,)), 1000, 5000 ) ),
+                    #( separate_svs, "ins-0100", ( (sv_insertion, tuple()), 100, 5000 ) )
                     ],
                    [(create_illumina_reads_dwgsim, "ill_250", (250,)),],
-                   [50])
+                   [500])
 
     #create_dataset(genome_dir + "/GRCh38.p12-chr1-large",
     #               "comprehensive",

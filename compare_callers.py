@@ -103,22 +103,22 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
                 if not "alignments" in read_set:
                     read_set["alignments"] = []
                 if not "jump_id" in read_set or recompute_jumps:
-                    print("computing jumps for MA-SV on", read_set["name"])
-                    params = ParameterSetManager()
-                    if read_set["func_name"] == "create_illumina_reads_dwgsim":
-                        params.set_selected("SV-Illumina")
-                    elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
-                        params.set_selected("SV-PacBio")
-                    elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
-                        params.set_selected("SV-ONT")
-                    else:
-                        print("WARNING: unknown read simulator - using default parameters for sv jumps")
-                    #params.by_name("Number of Threads").set(1)
-                    #params.by_name("Use all Processor Cores").set(False)
-                    runtime_file.write(str(datetime.datetime.now()) + " " + dataset_name + " ")
-                    runtime_file.write(dataset["name"] + " " + read_set["name"] + " compute_sv_jumps")
-                    runtime_file.write("\n")
                     if run_ma:
+                        print("computing jumps for MA-SV on", read_set["name"])
+                        params = ParameterSetManager()
+                        if read_set["func_name"] == "create_illumina_reads_dwgsim":
+                            params.set_selected("SV-Illumina")
+                        elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
+                            params.set_selected("SV-PacBio")
+                        elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
+                            params.set_selected("SV-ONT")
+                        else:
+                            print("WARNING: unknown read simulator - using default parameters for sv jumps")
+                        #params.by_name("Number of Threads").set(1)
+                        #params.by_name("Use all Processor Cores").set(False)
+                        runtime_file.write(str(datetime.datetime.now()) + " " + dataset_name + " ")
+                        runtime_file.write(dataset["name"] + " " + read_set["name"] + " compute_sv_jumps")
+                        runtime_file.write("\n")
                         read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(params, fm_index, pack, db,
                                                                                 read_set["seq_id"], runtime_file)
                 for alignment_call in alignment_calls[read_set["func_name"]]:
@@ -309,8 +309,8 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
 
     # @todo svim?
     sv_calls = {
-        "bwa":    [smoove], # delly, , manta
-        "bowtie": [smoove], # delly, , manta
+        "bwa":    [delly, manta], # smoove
+        "bowtie": [delly, manta], # smoove
         "mm2":    [sniffles],
         "pbmm2":  [pbSv],
         "ngmlr":  [sniffles],
