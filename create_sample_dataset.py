@@ -290,10 +290,11 @@ if __name__ == "__main__":
     create_dataset(genome_dir + "/GRCh38.p12",
                    "del_human",
                    [
-                    ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 5000 ) ),
+                    ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 50000 ) ),
                     ],
-                   [(create_illumina_reads_dwgsim, "ill_250", (250,)),],
-                   [5])
+                   [(create_illumina_reads_dwgsim, "ill_250", (250,)),
+                    (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb")),],
+                   [10])
 
     #create_dataset(genome_dir + "/GRCh38.p12-chr1-large",
     #               "comprehensive",
