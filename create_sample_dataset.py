@@ -287,13 +287,12 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = survivor_error_profile_dir + "HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = survivor_error_profile_dir + "NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset(genome_dir + "/GRCh38.p12",
-                   "del_human",
+    create_dataset(genome_dir + "/GRCh38.p12-chr1",
+                   "minimal",
                    [
-                    ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 50000 ) ),
+                    ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 1000 ) ),
                     ],
-                   [(create_illumina_reads_dwgsim, "ill_250", (250,)),
-                    (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb")),],
+                   [(create_illumina_reads_dwgsim, "ill_250", (250,)),],
                    [10])
 
     #create_dataset(genome_dir + "/GRCh38.p12-chr1-large",

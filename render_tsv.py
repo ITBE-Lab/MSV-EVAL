@@ -7,7 +7,6 @@ from bokeh.core.properties import value
 from create_json import create_json_from_db
 import json
 from MA import SV_DB, ParameterSetManager
-from sweep_sv_jumps import sv_jumps_to_dict
 from bokeh.models import Legend
 import math
 
@@ -377,4 +376,4 @@ def render_from_tsv(dataset_name):
     render_from_list(tsv_list, json_dict, dataset_name)
 
 if __name__ == "__main__":
-    render_from_tsv("minimal")
+    render_from_tsv("del_human")

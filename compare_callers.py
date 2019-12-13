@@ -2,8 +2,6 @@ from MA import *
 import math
 import os
 import json
-import compute_sv_jumps
-import sweep_sv_jumps
 import traceback
 from pathlib import Path
 from printColumns import print_columns
@@ -119,8 +117,8 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
                         runtime_file.write(str(datetime.datetime.now()) + " " + dataset_name + " ")
                         runtime_file.write(dataset["name"] + " " + read_set["name"] + " compute_sv_jumps")
                         runtime_file.write("\n")
-                        read_set["jump_id"] = compute_sv_jumps.compute_sv_jumps(params, fm_index, pack, db,
-                                                                                read_set["seq_id"], runtime_file)
+                        read_set["jump_id"] = compute_sv_jumps(params, fm_index, pack, db, read_set["seq_id"],
+                                                                runtime_file)
                 for alignment_call in alignment_calls[read_set["func_name"]]:
                     sam_file_path = svdb_dir + dataset_name + "/alignments/" \
                                 + read_set["name"] + "-" + alignment_call.__name__
@@ -349,10 +347,9 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                     runtime_file.write(dataset["name"] + " " + read_set["name"] + " sweep_sv_jumps_cpp")
                     runtime_file.write("\n")
                     if "jump_id" in read_set:
-                        sweep_sv_jumps.sweep_sv_jumps_cpp(params, db, read_set["jump_id"], 
-                                                    pack.unpacked_size_single_strand, read_set["name"] + "--" + "MA_SV",
-                                                    "ground_truth=" + str(dataset["ground_truth"]),
-                                                    [read_set["seq_id"]], pack, fm_index, runtime_file)
+                        sweep_sv_jumps(params, db, read_set["jump_id"], read_set["name"] + "--" + "MA_SV",
+                                           "ground_truth=" + str(dataset["ground_truth"]),
+                                           [read_set["seq_id"]], pack, runtime_file)
                     # other callers
                     for alignment in read_set["alignments"]:
                         for sv_call in sv_calls[alignment]:
@@ -634,7 +631,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("del_human")
+    analyze_sample_dataset("minimal")
 
     #analyze_sample_dataset("comprehensive", True)
 
