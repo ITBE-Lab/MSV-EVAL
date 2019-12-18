@@ -376,4 +376,4 @@ def render_from_tsv(dataset_name):
     render_from_list(tsv_list, json_dict, dataset_name)
 
 if __name__ == "__main__":
-    render_from_tsv("del_human")
+    render_from_tsv("del_human_depre")

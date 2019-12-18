@@ -13,7 +13,7 @@ import vcf_interpreters
 # Setup the appropriate environment
 """Markus @ Zeus""" 
 global_prefix = "/MAdata/"
-svdb_dir = global_prefix + "sv_datasets/" # AKFIX
+svdb_dir = global_prefix + "sv_datasets2/" # AKFIX
 
 """Arne @ home """
 #global_prefix = "C:/MAdata/"

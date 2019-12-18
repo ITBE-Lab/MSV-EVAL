@@ -15,7 +15,7 @@ global_prefix = "C:/MAdata/"
 
 # AKFIX
 """Markus @ Zeus""" 
-svdb_dir = "/MAdata/sv_datasets/" # AKFIX
+svdb_dir = "/MAdata/sv_datasets2/" # AKFIX
 survivor = "~/workspace/SURVIVOR/Debug/SURVIVOR simreads "  
 genome_dir = "/MAdata/genome/human"
 survivor_error_profile_dir = "~/workspace/SURVIVOR/"
@@ -293,7 +293,7 @@ if __name__ == "__main__":
                     ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 5000 ) ),
                     ],
                    [(create_illumina_reads_dwgsim, "ill_250", (250,)),],
-                   [25])
+                   [10])
 
     #create_dataset(genome_dir + "/GRCh38.p12-chr1-large",
     #               "comprehensive",
