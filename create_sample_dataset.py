@@ -7,6 +7,8 @@ import compare_callers
 import random
 import subprocess
 import random
+import shutil
+import sys
 
 supporting_nt = 10**6
 coverage = 1
@@ -16,6 +18,7 @@ global_prefix = "C:/MAdata/"
 # AKFIX
 """Markus @ Zeus""" 
 svdb_dir = "/MAdata/sv_datasets2/" # AKFIX
+sv_data_dir = "/MAdata/sv_datasets/" # AKFIX
 survivor = "~/workspace/SURVIVOR/Debug/SURVIVOR simreads "  
 genome_dir = "/MAdata/genome/human"
 survivor_error_profile_dir = "~/workspace/SURVIVOR/"
@@ -24,6 +27,7 @@ OS_is_MSWIN = False
 """Arne @ home """
 # survivor = global_prefix + "tools/Survivor.exe simreads " # Arne @ desktop at home
 # svdb_dir = global_prefix + "sv_datasets/" 
+# sv_data_dir = global_prefix + "sv_datasets/" 
 # genome_dir = global_prefix + "genome/GRCh38.p12-chr1"
 # survivor_error_profile_dir = global_prefix + "tools/"
 # OS_is_MSWIN = True
@@ -138,7 +142,8 @@ def separate_svs(pack, database, json_info_file, sv_func, sv_size, sv_margin, ch
 
     def x(s, l):
         for pos in range(s + sv_margin, s + l - sv_margin, sv_size + sv_margin):
-            sv_func[0](sv_inserter, pos, sv_size, *sv_func[1])
+            if pack.amount_of_region_covered_by_hole( pos, pos + sv_size ) == 0:
+                sv_func[0](sv_inserter, pos, sv_size, *sv_func[1])
     if chromosome is None:
         for s, l in zip(pack.contigStarts(), pack.contigLengths()):
             x(s, l)
@@ -163,6 +168,18 @@ def no_svs(pack, database, json_info_file):
 def create_dataset(reference_path, # dir with reference 
                    dataset_name, create_svs_funcs,
                    create_reads_funcs, coverages, chromosome=None):
+    if os.path.exists(svdb_dir + dataset_name) or os.path.exists(sv_data_dir + dataset_name):
+        print("WARNING dataset exists already, replace it? [y/n]")
+        for line in sys.stdin:
+            if line.strip() == "y":
+                if os.path.exists(svdb_dir + dataset_name):
+                    shutil.rmtree(svdb_dir + dataset_name)
+                if os.path.exists(sv_data_dir + dataset_name):
+                    shutil.rmtree(sv_data_dir + dataset_name)
+                break
+            print("aborting")
+            return
+
     ref_pack = Pack()
     ref_pack.load(reference_path + "/ma/genome")
     fm_index = FMIndex()
@@ -173,11 +190,13 @@ def create_dataset(reference_path, # dir with reference
         print("startindex, endindex: ", ref_pack.start_of_sequence_id(idx), 
                                       ref_pack.start_of_sequence_id(idx) + ref_pack.length_of_sequence(chromosome))
 
+
     os.mkdir(svdb_dir + dataset_name) # this throws an error if the dataset already exists
-    os.mkdir(svdb_dir + dataset_name + "/reads")
-    os.mkdir(svdb_dir + dataset_name + "/genomes")
-    os.mkdir(svdb_dir + dataset_name + "/alignments")
-    os.mkdir(svdb_dir + dataset_name + "/calls")
+    os.mkdir(sv_data_dir + dataset_name) # this throws an error if the dataset already exists
+    os.mkdir(sv_data_dir + dataset_name + "/reads")
+    os.mkdir(sv_data_dir + dataset_name + "/genomes")
+    os.mkdir(sv_data_dir + dataset_name + "/alignments")
+    os.mkdir(sv_data_dir + dataset_name + "/calls")
 
     json_info_file = {
         "reference_path": reference_path,
@@ -189,11 +208,11 @@ def create_dataset(reference_path, # dir with reference
     start = time.time()
 
     # create the sv_db
-    database = SV_DB(svdb_dir + dataset_name + "/svs.db", "create")
+    database = SV_DB(svdb_dir + dataset_name + "/svs.db", "create", True)
     print(time.time() - start, "seconds")
 
     for create_svs_func, sv_func_name, create_svs_funcs_params in create_svs_funcs:
-        seq_gen_path = svdb_dir + dataset_name + "/genomes/sequenced_genome_" + sv_func_name
+        seq_gen_path = sv_data_dir + dataset_name + "/genomes/sequenced_genome_" + sv_func_name
         print("creating", sv_func_name, "dataset ...")
         start = time.time()
         # create the svs
@@ -269,14 +288,14 @@ def create_dataset(reference_path, # dir with reference
                     "coverage": coverage
                 }
                 create_reads_func(seq_pack, ref_pack, seq_gen_path + ".fasta",
-                                database, svdb_dir + dataset_name + "/reads/", json_info_file_sub,
+                                database, sv_data_dir + dataset_name + "/reads/", json_info_file_sub,
                                 coverage, name_c, *create_reads_args)
                 json_info_file_dataset_sub["create_reads_funcs"].append(json_info_file_sub)
         json_info_file["datasets"].append(json_info_file_dataset_sub)
         print(time.time() - start, "seconds")
 
     # save the info.json file
-    with open(svdb_dir + dataset_name + "/info.json", "w") as json_out:
+    with open(sv_data_dir + dataset_name + "/info.json", "w") as json_out:
         json.dump(json_info_file, json_out)
 
     print("done creating dataset:")
@@ -287,8 +306,8 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = survivor_error_profile_dir + "HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = survivor_error_profile_dir + "NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset(genome_dir + "/GRCh38.p12",
-                   "del_human",
+    create_dataset(genome_dir + "/GRCh38.p12-chr1-large",
+                   "minimal",
                    [
                     ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 5000 ) ),
                     ],

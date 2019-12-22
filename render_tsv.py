@@ -10,6 +10,9 @@ from MA import SV_DB, ParameterSetManager
 from bokeh.models import Legend
 import math
 
+sv_data_dir = "/MAdata/sv_datasets/"
+sv_db_dir = "/MAdata/sv_datasets2/"
+
 def light_spec_approximation(x):
     #map input [0, 1] to wavelength [350, 645]
     w = 370 + x * (645-370)
@@ -335,9 +338,9 @@ def print_ground_truth(dataset_name):
             return o
     #actually open and load the info.json file
     json_info_file = None # noop
-    with open("/MAdata/sv_datasets/" + dataset_name + "/info.json", "r") as json_file:
+    with open(sv_data_dir + dataset_name + "/info.json", "r") as json_file:
         json_info_file = json.loads(json_file.read(), object_hook=_decode)
-    sv_db = SV_DB("/MAdata/sv_datasets/" + dataset_name + "/svs.db", "open")
+    sv_db = SV_DB(sv_db_dir + dataset_name + "/svs.db", "open")
     for dataset in json_info_file["datasets"]:
         id_b = dataset["ground_truth"]
         name_b = dataset["name"]
@@ -348,7 +351,7 @@ def render_from_tsv(dataset_name):
     print_ground_truth(dataset_name)
 
     tsv_list = []
-    with open("/MAdata/sv_datasets/" + dataset_name + "/bar_diagrams.tsv", "r") as tsv_file:
+    with open(sv_data_dir + dataset_name + "/bar_diagrams.tsv", "r") as tsv_file:
         for line in tsv_file:
             tsv_list.append(line.split("\t"))
     # decode hook for the json that decodes lists dicts and floats properly
@@ -366,7 +369,7 @@ def render_from_tsv(dataset_name):
             return o
     #actually open and load the file
     json_dict = None # noop
-    with open("/MAdata/sv_datasets/" + dataset_name + "/by_score.json", "r") as json_file:
+    with open(sv_data_dir + dataset_name + "/by_score.json", "r") as json_file:
         json_dict = json.loads(json_file.read(), object_hook=_decode)
     fist_line = tsv_list[0]
     tsv_list = tsv_list[1:]
@@ -376,4 +379,4 @@ def render_from_tsv(dataset_name):
     render_from_list(tsv_list, json_dict, dataset_name)
 
 if __name__ == "__main__":
-    render_from_tsv("del_human_depre")
+    render_from_tsv("minimal")

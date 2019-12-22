@@ -13,11 +13,13 @@ import vcf_interpreters
 # Setup the appropriate environment
 """Markus @ Zeus""" 
 global_prefix = "/MAdata/"
-svdb_dir = global_prefix + "sv_datasets2/" # AKFIX
+svdb_dir = global_prefix + "sv_datasets2/"
+sv_data_dir = global_prefix + "sv_datasets/"
 
 """Arne @ home """
 #global_prefix = "C:/MAdata/"
 # svdb_dir = global_prefix + "sv_datasets/" 
+# svdb_dir = global_prefix + "sv_datasets2/"
 
 def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, recompute_jumps=False, run_ma=True):
     def bwa(read_set, sam_file_path):
@@ -95,7 +97,7 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
         "create_illumina_reads_dwgsim": [] #[bwa, bowtie]
     }
 
-    with open(svdb_dir + dataset_name + "/runtimes.log", "a") as runtime_file:
+    with open(sv_data_dir + dataset_name + "/runtimes.log", "a") as runtime_file:
         for dataset in json_dict["datasets"]:
             for read_set in dataset["create_reads_funcs"]:
                 if not "alignments" in read_set:
@@ -120,7 +122,7 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
                         read_set["jump_id"] = compute_sv_jumps(params, fm_index, pack, db, read_set["seq_id"],
                                                                 runtime_file)
                 for alignment_call in alignment_calls[read_set["func_name"]]:
-                    sam_file_path = svdb_dir + dataset_name + "/alignments/" \
+                    sam_file_path = sv_data_dir + dataset_name + "/alignments/" \
                                 + read_set["name"] + "-" + alignment_call.__name__
                     if not alignment_call.__name__ in read_set["alignments"]:
                         read_set["alignments"].append(alignment_call.__name__)
@@ -323,8 +325,8 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
         "pbSv": vcf_interpreters.pb_sv_interpreter
     }
 
-    with open(svdb_dir + dataset_name + "/vcf_errors.log", "a") as error_file:
-        with open(svdb_dir + dataset_name + "/runtimes.log", "a") as runtime_file:
+    with open(sv_data_dir + dataset_name + "/vcf_errors.log", "a") as error_file:
+        with open(sv_data_dir + dataset_name + "/runtimes.log", "a") as runtime_file:
             for dataset in json_dict["datasets"]:
                 for read_set in dataset["create_reads_funcs"]:
                     if not "calls" in read_set:
@@ -353,9 +355,9 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                     # other callers
                     for alignment in read_set["alignments"]:
                         for sv_call in sv_calls[alignment]:
-                            vcf_file_path = svdb_dir + dataset_name + "/calls/" \
+                            vcf_file_path = sv_data_dir + dataset_name + "/calls/" \
                                     + read_set["name"] + "-" + alignment + "-" + sv_call.__name__ + ".vcf"
-                            bam_file_path = svdb_dir + dataset_name + "/alignments/" \
+                            bam_file_path = sv_data_dir + dataset_name + "/alignments/" \
                                     + read_set["name"] + "-" + alignment + ".sorted.bam"
                             if os.path.exists( vcf_file_path ):
                                 print("not creating calls for", read_set["name"], alignment, sv_call.__name__)
@@ -413,6 +415,7 @@ def analyze_by_score(sv_db, id_a, id_b):
             ys_2.append(0)
         else:
             #ys.append(num_overlaps_b_to_a/num_calls_a)
+            # assert(num_almost_overlaps_b_to_a <= num_calls_a)
             ys_2.append(num_almost_overlaps_b_to_a/num_calls_a)
 
         p += inc
@@ -598,11 +601,11 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
             return o
     #actually open and load the info.json file
     json_info_file = None # noop
-    with open(svdb_dir + dataset_name + "/info.json", "r") as json_file:
+    with open(sv_data_dir + dataset_name + "/info.json", "r") as json_file:
         json_info_file = json.loads(json_file.read(), object_hook=_decode)
 
     # create the calls
-    db = SV_DB(svdb_dir + dataset_name + "/svs.db", "open")
+    db = SV_DB(svdb_dir + dataset_name + "/svs.db", "open", True) # open as in memory database
     if run_callers:
         pack = Pack()
         pack.load(json_info_file["reference_path"] + "/ma/genome")
@@ -613,7 +616,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         create_alignments_if_necessary(dataset_name, json_info_file, db, pack, fm_index, recompute_jumps, run_ma)
         # save the info.json file
         print(json_info_file)
-        with open(svdb_dir + dataset_name + "/info.json", "w") as json_out:
+        with open(sv_data_dir + dataset_name + "/info.json", "w") as json_out:
             json.dump(json_info_file, json_out)
 
 
@@ -621,17 +624,18 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 
         # save the info.json file
         print(json_info_file)
-        with open(svdb_dir + dataset_name + "/info.json", "w") as json_out:
+        with open(sv_data_dir + dataset_name + "/info.json", "w") as json_out:
             json.dump(json_info_file, json_out)
 
-    compare_all_callers_against(db, json_info_file, svdb_dir + dataset_name + "/bar_diagrams.tsv", svdb_dir + dataset_name + "/by_score.json")
+    compare_all_callers_against(db, json_info_file, sv_data_dir + dataset_name + "/bar_diagrams.tsv",
+                                sv_data_dir + dataset_name + "/by_score.json")
 
 
 #print("===============")
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("del_human")
+    analyze_sample_dataset("minimal", False)
 
     #analyze_sample_dataset("comprehensive", True)
 
