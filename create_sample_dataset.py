@@ -34,7 +34,7 @@ OS_is_MSWIN = False
 
 
 def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_genome_path, database, reads_folder,
-                                 json_info_file, coverage, name, read_length):
+                                 json_info_file, coverage, name, reset_db_only, read_length):
     json_info_file["read_length"] = read_length
     reads1 = reads_folder + name + ".bwa.read1.fastq.gz"
     reads2 = reads_folder + name + ".bwa.read2.fastq.gz"
@@ -45,6 +45,8 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_geno
     dwgsim_instances = []
     file_names1 = ""
     file_names2 = ""
+    f_path_vec_1 = []
+    f_path_vec_2 = []
     # we actually need to seed dwgsim otherwise each instance will create the same data (it uses the current time)
     seed = random.randrange(0, 2**6)
     num_instances = 32
@@ -55,27 +57,32 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_geno
         #           "1", "-z", str(seed), sequenced_genome_path, reads_folder + "part_" + str(idx) + name]
         command = [dwgsim, "-1", str(read_length), "-2", str(read_length), "-C", str(coverage/num_instances), "-r", "0", "-o", \
                    "1", "-z", str(seed), sequenced_genome_path, reads_folder + "part_" + str(idx) + name]
-        dwgsim_instances.append(subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE))
+        if not reset_db_only:
+            dwgsim_instances.append(subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE))
         seed += 42 # increment the seed so that we have some different number every time
-        file_names1 += reads_folder + "part_" + str(idx) + name + ".bwa.read1.fastq.gz "
-        file_names2 += reads_folder + "part_" + str(idx) + name + ".bwa.read2.fastq.gz "
+        f_name_1 = reads_folder + "part_" + str(idx) + name + ".bwa.read1.fastq.gz"
+        f_name_2 = reads_folder + "part_" + str(idx) + name + ".bwa.read2.fastq.gz"
+        file_names1 += f_name_1 + " "
+        file_names2 += f_name_2 + " "
+        f_path_vec_1.append(libMA.path(f_name_1))
+        f_path_vec_2.append(libMA.path(f_name_2))
     for proc in dwgsim_instances:
         proc.wait()
 
     print("\tcat...")
-    os.system("zcat " + file_names1 + " > " + reads1)
-    os.system("zcat " + file_names2 + " > " + reads2)
+    if not reset_db_only:
+        os.system("zcat " + file_names1 + " > " + reads1)
+        os.system("zcat " + file_names2 + " > " + reads2)
 
     print("\tinserting into db...")
     inserter = ReadInserter(database, name, ref_pack)
     json_info_file["seq_id"] = inserter.sequencer_id
-    f_path_vec_1 = libMA.filePathVector([libMA.path(reads1)])
-    f_path_vec_2 = libMA.filePathVector([libMA.path(reads2)])
-    inserter.insert_paired_fasta_files(ParameterSetManager(), f_path_vec_1, f_path_vec_2)
+    inserter.insert_paired_fasta_files(ParameterSetManager(), libMA.filePathVector(f_path_vec_1),
+                                       libMA.filePathVector(f_path_vec_2))
     print("\tdone")
 
 def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path, database, reads_folder, 
-                          json_info_file, coverage, name, error_profile, technology):
+                          json_info_file, coverage, name, reset_db_only, error_profile, technology):
     json_info_file["error_profile"] = error_profile
     json_info_file["technology"] = technology
     reads1 = reads_folder + name + ".fasta"
@@ -85,10 +92,11 @@ def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path
               + reads1
     print("Command:", command)
 
-    if OS_is_MSWIN:
-        os.system(command)
-    else:
-        os.system(command + " >/dev/null 2>&1")
+    if not reset_db_only:
+        if OS_is_MSWIN:
+            os.system(command)
+        else:
+            os.system(command + " >/dev/null 2>&1")
 
     print("\tinserting into db...")
     inserter = ReadInserter(database, name, ref_pack)
@@ -168,6 +176,7 @@ def no_svs(pack, database, json_info_file):
 def create_dataset(reference_path, # dir with reference 
                    dataset_name, create_svs_funcs,
                    create_reads_funcs, coverages, chromosome=None):
+    reset_db_only = False
     if os.path.exists(svdb_dir + dataset_name) or os.path.exists(sv_data_dir + dataset_name):
         print("WARNING dataset exists already, replace it? [y/n]")
         for line in sys.stdin:
@@ -177,103 +186,118 @@ def create_dataset(reference_path, # dir with reference
                 if os.path.exists(sv_data_dir + dataset_name):
                     shutil.rmtree(sv_data_dir + dataset_name)
                 break
-            print("aborting")
-            return
+            elif line.strip() == "n":
+                print("reset the database [y/n]?")
+                for line in sys.stdin:
+                    if line.strip() == "y":
+                        reset_db_only = True
+                        os.remove(svdb_dir + dataset_name + "/svs.db")
+                        break
+                    elif line.strip() == "n":
+                        return
+                break
 
     ref_pack = Pack()
     ref_pack.load(reference_path + "/ma/genome")
     fm_index = FMIndex()
     fm_index.load(reference_path + "/ma/genome")
-    if not chromosome is None:
-        idx = ref_pack.id_of_sequence(chromosome)
-        print("picked contig:", idx)
-        print("startindex, endindex: ", ref_pack.start_of_sequence_id(idx), 
-                                      ref_pack.start_of_sequence_id(idx) + ref_pack.length_of_sequence(chromosome))
+    if not reset_db_only:
+        if not chromosome is None:
+            idx = ref_pack.id_of_sequence(chromosome)
+            print("picked contig:", idx)
+            print("startindex, endindex: ", ref_pack.start_of_sequence_id(idx), 
+                                        ref_pack.start_of_sequence_id(idx) + ref_pack.length_of_sequence(chromosome))
 
 
-    os.mkdir(svdb_dir + dataset_name) # this throws an error if the dataset already exists
-    os.mkdir(sv_data_dir + dataset_name) # this throws an error if the dataset already exists
-    os.mkdir(sv_data_dir + dataset_name + "/reads")
-    os.mkdir(sv_data_dir + dataset_name + "/genomes")
-    os.mkdir(sv_data_dir + dataset_name + "/alignments")
-    os.mkdir(sv_data_dir + dataset_name + "/calls")
+        os.mkdir(svdb_dir + dataset_name) # this throws an error if the dataset already exists
+        os.mkdir(sv_data_dir + dataset_name) # this throws an error if the dataset already exists
+        os.mkdir(sv_data_dir + dataset_name + "/reads")
+        os.mkdir(sv_data_dir + dataset_name + "/genomes")
+        os.mkdir(sv_data_dir + dataset_name + "/alignments")
+        os.mkdir(sv_data_dir + dataset_name + "/calls")
 
-    json_info_file = {
-        "reference_path": reference_path,
-        "datasets": [],
-        "version": 1
-    }
+        json_info_file = {
+            "reference_path": reference_path,
+            "datasets": [],
+            "version": 1
+        }
 
     print("creating SV-DB...")
     start = time.time()
 
     # create the sv_db
-    database = SV_DB(svdb_dir + dataset_name + "/svs.db", "create", True)
+    database = SV_DB(svdb_dir + dataset_name + "/svs.db", "create", False)
     print(time.time() - start, "seconds")
 
     for create_svs_func, sv_func_name, create_svs_funcs_params in create_svs_funcs:
         seq_gen_path = sv_data_dir + dataset_name + "/genomes/sequenced_genome_" + sv_func_name
-        print("creating", sv_func_name, "dataset ...")
-        start = time.time()
-        # create the svs
-        json_info_file_dataset_sub = {
-            "func_name": create_svs_func.__name__,
-            "create_reads_funcs": [],
-            "sequenced_genome_path": seq_gen_path,
-            "name": sv_func_name
-        }
-        caller_id = create_svs_func(ref_pack, database, json_info_file_dataset_sub, *create_svs_funcs_params)
-        json_info_file_dataset_sub["ground_truth"] = caller_id
-        print(time.time() - start, "seconds")
+        if not reset_db_only:
+            print("creating", sv_func_name, "dataset ...")
+            start = time.time()
+            # create the svs
+            json_info_file_dataset_sub = {
+                "func_name": create_svs_func.__name__,
+                "create_reads_funcs": [],
+                "sequenced_genome_path": seq_gen_path,
+                "name": sv_func_name
+            }
+            caller_id = create_svs_func(ref_pack, database, json_info_file_dataset_sub, *create_svs_funcs_params)
+            json_info_file_dataset_sub["ground_truth"] = caller_id
+            print(time.time() - start, "seconds")
 
-        print("creating sequenced genome...")
-        start = time.time()
+            print("creating sequenced genome...")
+            start = time.time()
 
-        # save the sequenced genome
-        
-        print("\treconstructing sequenced genome")
-        seq_pack = database.reconstruct_sequenced_genome(ref_pack, caller_id)
-        if not chromosome is None:
-            seq_pack_ = Pack()
-            seq_pack_.append(seq_pack.contigNames()[ref_pack.id_of_sequence(chromosome)], "no_description_given", 
-                             NucSeq(seq_pack.contigSeqs()[ref_pack.id_of_sequence(chromosome)]))
-            seq_pack = seq_pack_
-        print("\tstoring sequenced genome")
-        seq_pack.store(seq_gen_path)
-        with open(seq_gen_path + ".fasta", "w") as fasta_out:
-            for name, sequence in zip(seq_pack.contigNames(), seq_pack.contigSeqs()):
-                print("writing:", name, "len:", len(sequence))
-                fasta_out.write(">")
-                fasta_out.write(name)
-                fasta_out.write("\n")
-                idx = 0
-                while idx < len(sequence):
-                    fasta_out.write(sequence[idx:idx+50])
+            # save the sequenced genome
+            
+            print("\treconstructing sequenced genome")
+            seq_pack = database.reconstruct_sequenced_genome(ref_pack, caller_id)
+            if not chromosome is None:
+                seq_pack_ = Pack()
+                seq_pack_.append(seq_pack.contigNames()[ref_pack.id_of_sequence(chromosome)], "no_description_given", 
+                                NucSeq(seq_pack.contigSeqs()[ref_pack.id_of_sequence(chromosome)]))
+                seq_pack = seq_pack_
+            print("\tstoring sequenced genome")
+            seq_pack.store(seq_gen_path)
+            with open(seq_gen_path + ".fasta", "w") as fasta_out:
+                for name, sequence in zip(seq_pack.contigNames(), seq_pack.contigSeqs()):
+                    print("writing:", name, "len:", len(sequence))
+                    fasta_out.write(">")
+                    fasta_out.write(name)
                     fasta_out.write("\n")
-                    idx += 50
-        print(time.time() - start, "seconds")
+                    idx = 0
+                    while idx < len(sequence):
+                        fasta_out.write(sequence[idx:idx+50])
+                        fasta_out.write("\n")
+                        idx += 50
+            print(time.time() - start, "seconds")
 
-        if not chromosome is None:
-            print("\tvalidating created genome...")
-            seeding_module = BinarySeeding(ParameterSetManager())
-            q = seq_pack.extract_forward_strand_n()
-            segments = seeding_module.execute(fm_index, q)
-            num_nts = [0]*len(ref_pack.contigLengths())
-            for seeds in segments.extract_seeds(fm_index, 1, 16, len(q), True):
-                pos = ref_pack.seq_id_for_pos(seeds.start_ref)
-                num_nts[pos] += seeds.size
-            highest_idx = 0
-            print("id\tcoverage\tnt generated")
-            for idx, (num_nt, size) in enumerate(zip(num_nts, ref_pack.contigLengths())):
-                if round(100*num_nt/size, 3) >= 3:
-                    print(idx, str(round(100*num_nt/size, 3)) + "%", num_nt, sep='\t')
-                    if num_nt > num_nts[highest_idx]:
-                        highest_idx = idx
-            if highest_idx != ref_pack.id_of_sequence(chromosome):
-                print("WARNING picked chromosome seems not to be the one that was generated")
+            if not chromosome is None:
+                print("\tvalidating created genome...")
+                seeding_module = BinarySeeding(ParameterSetManager())
+                q = seq_pack.extract_forward_strand_n()
+                segments = seeding_module.execute(fm_index, q)
+                num_nts = [0]*len(ref_pack.contigLengths())
+                for seeds in segments.extract_seeds(fm_index, 1, 16, len(q), True):
+                    pos = ref_pack.seq_id_for_pos(seeds.start_ref)
+                    num_nts[pos] += seeds.size
+                highest_idx = 0
+                print("id\tcoverage\tnt generated")
+                for idx, (num_nt, size) in enumerate(zip(num_nts, ref_pack.contigLengths())):
+                    if round(100*num_nt/size, 3) >= 3:
+                        print(idx, str(round(100*num_nt/size, 3)) + "%", num_nt, sep='\t')
+                        if num_nt > num_nts[highest_idx]:
+                            highest_idx = idx
+                if highest_idx != ref_pack.id_of_sequence(chromosome):
+                    print("WARNING picked chromosome seems not to be the one that was generated")
+        else:
+            print("\tloading sequenced genome")
+            seq_pack = Pack()
+            seq_pack.load(seq_gen_path)
 
 
-        print("\tdone")
+            print("\tdone")
+
         print("creating reads...")
         start = time.time()
 
@@ -289,25 +313,29 @@ def create_dataset(reference_path, # dir with reference
                 }
                 create_reads_func(seq_pack, ref_pack, seq_gen_path + ".fasta",
                                 database, sv_data_dir + dataset_name + "/reads/", json_info_file_sub,
-                                coverage, name_c, *create_reads_args)
-                json_info_file_dataset_sub["create_reads_funcs"].append(json_info_file_sub)
-        json_info_file["datasets"].append(json_info_file_dataset_sub)
+                                coverage, name_c, reset_db_only, *create_reads_args)
+                if not reset_db_only:
+                    json_info_file_dataset_sub["create_reads_funcs"].append(json_info_file_sub)
+        if not reset_db_only:
+            json_info_file["datasets"].append(json_info_file_dataset_sub)
         print(time.time() - start, "seconds")
 
-    # save the info.json file
-    with open(sv_data_dir + dataset_name + "/info.json", "w") as json_out:
-        json.dump(json_info_file, json_out)
+    if not reset_db_only:
+        # save the info.json file
+        with open(sv_data_dir + dataset_name + "/info.json", "w") as json_out:
+            json.dump(json_info_file, json_out)
 
-    print("done creating dataset:")
-    print(json_info_file)
+    print("done creating dataset")
+    if not reset_db_only:
+        print(json_info_file)
 
 
 if __name__ == "__main__":
     survivor_error_profile_pac_b = survivor_error_profile_dir + "HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = survivor_error_profile_dir + "NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset(genome_dir + "/GRCh38.p12-chr1-large",
-                   "minimal",
+    create_dataset(genome_dir + "/GRCh38.p12",
+                   "del_human",
                    [
                     ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 5000 ) ),
                     ],
