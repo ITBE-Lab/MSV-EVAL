@@ -13,7 +13,7 @@ import vcf_interpreters
 # Setup the appropriate environment
 """Markus @ Zeus""" 
 global_prefix = "/MAdata/"
-svdb_dir = global_prefix + "sv_datasets2/"
+svdb_dir = global_prefix + "sv_datasets3/"
 sv_data_dir = global_prefix + "sv_datasets/"
 
 """Arne @ home """
@@ -93,8 +93,8 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
 
 
     alignment_calls = {
-        "create_reads_survivor": [], #[mm2, ngmlr, pbmm2],
-        "create_illumina_reads_dwgsim": [] #[bwa, bowtie]
+        "create_reads_survivor": [mm2, ngmlr, pbmm2],
+        "create_illumina_reads_dwgsim": [bwa, bowtie]
     }
 
     with open(sv_data_dir + dataset_name + "/runtimes.log", "a") as runtime_file:
@@ -219,7 +219,7 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, vcf_interpreter, error_file=No
         num_calls += 1
         vcf_interpreter(call, call_inserter, pack, error_file)
     print("number of calls:", num_calls)
-    del call_inserter # trigger destructor
+    call_inserter.end_transaction()
 
 def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
     def sniffles(bam_file, vcf_file):
@@ -368,7 +368,8 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                                 print("caller did not create calls: ", read_set["name"], alignment, sv_call.__name__)
                                 continue
                             vcf_to_db(read_set["name"] + "-" + alignment + "-" + sv_call.__name__,
-                                    "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack, call_interpreters[sv_call.__name__], error_file,
+                                    "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack, 
+                                    call_interpreters[sv_call.__name__], error_file,
                                     dataset["sv_func"] if "sv_func" in dataset else None)
 
                         for sv_call in sv_calls[alignment]:
@@ -422,7 +423,8 @@ def analyze_by_score(sv_db, id_a, id_b):
 
     #num_invalid_calls = sv_db.get_num_invalid_calls(id_a, 0, 0)
     num_invalid_calls_fuzzy = sv_db.get_num_invalid_calls(id_a, 0, blur_amount)
-    avg_blur = round(sv_db.get_blur_on_overlaps_between_calls(id_b, id_a, 0, blur_amount), 1)
+    # @todo at the moment this is inefficient
+    avg_blur = 0 #round(sv_db.get_blur_on_overlaps_between_calls(id_b, id_a, 0, blur_amount), 1)
 
     return xs_2, ys_2, ps, num_invalid_calls_fuzzy, avg_blur
     #return xs, ys, xs_2, ys_2, ps, num_invalid_calls, num_invalid_calls_fuzzy, avg_blur
@@ -515,11 +517,15 @@ def compare_caller(sv_db, id_a, id_b, min_score):
         rel_call_area_a = "n/a"
     call_area_b = sv_db.get_call_area(id_b, min_score)
     rel_call_area_b = call_area_b/num_calls_b
-    num_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_a, id_b, min_score, 0) # true positives
+    # @note start with the largest blur_amount so that we only need to initialize the cache once
     num_almost_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_a, id_b, min_score, blur_amount) # true positives
+    # true positives
+    num_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_a, id_b, min_score, 0)
     num_almost_overlaps_a_to_b -= num_overlaps_a_to_b
-    num_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, 0) # how many of the sv's are detected?
-    num_almost_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, blur_amount) # how many of the sv's are detected?
+    # how many of the sv's are detected?
+    num_almost_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, blur_amount)
+    # how many of the sv's are detected?
+    num_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, 0)
     num_errors = num_calls_b - num_overlaps_b_to_a # how many of the sv's are NOT detected?
     num_way_off = num_calls_b - num_almost_overlaps_b_to_a # how many of the sv's are NOT detected?
     num_invalid_calls = sv_db.get_num_invalid_calls(id_a, min_score, 0)
@@ -605,7 +611,9 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         json_info_file = json.loads(json_file.read(), object_hook=_decode)
 
     # create the calls
-    db = SV_DB(svdb_dir + dataset_name + "/svs.db", "open", True) # open as in memory database
+    print("opening the DB...")
+    db = SV_DB(svdb_dir + dataset_name + "/svs.db", "open")
+    print("done")
     if run_callers:
         pack = Pack()
         pack.load(json_info_file["reference_path"] + "/ma/genome")
@@ -635,7 +643,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("del_human")
+    analyze_sample_dataset("del_human_compre")
 
     #analyze_sample_dataset("comprehensive", True)
 

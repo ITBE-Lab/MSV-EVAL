@@ -11,7 +11,7 @@ from bokeh.models import Legend
 import math
 
 sv_data_dir = "/MAdata/sv_datasets/"
-sv_db_dir = "/MAdata/sv_datasets2/"
+sv_db_dir = "/MAdata/sv_datasets3/"
 
 def light_spec_approximation(x):
     #map input [0, 1] to wavelength [350, 645]
@@ -379,4 +379,4 @@ def render_from_tsv(dataset_name):
     render_from_list(tsv_list, json_dict, dataset_name)
 
 if __name__ == "__main__":
-    render_from_tsv("minimal")
+    render_from_tsv("del_human_compre")

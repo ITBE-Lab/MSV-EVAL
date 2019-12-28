@@ -17,7 +17,7 @@ global_prefix = "C:/MAdata/"
 
 # AKFIX
 """Markus @ Zeus""" 
-svdb_dir = "/MAdata/sv_datasets2/" # AKFIX
+svdb_dir = "/MAdata/sv_datasets3/" # AKFIX
 sv_data_dir = "/MAdata/sv_datasets/" # AKFIX
 survivor = "~/workspace/SURVIVOR/Debug/SURVIVOR simreads "  
 genome_dir = "/MAdata/genome/human"
@@ -231,20 +231,20 @@ def create_dataset(reference_path, # dir with reference
 
     for create_svs_func, sv_func_name, create_svs_funcs_params in create_svs_funcs:
         seq_gen_path = sv_data_dir + dataset_name + "/genomes/sequenced_genome_" + sv_func_name
-        if not reset_db_only:
-            print("creating", sv_func_name, "dataset ...")
-            start = time.time()
-            # create the svs
-            json_info_file_dataset_sub = {
-                "func_name": create_svs_func.__name__,
-                "create_reads_funcs": [],
-                "sequenced_genome_path": seq_gen_path,
-                "name": sv_func_name
-            }
-            caller_id = create_svs_func(ref_pack, database, json_info_file_dataset_sub, *create_svs_funcs_params)
-            json_info_file_dataset_sub["ground_truth"] = caller_id
-            print(time.time() - start, "seconds")
+        print("creating", sv_func_name, "dataset ...")
+        start = time.time()
+        # create the svs
+        json_info_file_dataset_sub = {
+            "func_name": create_svs_func.__name__,
+            "create_reads_funcs": [],
+            "sequenced_genome_path": seq_gen_path,
+            "name": sv_func_name
+        }
+        caller_id = create_svs_func(ref_pack, database, json_info_file_dataset_sub, *create_svs_funcs_params)
+        json_info_file_dataset_sub["ground_truth"] = caller_id
+        print(time.time() - start, "seconds")
 
+        if not reset_db_only:
             print("creating sequenced genome...")
             start = time.time()
 
@@ -334,13 +334,19 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = survivor_error_profile_dir + "HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = survivor_error_profile_dir + "NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset(genome_dir + "/GRCh38.p12",
-                   "del_human",
+    create_dataset(genome_dir + "/GRCh38.p12-chr1-full",
+                   "del_human_compre",
                    [
                     ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 5000 ) ),
+                    ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 50000 ) ),
                     ],
-                   [(create_illumina_reads_dwgsim, "ill_250", (250,)),],
-                   [10])
+                   [
+                       (create_illumina_reads_dwgsim, "ill_250", (250,)),
+                       (create_illumina_reads_dwgsim, "ill_150", (150,)),
+                       (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb")),
+                       (create_reads_survivor, "ont", (survivor_error_profile_ont, "ont"))
+                   ],
+                   [5, 10, 20])
 
     #create_dataset(genome_dir + "/GRCh38.p12-chr1-large",
     #               "comprehensive",
