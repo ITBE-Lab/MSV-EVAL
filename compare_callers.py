@@ -335,23 +335,23 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                     # MA-SV
                     if not "MA_SV" in read_set["calls"]:
                         read_set["calls"].append("MA_SV")
-                    print("creating calls for", read_set["name"], "MA_SV")
-                    params = ParameterSetManager()
-                    if read_set["func_name"] == "create_illumina_reads_dwgsim":
-                        params.set_selected("SV-Illumina")
-                    elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
-                        params.set_selected("SV-PacBio")
-                    elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
-                        params.set_selected("SV-ONT")
-                    else:
-                        print("WARNING: unknown read simulator - using default parameters for sv jumps")
-                    runtime_file.write(str(datetime.datetime.now()) + " " + dataset_name + " ")
-                    runtime_file.write(dataset["name"] + " " + read_set["name"] + " sweep_sv_jumps_cpp")
-                    runtime_file.write("\n")
-                    if "jump_id" in read_set:
-                        sweep_sv_jumps(params, db, read_set["jump_id"], read_set["name"] + "--" + "MA_SV",
-                                           "ground_truth=" + str(dataset["ground_truth"]),
-                                           [read_set["seq_id"]], pack, runtime_file)
+                        print("creating calls for", read_set["name"], "MA_SV")
+                        params = ParameterSetManager()
+                        if read_set["func_name"] == "create_illumina_reads_dwgsim":
+                            params.set_selected("SV-Illumina")
+                        elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "pb":
+                            params.set_selected("SV-PacBio")
+                        elif read_set["func_name"] == "create_reads_survivor" and read_set["technology"] == "ont":
+                            params.set_selected("SV-ONT")
+                        else:
+                            print("WARNING: unknown read simulator - using default parameters for sv jumps")
+                        runtime_file.write(str(datetime.datetime.now()) + " " + dataset_name + " ")
+                        runtime_file.write(dataset["name"] + " " + read_set["name"] + " sweep_sv_jumps_cpp")
+                        runtime_file.write("\n")
+                        if "jump_id" in read_set:
+                            sweep_sv_jumps(params, db, read_set["jump_id"], read_set["name"] + "--" + "MA_SV",
+                                            "ground_truth=" + str(dataset["ground_truth"]),
+                                            [read_set["seq_id"]], pack, runtime_file)
                     # other callers
                     for alignment in read_set["alignments"]:
                         for sv_call in sv_calls[alignment]:
@@ -635,6 +635,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         with open(sv_data_dir + dataset_name + "/info.json", "w") as json_out:
             json.dump(json_info_file, json_out)
 
+    return
     compare_all_callers_against(db, json_info_file, sv_data_dir + dataset_name + "/bar_diagrams.tsv",
                                 sv_data_dir + dataset_name + "/by_score.json")
 
