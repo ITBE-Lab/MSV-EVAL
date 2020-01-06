@@ -635,7 +635,6 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         with open(sv_data_dir + dataset_name + "/info.json", "w") as json_out:
             json.dump(json_info_file, json_out)
 
-    return
     compare_all_callers_against(db, json_info_file, sv_data_dir + dataset_name + "/bar_diagrams.tsv",
                                 sv_data_dir + dataset_name + "/by_score.json")
 
