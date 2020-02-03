@@ -226,7 +226,7 @@ def create_dataset(reference_path, # dir with reference
     start = time.time()
 
     # create the sv_db
-    database = SV_DB(svdb_dir + dataset_name + "/svs.db", "create", False)
+    database = SV_DB(dataset_name, "create", False)
     print(time.time() - start, "seconds")
 
     for create_svs_func, sv_func_name, create_svs_funcs_params in create_svs_funcs:
@@ -334,19 +334,19 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = survivor_error_profile_dir + "HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = survivor_error_profile_dir + "NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset(genome_dir + "/GRCh38.p12-chr1-full",
-                   "del_human_compre",
+    create_dataset(genome_dir + "/GRCh38.p12-chr1",
+                   "minimal2",
                    [
                     ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 5000 ) ),
-                    ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 50000 ) ),
+#                    ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 50000 ) ),
                     ],
                    [
                        (create_illumina_reads_dwgsim, "ill_250", (250,)),
-                       (create_illumina_reads_dwgsim, "ill_150", (150,)),
-                       (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb")),
-                       (create_reads_survivor, "ont", (survivor_error_profile_ont, "ont"))
+#                       (create_illumina_reads_dwgsim, "ill_150", (150,)),
+#                       (create_reads_survivor, "pacBio", (survivor_error_profile_pac_b, "pb")),
+#                       (create_reads_survivor, "ont", (survivor_error_profile_ont, "ont"))
                    ],
-                   [5, 10, 20])
+                   [10])
 
     #create_dataset(genome_dir + "/GRCh38.p12-chr1-large",
     #               "comprehensive",

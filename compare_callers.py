@@ -21,7 +21,8 @@ sv_data_dir = global_prefix + "sv_datasets/"
 # svdb_dir = global_prefix + "sv_datasets/" 
 # svdb_dir = global_prefix + "sv_datasets2/"
 
-def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, recompute_jumps=False, run_ma=True):
+def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, recompute_jumps=False, run_ma=True,
+                                   run_others=True):
     def bwa(read_set, sam_file_path):
         index_str = json_dict["reference_path"] + "/bwa/genome"
         os.system("~/workspace/bwa/bwa mem -R \"@RG\\tID:1\\tSM:" + read_set["name"] + "\" -t 32 " + index_str + " "
@@ -126,7 +127,7 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
                                 + read_set["name"] + "-" + alignment_call.__name__
                     if not alignment_call.__name__ in read_set["alignments"]:
                         read_set["alignments"].append(alignment_call.__name__)
-                    if os.path.exists( sam_file_path + ".sam" ):
+                    if os.path.exists( sam_file_path + ".sam" ) or not run_others:
                         continue
                     print("creating alignment files for", read_set["name"], alignment_call.__name__)
                     alignment_call(read_set, sam_file_path + ".sam")
@@ -221,7 +222,7 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, vcf_interpreter, error_file=No
     print("number of calls:", num_calls)
     call_inserter.end_transaction()
 
-def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
+def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index, run_others=True):
     def sniffles(bam_file, vcf_file):
         # threads: -t
         # Minimum number of reads that support a SV: -s
@@ -359,7 +360,7 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index):
                                     + read_set["name"] + "-" + alignment + "-" + sv_call.__name__ + ".vcf"
                             bam_file_path = sv_data_dir + dataset_name + "/alignments/" \
                                     + read_set["name"] + "-" + alignment + ".sorted.bam"
-                            if os.path.exists( vcf_file_path ):
+                            if os.path.exists( vcf_file_path ) or not run_others:
                                 print("not creating calls for", read_set["name"], alignment, sv_call.__name__)
                                 continue
                             print("creating calls for", read_set["name"], alignment, sv_call.__name__)
@@ -591,7 +592,8 @@ def compare_all_callers_against(sv_db, json_info_file, out_file_name=None, outfi
             json.dump(out_2, file_out)
 
 
-def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False, out_file_name=None, run_ma=True):
+def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False, out_file_name=None, run_ma=True,
+                           run_others=True):
     # decode hook for the json that decodes lists dicts and floats properly
     def _decode(o):
         if isinstance(o, str):
@@ -612,7 +614,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 
     # create the calls
     print("opening the DB...")
-    db = SV_DB(svdb_dir + dataset_name + "/svs.db", "open")
+    db = SV_DB(dataset_name, "open")
     print("done")
     if run_callers:
         pack = Pack()
@@ -621,14 +623,15 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         fm_index.load(json_info_file["reference_path"] + "/ma/genome")
 
         # create alignment files if they do not exist
-        create_alignments_if_necessary(dataset_name, json_info_file, db, pack, fm_index, recompute_jumps, run_ma)
+        create_alignments_if_necessary(dataset_name, json_info_file, db, pack, fm_index, recompute_jumps, run_ma,
+                                       run_others)
         # save the info.json file
         print(json_info_file)
         with open(sv_data_dir + dataset_name + "/info.json", "w") as json_out:
             json.dump(json_info_file, json_out)
 
 
-        run_callers_if_necessary(dataset_name, json_info_file, db, pack, fm_index)
+        run_callers_if_necessary(dataset_name, json_info_file, db, pack, fm_index, run_others)
 
         # save the info.json file
         print(json_info_file)
@@ -643,8 +646,8 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("del_human_compre")
+    analyze_sample_dataset("minimal2", run_others=False)
 
     #analyze_sample_dataset("comprehensive", True)
 
-    #compare_all_callers_against(SV_DB("/MAdata/databases/sv_simulated", "open"))
+    #compare_all_callers_against(SV_DB("sv_simulated", "open"))

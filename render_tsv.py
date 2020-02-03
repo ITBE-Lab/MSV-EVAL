@@ -340,7 +340,7 @@ def print_ground_truth(dataset_name):
     json_info_file = None # noop
     with open(sv_data_dir + dataset_name + "/info.json", "r") as json_file:
         json_info_file = json.loads(json_file.read(), object_hook=_decode)
-    sv_db = SV_DB(sv_db_dir + dataset_name + "/svs.db", "open")
+    sv_db = SV_DB(dataset_name, "open")
     for dataset in json_info_file["datasets"]:
         id_b = dataset["ground_truth"]
         name_b = dataset["name"]

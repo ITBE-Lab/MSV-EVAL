@@ -48,5 +48,5 @@ def analyze_jump_distance_distribution(sv_db, run_ids=None, resolution=5, x=None
 
 
 if __name__ == "__main__":
-    sv_db = SV_DB("/MAdata/sv_datasets/small_test_1/svs.db", "open")
+    sv_db = SV_DB("small_test_1", "open")
     analyze_jump_distance_distribution(sv_db)
