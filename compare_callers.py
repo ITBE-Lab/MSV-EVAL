@@ -213,7 +213,7 @@ def vcf_parser(file_name):
                         d[name] = field
                 yield VCFFile(d, names, 0, info)
 
-def vcf_to_db(name, desc, sv_db, file_name, pack, vcf_interpreter, error_file=None, create_sv_func=None):
+def vcf_to_db(name, desc, dataset_name, file_name, pack, vcf_interpreter, error_file=None, create_sv_func=None):
     call_inserter = SvCallInserter(sv_db, name, desc, -1) # -1 since there are no related sv jumps...
     num_calls = 0
     for call in vcf_parser(file_name):
@@ -222,7 +222,7 @@ def vcf_to_db(name, desc, sv_db, file_name, pack, vcf_interpreter, error_file=No
     print("number of calls:", num_calls)
     call_inserter.end_transaction()
 
-def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index, run_others=True):
+def run_callers_if_necessary(dataset_name, json_dict, pack, fm_index, run_others=True):
     def sniffles(bam_file, vcf_file):
         # threads: -t
         # Minimum number of reads that support a SV: -s
@@ -350,7 +350,7 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index, run_ot
                         runtime_file.write(dataset["name"] + " " + read_set["name"] + " sweep_sv_jumps_cpp")
                         runtime_file.write("\n")
                         if "jump_id" in read_set:
-                            sweep_sv_jumps(params, db, read_set["jump_id"], read_set["name"] + "--" + "MA_SV",
+                            sweep_sv_jumps(params, dataset_name, read_set["jump_id"], read_set["name"] + "--" + "MA_SV",
                                             "ground_truth=" + str(dataset["ground_truth"]),
                                             [read_set["seq_id"]], pack, runtime_file)
                     # other callers
@@ -369,7 +369,7 @@ def run_callers_if_necessary(dataset_name, json_dict, db, pack, fm_index, run_ot
                                 print("caller did not create calls: ", read_set["name"], alignment, sv_call.__name__)
                                 continue
                             vcf_to_db(read_set["name"] + "-" + alignment + "-" + sv_call.__name__,
-                                    "ground_truth=" + str(dataset["ground_truth"]), db, vcf_file_path, pack, 
+                                    "ground_truth=" + str(dataset["ground_truth"]), dataset_name, vcf_file_path, pack, 
                                     call_interpreters[sv_call.__name__], error_file,
                                     dataset["sv_func"] if "sv_func" in dataset else None)
 
@@ -622,7 +622,6 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         # create alignment files if they do not exist
         create_alignments_if_necessary(dataset_name, json_info_file, pack, fm_index, recompute_jumps, run_ma,
                                        run_others)
-        return # @todo remove me
         # save the info.json file
         print(json_info_file)
         with open(sv_data_dir + dataset_name + "/info.json", "w") as json_out:
@@ -635,6 +634,8 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         print(json_info_file)
         with open(sv_data_dir + dataset_name + "/info.json", "w") as json_out:
             json.dump(json_info_file, json_out)
+
+        return
 
     compare_all_callers_against(json_info_file, sv_data_dir + dataset_name + "/bar_diagrams.tsv",
                                 sv_data_dir + dataset_name + "/by_score.json")
