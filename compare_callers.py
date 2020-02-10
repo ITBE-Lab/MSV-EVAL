@@ -21,7 +21,7 @@ sv_data_dir = global_prefix + "sv_datasets/"
 # svdb_dir = global_prefix + "sv_datasets/" 
 # svdb_dir = global_prefix + "sv_datasets2/"
 
-def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, recompute_jumps=False, run_ma=True,
+def create_alignments_if_necessary(dataset_name, json_dict, pack, fm_index, recompute_jumps=False, run_ma=True,
                                    run_others=True):
     def bwa(read_set, sam_file_path):
         index_str = json_dict["reference_path"] + "/bwa/genome"
@@ -120,7 +120,7 @@ def create_alignments_if_necessary(dataset_name, json_dict, db, pack, fm_index, 
                         runtime_file.write(str(datetime.datetime.now()) + " " + dataset_name + " ")
                         runtime_file.write(dataset["name"] + " " + read_set["name"] + " compute_sv_jumps")
                         runtime_file.write("\n")
-                        read_set["jump_id"] = compute_sv_jumps(params, fm_index, pack, db, read_set["seq_id"],
+                        read_set["jump_id"] = compute_sv_jumps(params, fm_index, pack, dataset_name, read_set["seq_id"],
                                                                 runtime_file)
                 for alignment_call in alignment_calls[read_set["func_name"]]:
                     sam_file_path = sv_data_dir + dataset_name + "/alignments/" \
@@ -613,9 +613,6 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         json_info_file = json.loads(json_file.read(), object_hook=_decode)
 
     # create the calls
-    print("opening the DB...")
-    db = SV_DB(dataset_name, "open")
-    print("done")
     if run_callers:
         pack = Pack()
         pack.load(json_info_file["reference_path"] + "/ma/genome")
@@ -623,22 +620,23 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         fm_index.load(json_info_file["reference_path"] + "/ma/genome")
 
         # create alignment files if they do not exist
-        create_alignments_if_necessary(dataset_name, json_info_file, db, pack, fm_index, recompute_jumps, run_ma,
+        create_alignments_if_necessary(dataset_name, json_info_file, pack, fm_index, recompute_jumps, run_ma,
                                        run_others)
+        return # @todo remove me
         # save the info.json file
         print(json_info_file)
         with open(sv_data_dir + dataset_name + "/info.json", "w") as json_out:
             json.dump(json_info_file, json_out)
 
 
-        run_callers_if_necessary(dataset_name, json_info_file, db, pack, fm_index, run_others)
+        run_callers_if_necessary(dataset_name, json_info_file, pack, fm_index, run_others)
 
         # save the info.json file
         print(json_info_file)
         with open(sv_data_dir + dataset_name + "/info.json", "w") as json_out:
             json.dump(json_info_file, json_out)
 
-    compare_all_callers_against(db, json_info_file, sv_data_dir + dataset_name + "/bar_diagrams.tsv",
+    compare_all_callers_against(json_info_file, sv_data_dir + dataset_name + "/bar_diagrams.tsv",
                                 sv_data_dir + dataset_name + "/by_score.json")
 
 

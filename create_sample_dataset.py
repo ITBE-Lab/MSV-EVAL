@@ -33,8 +33,8 @@ OS_is_MSWIN = False
 # OS_is_MSWIN = True
 
 
-def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_genome_path, database, reads_folder,
-                                 json_info_file, coverage, name, reset_db_only, read_length):
+def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_genome_path, dataset_name, 
+                                 reads_folder, json_info_file, coverage, name, reset_db_only, read_length):
     json_info_file["read_length"] = read_length
     reads1 = reads_folder + name + ".bwa.read1.fastq.gz"
     reads2 = reads_folder + name + ".bwa.read2.fastq.gz"
@@ -49,7 +49,7 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_geno
     f_path_vec_2 = []
     # we actually need to seed dwgsim otherwise each instance will create the same data (it uses the current time)
     seed = random.randrange(0, 2**6)
-    num_instances = 32
+    num_instances = 30
     for idx in range(num_instances):
         dwgsim = "/usr/home/markus/workspace/DWGSIM/dwgsim"
         #command = [dwgsim, "-1", str(read_length), "-2", str(read_length), "-e", "from 0.000 to 0.000 by 0.000", \
@@ -64,8 +64,8 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_geno
         f_name_2 = reads_folder + "part_" + str(idx) + name + ".bwa.read2.fastq.gz"
         file_names1 += f_name_1 + " "
         file_names2 += f_name_2 + " "
-        f_path_vec_1.append(libMA.path(f_name_1))
-        f_path_vec_2.append(libMA.path(f_name_2))
+        f_path_vec_1.append(f_name_1)
+        f_path_vec_2.append(f_name_2)
     for proc in dwgsim_instances:
         proc.wait()
 
@@ -75,14 +75,13 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_geno
         os.system("zcat " + file_names2 + " > " + reads2)
 
     print("\tinserting into db...")
-    inserter = ReadInserter(database, name, ref_pack)
-    json_info_file["seq_id"] = inserter.sequencer_id
-    inserter.insert_paired_fasta_files(ParameterSetManager(), libMA.filePathVector(f_path_vec_1),
-                                       libMA.filePathVector(f_path_vec_2))
+    sequencer_id = insert_paired_reads(ParameterSetManager(), dataset_name, name, f_path_vec_1, f_path_vec_2)
+    json_info_file["seq_id"] = sequencer_id
     print("\tdone")
 
-def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path, database, reads_folder, 
+def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path, dataset_name, reads_folder, 
                           json_info_file, coverage, name, reset_db_only, error_profile, technology):
+    return
     json_info_file["error_profile"] = error_profile
     json_info_file["technology"] = technology
     reads1 = reads_folder + name + ".fasta"
@@ -99,21 +98,19 @@ def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path
             os.system(command + " >/dev/null 2>&1")
 
     print("\tinserting into db...")
-    inserter = ReadInserter(database, name, ref_pack)
-    json_info_file["seq_id"] = inserter.sequencer_id
-    f_path_vec = libMA.filePathVector([libMA.path(reads1)])
-    inserter.insert_fasta_files(ParameterSetManager(), f_path_vec)
+    sequencer_id = insert_reads(ParameterSetManager(), dataset_name, name, [reads1])
+    json_info_file["seq_id"] = sequencer_id
     print("\tdone")
 
 def sv_deletion(sv_inserter, position, sv_size):
-    sv_inserter.insert_call(SvCall(position, position + sv_size, 0, 0, False, supporting_nt, coverage))
+    sv_inserter.insert(SvCall(position, position + sv_size, 0, 0, False, supporting_nt, coverage))
 
 def sv_duplication(sv_inserter, position, sv_size):
-    sv_inserter.insert_call(SvCall(position + sv_size, position, 0, 0, False, supporting_nt, coverage))
+    sv_inserter.insert(SvCall(position + sv_size, position, 0, 0, False, supporting_nt, coverage))
 
 def sv_inversion(sv_inserter, position, sv_size):
-    sv_inserter.insert_call(SvCall(position + sv_size, position, 0, 0, True, supporting_nt, coverage))
-    sv_inserter.insert_call(SvCall(position, position + sv_size, 0, 0, True, supporting_nt, coverage))
+    sv_inserter.insert(SvCall(position + sv_size, position, 0, 0, True, supporting_nt, coverage))
+    sv_inserter.insert(SvCall(position, position + sv_size, 0, 0, True, supporting_nt, coverage))
 
 def sv_translocation(sv_inserter, position, sv_size, gap_size):
     assert gap_size < sv_size # sanity check
@@ -122,10 +119,10 @@ def sv_translocation(sv_inserter, position, sv_size, gap_size):
     end_a = position + int((sv_size - gap_size) / 2)
     start_b = end_a + gap_size
     end_b = position + sv_size
-    sv_inserter.insert_call(SvCall(start_a, start_b, 0, 0, False, supporting_nt, coverage))
-    sv_inserter.insert_call(SvCall(end_b, end_a, 0, 0, False, supporting_nt, coverage)) # (1)
-    sv_inserter.insert_call(SvCall(start_b - 1, start_a + 1, 0, 0, False, supporting_nt, coverage)) # (2)
-    sv_inserter.insert_call(SvCall(end_a - 1, end_b + 1, 0, 0, False, supporting_nt, coverage))
+    sv_inserter.insert(SvCall(start_a, start_b, 0, 0, False, supporting_nt, coverage))
+    sv_inserter.insert(SvCall(end_b, end_a, 0, 0, False, supporting_nt, coverage)) # (1)
+    sv_inserter.insert(SvCall(start_b - 1, start_a + 1, 0, 0, False, supporting_nt, coverage)) # (2)
+    sv_inserter.insert(SvCall(end_a - 1, end_b + 1, 0, 0, False, supporting_nt, coverage))
 
 def sv_insertion(sv_inserter, position, sv_size):
     call = SvCall(position, position + 1, 0, 0, False, supporting_nt, coverage)
@@ -135,18 +132,22 @@ def sv_insertion(sv_inserter, position, sv_size):
         ins += random.choice(["a", "c", "g", "t"])
 
     call.inserted_sequence = NucSeq(ins)
-    sv_inserter.insert_call(call)
+    sv_inserter.insert(call)
 
 ##
 # sv_func signature: def sv_func(sv_inserter, position, sv_size)
 #
-def separate_svs(pack, database, json_info_file, sv_func, sv_size, sv_margin, chromosome=None):
+def separate_svs(pack, dataset_name, json_info_file, sv_func, sv_size, sv_margin, chromosome=None):
     json_info_file["sv_size"] = sv_size
     json_info_file["sv_margin"] = sv_margin
     json_info_file["sv_func"] = sv_func[0].__name__
 
     # -1 since there are no related sv jumps
-    sv_inserter = SvCallInserter(database, json_info_file["name"] + "_simulated_sv", "the sv's that were simulated", -1)
+    parameter_set = ParameterSetManager()
+    pooled_connection = PoolContainer(1, dataset_name)
+    get_inserter = GetCallInserter(parameter_set, DbConn(dataset_name), json_info_file["name"] + "_simulated_sv",
+                                  "the sv's that were simulated", -1)
+    sv_inserter = get_inserter.execute(pooled_connection)
 
     def x(s, l):
         for pos in range(s + sv_margin, s + l - sv_margin, sv_size + sv_margin):
@@ -160,19 +161,17 @@ def separate_svs(pack, database, json_info_file, sv_func, sv_size, sv_margin, ch
         l = pack.contigLengths()[pack.id_of_sequence(chromosome)]
         x(s, l)
 
-    return sv_inserter.sv_caller_run_id
+    return get_inserter.cpp_module.id
 
-def no_svs(pack, database, json_info_file):
-    sv_inserter = SvCallInserter(database, json_info_file["name"] + "_simulated_sv", "the sv's that were simulated", -1)
-    return sv_inserter.sv_caller_run_id
+def no_svs(pack, dataset_name, json_info_file):
+    parameter_set = ParameterSetManager()
+    pooled_connection = PoolContainer(1, dataset_name)
+    get_inserter = GetCallInserter(parameter_set, DbConn(dataset_name), json_info_file["name"] + "_simulated_sv",
+                                  "the sv's that were simulated", -1)
+    sv_inserter = get_inserter.execute(pooled_connection)
+    return get_inserter.cpp_module.id
 
 
-##
-# create_svs_func signature: def create_svs_func(pack, database, json_info_file) -> caller_id
-# create_reads_funcs is a list of functions with the signature: 
-#       def create_reads_func(sequenced_genome_pack, sequenced_genome_path, database, reads_folder,
-#                             json_info_file, coverage, name)
-#
 def create_dataset(reference_path, # dir with reference 
                    dataset_name, create_svs_funcs,
                    create_reads_funcs, coverages, chromosome=None):
@@ -222,13 +221,6 @@ def create_dataset(reference_path, # dir with reference
             "version": 1
         }
 
-    print("creating SV-DB...")
-    start = time.time()
-
-    # create the sv_db
-    database = SV_DB(dataset_name, "create", False)
-    print(time.time() - start, "seconds")
-
     for create_svs_func, sv_func_name, create_svs_funcs_params in create_svs_funcs:
         seq_gen_path = sv_data_dir + dataset_name + "/genomes/sequenced_genome_" + sv_func_name
         print("creating", sv_func_name, "dataset ...")
@@ -240,7 +232,8 @@ def create_dataset(reference_path, # dir with reference
             "sequenced_genome_path": seq_gen_path,
             "name": sv_func_name
         }
-        caller_id = create_svs_func(ref_pack, database, json_info_file_dataset_sub, *create_svs_funcs_params)
+        JumpRunTable(DbConn(dataset_name))
+        caller_id = create_svs_func(ref_pack, dataset_name, json_info_file_dataset_sub, *create_svs_funcs_params)
         json_info_file_dataset_sub["ground_truth"] = caller_id
         print(time.time() - start, "seconds")
 
@@ -251,7 +244,7 @@ def create_dataset(reference_path, # dir with reference
             # save the sequenced genome
             
             print("\treconstructing sequenced genome")
-            seq_pack = database.reconstruct_sequenced_genome(ref_pack, caller_id)
+            seq_pack = SvCallTable(DbConn(dataset_name)).reconstruct_sequenced_genome(ref_pack, caller_id)
             if not chromosome is None:
                 seq_pack_ = Pack()
                 seq_pack_.append(seq_pack.contigNames()[ref_pack.id_of_sequence(chromosome)], "no_description_given", 
@@ -295,7 +288,6 @@ def create_dataset(reference_path, # dir with reference
             seq_pack = Pack()
             seq_pack.load(seq_gen_path)
 
-
             print("\tdone")
 
         print("creating reads...")
@@ -312,7 +304,7 @@ def create_dataset(reference_path, # dir with reference
                     "coverage": coverage
                 }
                 create_reads_func(seq_pack, ref_pack, seq_gen_path + ".fasta",
-                                database, sv_data_dir + dataset_name + "/reads/", json_info_file_sub,
+                                dataset_name, sv_data_dir + dataset_name + "/reads/", json_info_file_sub,
                                 coverage, name_c, reset_db_only, *create_reads_args)
                 if not reset_db_only:
                     json_info_file_dataset_sub["create_reads_funcs"].append(json_info_file_sub)
@@ -334,7 +326,7 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = survivor_error_profile_dir + "HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = survivor_error_profile_dir + "NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset(genome_dir + "/GRCh38.p12-chr1",
+    create_dataset(genome_dir + "/GRCh38.p12-chr1-full",
                    "minimal2",
                    [
                     ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 5000 ) ),
