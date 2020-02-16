@@ -160,6 +160,7 @@ def separate_svs(pack, dataset_name, json_info_file, sv_func, sv_size, sv_margin
         s = pack.contigStarts()[pack.id_of_sequence(chromosome)]
         l = pack.contigLengths()[pack.id_of_sequence(chromosome)]
         x(s, l)
+    sv_inserter.close()
 
     return get_inserter.cpp_module.id
 
@@ -169,6 +170,7 @@ def no_svs(pack, dataset_name, json_info_file):
     get_inserter = GetCallInserter(parameter_set, DbConn(dataset_name), json_info_file["name"] + "_simulated_sv",
                                   "the sv's that were simulated", -1)
     sv_inserter = get_inserter.execute(pooled_connection)
+    sv_inserter.close()
     return get_inserter.cpp_module.id
 
 
@@ -184,13 +186,14 @@ def create_dataset(reference_path, # dir with reference
                     shutil.rmtree(svdb_dir + dataset_name)
                 if os.path.exists(sv_data_dir + dataset_name):
                     shutil.rmtree(sv_data_dir + dataset_name)
+                DbConn(dataset_name).drop_schema(dataset_name)
                 break
             elif line.strip() == "n":
                 print("reset the database [y/n]?")
                 for line in sys.stdin:
                     if line.strip() == "y":
                         reset_db_only = True
-                        os.remove(svdb_dir + dataset_name + "/svs.db")
+                        DbConn(dataset_name).drop_schema(dataset_name)
                         break
                     elif line.strip() == "n":
                         return
@@ -326,7 +329,7 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = survivor_error_profile_dir + "HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = survivor_error_profile_dir + "NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset(genome_dir + "/GRCh38.p12-chr1",
+    create_dataset(genome_dir + "/GRCh38.p12-chr1-full",
                    "minimal2",
                    [
                     ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 5000 ) ),

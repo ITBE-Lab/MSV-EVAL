@@ -222,7 +222,7 @@ def vcf_to_db(name, desc, dataset_name, file_name, pack, vcf_interpreter, error_
     print("number of calls:", num_calls)
     call_inserter.end_transaction()
 
-def run_callers_if_necessary(dataset_name, json_dict, pack, fm_index, run_others=True):
+def run_callers_if_necessary(dataset_name, json_dict, pack, fm_index, run_others=True, recompute_calls=False):
     def sniffles(bam_file, vcf_file):
         # threads: -t
         # Minimum number of reads that support a SV: -s
@@ -334,7 +334,7 @@ def run_callers_if_necessary(dataset_name, json_dict, pack, fm_index, run_others
                         read_set["calls"] = []
 
                     # MA-SV
-                    if not "MA_SV" in read_set["calls"]:
+                    if not "MA_SV" in read_set["calls"] or recompute_calls:
                         read_set["calls"].append("MA_SV")
                         print("creating calls for", read_set["name"], "MA_SV")
                         params = ParameterSetManager()
@@ -360,7 +360,7 @@ def run_callers_if_necessary(dataset_name, json_dict, pack, fm_index, run_others
                                     + read_set["name"] + "-" + alignment + "-" + sv_call.__name__ + ".vcf"
                             bam_file_path = sv_data_dir + dataset_name + "/alignments/" \
                                     + read_set["name"] + "-" + alignment + ".sorted.bam"
-                            if os.path.exists( vcf_file_path ) or not run_others:
+                            if ( os.path.exists( vcf_file_path ) and not recompute_calls ) or not run_others:
                                 print("not creating calls for", read_set["name"], alignment, sv_call.__name__)
                                 continue
                             print("creating calls for", read_set["name"], alignment, sv_call.__name__)
@@ -593,7 +593,7 @@ def compare_all_callers_against(sv_db, json_info_file, out_file_name=None, outfi
 
 
 def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False, out_file_name=None, run_ma=True,
-                           run_others=True):
+                           run_others=True, recompute_calls=False):
     # decode hook for the json that decodes lists dicts and floats properly
     def _decode(o):
         if isinstance(o, str):
@@ -628,7 +628,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
             json.dump(json_info_file, json_out)
 
 
-        run_callers_if_necessary(dataset_name, json_info_file, pack, fm_index, run_others)
+        run_callers_if_necessary(dataset_name, json_info_file, pack, fm_index, run_others, recompute_calls)
 
         # save the info.json file
         print(json_info_file)
@@ -645,7 +645,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("minimal2", run_others=False)
+    analyze_sample_dataset("minimal2", run_others=False, recompute_calls=True)
 
     #analyze_sample_dataset("comprehensive", True)
 
