@@ -645,7 +645,7 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 #compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
 #print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("minimal2", run_others=False, recompute_calls=True)
+    analyze_sample_dataset("minimal", run_others=False, recompute_calls=True)
 
     #analyze_sample_dataset("comprehensive", True)
 

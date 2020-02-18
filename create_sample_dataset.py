@@ -160,7 +160,7 @@ def separate_svs(pack, dataset_name, json_info_file, sv_func, sv_size, sv_margin
         s = pack.contigStarts()[pack.id_of_sequence(chromosome)]
         l = pack.contigLengths()[pack.id_of_sequence(chromosome)]
         x(s, l)
-    sv_inserter.close()
+    sv_inserter.close(pooled_connection)
 
     return get_inserter.cpp_module.id
 
@@ -170,7 +170,7 @@ def no_svs(pack, dataset_name, json_info_file):
     get_inserter = GetCallInserter(parameter_set, DbConn(dataset_name), json_info_file["name"] + "_simulated_sv",
                                   "the sv's that were simulated", -1)
     sv_inserter = get_inserter.execute(pooled_connection)
-    sv_inserter.close()
+    sv_inserter.close(pooled_connection)
     return get_inserter.cpp_module.id
 
 
@@ -238,7 +238,7 @@ def create_dataset(reference_path, # dir with reference
         JumpRunTable(DbConn(dataset_name))
         caller_id = create_svs_func(ref_pack, dataset_name, json_info_file_dataset_sub, *create_svs_funcs_params)
         json_info_file_dataset_sub["ground_truth"] = caller_id
-        print(time.time() - start, "seconds")
+        print("took a total of", time.time() - start, "seconds")
 
         if not reset_db_only:
             print("creating sequenced genome...")
@@ -266,7 +266,7 @@ def create_dataset(reference_path, # dir with reference
                         fasta_out.write(sequence[idx:idx+50])
                         fasta_out.write("\n")
                         idx += 50
-            print(time.time() - start, "seconds")
+            print("took a total of", time.time() - start, "seconds")
 
             if not chromosome is None:
                 print("\tvalidating created genome...")
@@ -313,7 +313,7 @@ def create_dataset(reference_path, # dir with reference
                     json_info_file_dataset_sub["create_reads_funcs"].append(json_info_file_sub)
         if not reset_db_only:
             json_info_file["datasets"].append(json_info_file_dataset_sub)
-        print(time.time() - start, "seconds")
+        print("took a total of", time.time() - start, "seconds")
 
     if not reset_db_only:
         # save the info.json file
@@ -330,7 +330,7 @@ if __name__ == "__main__":
     survivor_error_profile_ont = survivor_error_profile_dir + "NA12878_nano_error_profile_bwa.txt"
 
     create_dataset(genome_dir + "/GRCh38.p12-chr1-full",
-                   "minimal2",
+                   "minimal",
                    [
                     ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 5000 ) ),
 #                    ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 50000 ) ),
