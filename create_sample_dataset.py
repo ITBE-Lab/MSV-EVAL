@@ -75,7 +75,7 @@ def create_illumina_reads_dwgsim(sequenced_genome_pack, ref_pack, sequenced_geno
         os.system("zcat " + file_names2 + " > " + reads2)
 
     print("\tinserting into db...")
-    sequencer_id = insert_paired_reads(ParameterSetManager(), dataset_name, name, f_path_vec_1, f_path_vec_2)
+    sequencer_id = insert_reads_path_string_vec(ParameterSetManager(), dataset_name, name, f_path_vec_1, f_path_vec_2)
     json_info_file["seq_id"] = sequencer_id
     print("\tdone")
 
@@ -98,7 +98,7 @@ def create_reads_survivor(sequenced_genome_pack, ref_pack, sequenced_genome_path
             os.system(command + " >/dev/null 2>&1")
 
     print("\tinserting into db...")
-    sequencer_id = insert_reads(ParameterSetManager(), dataset_name, name, [reads1])
+    sequencer_id = insert_reads_path_string_vec(ParameterSetManager(), dataset_name, name, [reads1])
     json_info_file["seq_id"] = sequencer_id
     print("\tdone")
 
@@ -329,7 +329,7 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = survivor_error_profile_dir + "HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = survivor_error_profile_dir + "NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset(genome_dir + "/GRCh38.p12-chr1-full",
+    create_dataset(genome_dir + "/GRCh38.p12-chr1",
                    "minimal",
                    [
                     ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 5000 ) ),
