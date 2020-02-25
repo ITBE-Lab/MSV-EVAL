@@ -214,13 +214,17 @@ def vcf_parser(file_name):
                 yield VCFFile(d, names, 0, info)
 
 def vcf_to_db(name, desc, dataset_name, file_name, pack, vcf_interpreter, error_file=None, create_sv_func=None):
-    call_inserter = SvCallInserter(sv_db, name, desc, -1) # -1 since there are no related sv jumps...
+    pooled_connection = PoolContainer(1, dataset_name)
+    # -1 since there are no related sv jumps...
+    get_inserter = GetCallInserter(ParameterSetManager(), DbConn(dataset_name), name, desc, -1)
+    call_inserter = get_inserter.execute(pooled_connection)
+
     num_calls = 0
     for call in vcf_parser(file_name):
         num_calls += 1
         vcf_interpreter(call, call_inserter, pack, error_file)
     print("number of calls:", num_calls)
-    call_inserter.end_transaction()
+    call_inserter.close(pooled_connection)
 
 def run_callers_if_necessary(dataset_name, json_dict, pack, fm_index, run_others=True, recompute_calls=False):
     def sniffles(bam_file, vcf_file):
@@ -381,12 +385,12 @@ def run_callers_if_necessary(dataset_name, json_dict, pack, fm_index, run_others
 blur_amount = 10
 #blur_amount = 350
 
-def analyze_by_score(sv_db, id_a, id_b):
-    num_calls_a = sv_db.get_num_calls(id_a, 0) # num calls made
+def analyze_by_score(call_table, id_a, id_b):
+    num_calls_a = call_table.num_calls(id_a, 0) # num calls made
     if num_calls_a == 0:
         return [], [], [], 0, 0
-    min_score = sv_db.get_min_score(id_a)
-    max_score = sv_db.get_max_score(id_a)
+    min_score = call_table.min_score(id_a)
+    max_score = call_table.max_score(id_a)
     p = min_score
     inc = (max_score - min_score) / 50
     if max_score <= min_score:
@@ -396,7 +400,7 @@ def analyze_by_score(sv_db, id_a, id_b):
     #ys = []
     ys_2 = []
     ps = []
-    num_calls_b = sv_db.get_num_calls(id_b, 0) # num actual calls
+    num_calls_b = call_table.num_calls(id_b, 0) # num actual calls
     if num_calls_b == 0 or min_score == float('inf') or max_score == float('inf'):
         #print(num_calls_a, min_score, max_score)
         return [], [], [], 0, 0
@@ -404,13 +408,13 @@ def analyze_by_score(sv_db, id_a, id_b):
         #print(min_score, p, max_score)
         ps.append(p)
         # how many of the sv's are detected?
-        #num_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, p, 0)
-        num_almost_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, p, blur_amount)
+        #num_overlaps_b_to_a = call_table.num_overlaps(id_b, id_a, p, 0)
+        num_almost_overlaps_b_to_a = call_table.num_overlaps(id_b, id_a, p, blur_amount)
 
         #xs.append(num_overlaps_b_to_a/num_calls_b)
         xs_2.append(num_almost_overlaps_b_to_a/num_calls_b)
 
-        num_calls_a = sv_db.get_num_calls(id_a, p) # num calls made
+        num_calls_a = call_table.num_calls(id_a, p) # num calls made
 
         if num_calls_a == 0:
             #ys.append(0)
@@ -422,10 +426,10 @@ def analyze_by_score(sv_db, id_a, id_b):
 
         p += inc
 
-    #num_invalid_calls = sv_db.get_num_invalid_calls(id_a, 0, 0)
-    num_invalid_calls_fuzzy = sv_db.get_num_invalid_calls(id_a, 0, blur_amount)
+    #num_invalid_calls = call_table.num_invalid_calls(id_a, 0, 0)
+    num_invalid_calls_fuzzy = call_table.num_invalid_calls(id_a, 0, blur_amount)
     # @todo at the moment this is inefficient
-    avg_blur = 0 #round(sv_db.get_blur_on_overlaps_between_calls(id_b, id_a, 0, blur_amount), 1)
+    avg_blur = 0 #round(call_table.blur_on_overlaps(id_b, id_a, 0, blur_amount), 1)
 
     return xs_2, ys_2, ps, num_invalid_calls_fuzzy, avg_blur
     #return xs, ys, xs_2, ys_2, ps, num_invalid_calls, num_invalid_calls_fuzzy, avg_blur
@@ -437,10 +441,10 @@ def analyze_by_score(sv_db, id_a, id_b):
 #  - get standard deviation of sv jumps from mean delta value
 #  - get standard deviation of sv jumps from mean r+q value
 #  - divide values and filer calls based on that ratio
-def compute_diagonal_threshold_picture(sv_db, id_a, id_b):
+def compute_diagonal_threshold_picture(db_conn, id_a, id_b):
     parameter_set_manager = ParameterSetManager()
-    true_positives = SvCallsFromDb(parameter_set_manager, sv_db, id_a, id_b, True, blur_amount)
-    false_positives = SvCallsFromDb(parameter_set_manager, sv_db, id_a, id_b, False, blur_amount)
+    true_positives = SvCallsFromDb(parameter_set_manager, db_conn, id_a, id_b, True, blur_amount)
+    false_positives = SvCallsFromDb(parameter_set_manager, db_conn, id_a, id_b, False, blur_amount)
 
     def get_std(l):
         l.sort()
@@ -504,76 +508,73 @@ def compute_diagonal_threshold_picture(sv_db, id_a, id_b):
     show(plot)
 
 
-def compare_caller(sv_db, id_a, id_b, min_score):
-    sv_db.add_score_index(id_a) # @todo this can be removed once index is in all databases
-    num_calls_a = sv_db.get_num_calls(id_a, min_score) # num calls made
-    num_calls_b = sv_db.get_num_calls(id_b, min_score) # num actual calls
+def compare_caller(call_table, id_a, id_b, min_score):
+    num_calls_a = call_table.num_calls(id_a, min_score) # num calls made
+    num_calls_b = call_table.num_calls(id_b, min_score) # num actual calls
     if num_calls_b == 0:
         print("no calls")
         return (0, 0, 0, 0, 0, 0, 0)
-    call_area_a = sv_db.get_call_area(id_a, min_score)
+    call_area_a = call_table.call_area(id_a, min_score)
     if num_calls_a > 0:
         rel_call_area_a = int(math.sqrt(call_area_a/num_calls_a)) # get the edge length
     else:
         rel_call_area_a = "n/a"
-    call_area_b = sv_db.get_call_area(id_b, min_score)
+    call_area_b = call_table.call_area(id_b, min_score)
     rel_call_area_b = call_area_b/num_calls_b
     # @note start with the largest blur_amount so that we only need to initialize the cache once
-    num_almost_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_a, id_b, min_score, blur_amount) # true positives
+    num_almost_overlaps_a_to_b = call_table.num_overlaps(id_a, id_b, min_score, blur_amount) # true positives
     # true positives
-    num_overlaps_a_to_b = sv_db.get_num_overlaps_between_calls(id_a, id_b, min_score, 0)
+    num_overlaps_a_to_b = call_table.num_overlaps(id_a, id_b, min_score, 0)
     num_almost_overlaps_a_to_b -= num_overlaps_a_to_b
     # how many of the sv's are detected?
-    num_almost_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, blur_amount)
+    num_almost_overlaps_b_to_a = call_table.num_overlaps(id_b, id_a, min_score, blur_amount)
     # how many of the sv's are detected?
-    num_overlaps_b_to_a = sv_db.get_num_overlaps_between_calls(id_b, id_a, min_score, 0)
+    num_overlaps_b_to_a = call_table.num_overlaps(id_b, id_a, min_score, 0)
     num_errors = num_calls_b - num_overlaps_b_to_a # how many of the sv's are NOT detected?
     num_way_off = num_calls_b - num_almost_overlaps_b_to_a # how many of the sv's are NOT detected?
-    num_invalid_calls = sv_db.get_num_invalid_calls(id_a, min_score, 0)
+    num_invalid_calls = call_table.num_invalid_calls(id_a, min_score, 0)
     return (num_calls_a, num_overlaps_b_to_a, num_almost_overlaps_b_to_a, num_errors, num_way_off, 
             rel_call_area_a, num_invalid_calls)
 
-def compare_callers(db_name, names_a, names_b=["simulated sv"], min_scores=[0]):
-    sv_db = SV_DB(db_name, "open")
-    #print("sensitivity = true positive rate = recall")
-    #print("missing rate = how many calls are missing")
-    out = [["test caller", "ground truth caller", "min score", "#calls", "#found", "#almost", "#missed", "#way off", "fuzziness", "#inv call"]]
-    for name_a, name_b in zip(names_a, names_b):
-        id_a = sv_db.get_run_id(name_a)
-        id_b = sv_db.get_run_id(name_b)
-        date_a = sv_db.get_run_date(id_a) 
-        date_b = sv_db.get_run_date(id_b)
-        for min_score in min_scores:
-            out.append([name_a + " - " + date_a, name_b + " - " + date_b, min_score,
-                       *(str(x) for x in compare_caller(sv_db, id_a, id_b, min_score))])
-    print_columns(out)
+"""
 
-def compare_all_callers_against(sv_db, json_info_file, out_file_name=None, outfile_2_name=None):
+            run_table = SvCallerRunTable(self.db_conn)
+            for run_id in run_table.getIds():
+                text = run_table.getName(run_id) + " - " + run_table.getDate(run_id) + " - " + run_table.getDesc(run_id)
+                text += " - " + str(SvCallTable(self.db_conn).num_calls(run_id, self.widgets.score_slider.value))
+
+"""
+
+def compare_all_callers_against(dataset_name, json_info_file, out_file_name=None, outfile_2_name=None):
+    db_conn = DbConn(dataset_name)
+    run_table = SvCallerRunTable(db_conn)
+    call_table = SvCallTable(db_conn)
     out = []
     out_2 = {}
     for dataset in json_info_file["datasets"]:
         id_b = dataset["ground_truth"]
         name_b = dataset["name"]
-        date_b = sv_db.get_run_date(id_b)
-        print("ground truth is:", name_b, "-", date_b, "[ id:", id_b, "] - with", sv_db.get_num_calls(id_b, 0), "calls")
+        date_b = run_table.getDate(id_b)
+        print("ground truth is:", name_b, "-", date_b, "[ id:", id_b, "] - with",
+              call_table.num_calls(id_b, 0), "calls")
         #print("sensitivity = true positive rate = recall")
         #print("missing rate = how many calls are missing")
-        for id_a in sv_db.newest_unique_runs(2, "ground_truth=" + str(id_b)):
-            name_a = sv_db.get_run_name(id_a).split("-")
+        for id_a in run_table.newest_unique_runs(2, "ground_truth=" + str(id_b)):
+            name_a = run_table.getName(id_a).split("-")
             dataset_name = name_a[0]
             dataset_size = name_a[1]
             seq = name_a[2]
             cov = name_a[3]
             aligner = name_a[4]
             caller = name_a[5]
-            date_a = sv_db.get_run_date(id_a)
+            date_a = run_table.getDate(id_a)
             print("analyzing", id_a, name_a, date_a)
             out.append([dataset_name, dataset_size, seq, cov, caller, aligner, str(id_a),
-                        *(str(x) for x in compare_caller(sv_db, id_a, id_b, 0))]) # 60 if caller == "MA_SV" else 0
+                        *(str(x) for x in compare_caller(call_table, id_a, id_b, 0))])
             if str(name_a[:4]) not in out_2:
                 out_2[str(name_a[:4])] = {}
-            out_2[str(name_a[:4])][str((aligner, caller))] = analyze_by_score(sv_db, id_a, id_b)
-            #compute_diagonal_threshold_picture(sv_db, id_a, id_b)
+            out_2[str(name_a[:4])][str((aligner, caller))] = analyze_by_score(call_table, id_a, id_b)
+            #compute_diagonal_threshold_picture(db_conn, id_a, id_b)
 
     out.sort()
     out.insert(0, ["dataset", "size", "sequencer", "coverage", "caller", "aligner", "id", "#calls", "#found", "#almost",
@@ -635,18 +636,9 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
         with open(sv_data_dir + dataset_name + "/info.json", "w") as json_out:
             json.dump(json_info_file, json_out)
 
-        return
-
-    compare_all_callers_against(json_info_file, sv_data_dir + dataset_name + "/bar_diagrams.tsv",
+    compare_all_callers_against(dataset_name, json_info_file, sv_data_dir + dataset_name + "/bar_diagrams.tsv",
                                 sv_data_dir + dataset_name + "/by_score.json")
 
 
-#print("===============")
-#compare_callers("/MAdata/databases/sv_simulated", ["MA-SV"])
-#print("===============")
 if __name__ == "__main__":
-    analyze_sample_dataset("minimal", run_others=False, recompute_calls=True)
-
-    #analyze_sample_dataset("comprehensive", True)
-
-    #compare_all_callers_against(SV_DB("sv_simulated", "open"))
+    analyze_sample_dataset("minimal", run_others=False, recompute_calls=True, recompute_jumps=True)
