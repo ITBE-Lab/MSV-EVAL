@@ -4,9 +4,8 @@ from bokeh.models import Arrow, VeeHead, FactorRange, LabelSet
 from bokeh.palettes import Category20, Category10
 from bokeh.transform import dodge
 from bokeh.core.properties import value
-from create_json import create_json_from_db
 import json
-from MA import SV_DB, ParameterSetManager
+from MA import DbConn, SvCallerRunTable, SvCallTable, ParameterSetManager
 from bokeh.models import Legend
 import math
 
@@ -340,12 +339,15 @@ def print_ground_truth(dataset_name):
     json_info_file = None # noop
     with open(sv_data_dir + dataset_name + "/info.json", "r") as json_file:
         json_info_file = json.loads(json_file.read(), object_hook=_decode)
-    sv_db = SV_DB(dataset_name, "open")
+    conn = DbConn(dataset_name)
+    run_table = SvCallerRunTable(conn)
+    call_table = SvCallTable(conn)
     for dataset in json_info_file["datasets"]:
         id_b = dataset["ground_truth"]
         name_b = dataset["name"]
-        date_b = sv_db.get_run_date(id_b)
-        print("ground truth is:", name_b, "-", date_b, "[ id:", id_b, "] - with", sv_db.get_num_calls(id_b, 0), "calls")
+        date_b = run_table.getDate(id_b)
+        print("ground truth is:", name_b, "-", date_b, "[ id:", id_b, "] - with",
+              call_table.num_calls(id_b, 0), "calls")
 
 def render_from_tsv(dataset_name):
     print_ground_truth(dataset_name)
@@ -379,4 +381,4 @@ def render_from_tsv(dataset_name):
     render_from_list(tsv_list, json_dict, dataset_name)
 
 if __name__ == "__main__":
-    render_from_tsv("del_human_compre")
+    render_from_tsv("minimal")

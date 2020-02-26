@@ -4,7 +4,6 @@ import os
 import json
 import traceback
 from pathlib import Path
-from printColumns import print_columns
 import datetime
 from bokeh.plotting import figure, show
 from bokeh.models.formatters import PrintfTickFormatter
@@ -385,6 +384,9 @@ def run_callers_if_necessary(dataset_name, json_dict, pack, fm_index, run_others
 blur_amount = 10
 #blur_amount = 350
 
+##
+# id_b = ground truth
+# id_a = calls
 def analyze_by_score(call_table, id_a, id_b):
     num_calls_a = call_table.num_calls(id_a, 0) # num calls made
     if num_calls_a == 0:
@@ -409,7 +411,7 @@ def analyze_by_score(call_table, id_a, id_b):
         ps.append(p)
         # how many of the sv's are detected?
         #num_overlaps_b_to_a = call_table.num_overlaps(id_b, id_a, p, 0)
-        num_almost_overlaps_b_to_a = call_table.num_overlaps(id_b, id_a, p, blur_amount)
+        num_almost_overlaps_b_to_a = call_table.num_overlaps(id_a, id_b, p, blur_amount)
 
         #xs.append(num_overlaps_b_to_a/num_calls_b)
         xs_2.append(num_almost_overlaps_b_to_a/num_calls_b)
@@ -536,14 +538,6 @@ def compare_caller(call_table, id_a, id_b, min_score):
     return (num_calls_a, num_overlaps_b_to_a, num_almost_overlaps_b_to_a, num_errors, num_way_off, 
             rel_call_area_a, num_invalid_calls)
 
-"""
-
-            run_table = SvCallerRunTable(self.db_conn)
-            for run_id in run_table.getIds():
-                text = run_table.getName(run_id) + " - " + run_table.getDate(run_id) + " - " + run_table.getDesc(run_id)
-                text += " - " + str(SvCallTable(self.db_conn).num_calls(run_id, self.widgets.score_slider.value))
-
-"""
 
 def compare_all_callers_against(dataset_name, json_info_file, out_file_name=None, outfile_2_name=None):
     db_conn = DbConn(dataset_name)
