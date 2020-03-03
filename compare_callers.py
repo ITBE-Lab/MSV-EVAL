@@ -387,7 +387,7 @@ blur_amount = 10
 ##
 # id_b = ground truth
 # id_a = calls
-def analyze_by_score(call_table, id_a, id_b):
+def analyze_by_score(call_table_analyzer, call_table, id_a, id_b):
     num_calls_a = call_table.num_calls(id_a, 0) # num calls made
     if num_calls_a == 0:
         return [], [], [], 0, 0
@@ -406,12 +406,13 @@ def analyze_by_score(call_table, id_a, id_b):
     if num_calls_b == 0 or min_score == float('inf') or max_score == float('inf'):
         #print(num_calls_a, min_score, max_score)
         return [], [], [], 0, 0
+    num_almost_overlaps_b_to_a = 0
     while p <= max_score:
         #print(min_score, p, max_score)
         ps.append(p)
         # how many of the sv's are detected?
         #num_overlaps_b_to_a = call_table.num_overlaps(id_b, id_a, p, 0)
-        num_almost_overlaps_b_to_a = call_table.num_overlaps(id_a, id_b, p, blur_amount)
+        num_almost_overlaps_b_to_a += call_table_analyzer.num_overlaps(id_a, id_b, p, p + inc, blur_amount)
 
         #xs.append(num_overlaps_b_to_a/num_calls_b)
         xs_2.append(num_almost_overlaps_b_to_a/num_calls_b)
@@ -429,9 +430,8 @@ def analyze_by_score(call_table, id_a, id_b):
         p += inc
 
     #num_invalid_calls = call_table.num_invalid_calls(id_a, 0, 0)
-    num_invalid_calls_fuzzy = call_table.num_invalid_calls(id_a, 0, blur_amount)
-    # @todo at the moment this is inefficient
-    avg_blur = 0 #round(call_table.blur_on_overlaps(id_b, id_a, 0, blur_amount), 1)
+    num_invalid_calls_fuzzy = call_table_analyzer.num_invalid_calls(id_a, 0, max_score + 1, blur_amount)
+    avg_blur = round(call_table_analyzer.blur_on_overlaps(id_b, id_a, 0, max_score + 1, blur_amount), 1)
 
     return xs_2, ys_2, ps, num_invalid_calls_fuzzy, avg_blur
     #return xs, ys, xs_2, ys_2, ps, num_invalid_calls, num_invalid_calls_fuzzy, avg_blur
@@ -510,7 +510,8 @@ def compute_diagonal_threshold_picture(db_conn, id_a, id_b):
     show(plot)
 
 
-def compare_caller(call_table, id_a, id_b, min_score):
+def compare_caller(call_table_analyzer, call_table, id_a, id_b, min_score):
+    max_score = call_table.max_score(id_a)
     num_calls_a = call_table.num_calls(id_a, min_score) # num calls made
     num_calls_b = call_table.num_calls(id_b, min_score) # num actual calls
     if num_calls_b == 0:
@@ -524,23 +525,25 @@ def compare_caller(call_table, id_a, id_b, min_score):
     call_area_b = call_table.call_area(id_b, min_score)
     rel_call_area_b = call_area_b/num_calls_b
     # @note start with the largest blur_amount so that we only need to initialize the cache once
-    num_almost_overlaps_a_to_b = call_table.num_overlaps(id_a, id_b, min_score, blur_amount) # true positives
+    num_almost_overlaps_a_to_b = call_table_analyzer.num_overlaps(id_a, id_b, min_score, max_score+1, blur_amount) # true positives
     # true positives
-    num_overlaps_a_to_b = call_table.num_overlaps(id_a, id_b, min_score, 0)
+    num_overlaps_a_to_b = call_table_analyzer.num_overlaps(id_a, id_b, min_score, max_score+1, 0)
     num_almost_overlaps_a_to_b -= num_overlaps_a_to_b
     # how many of the sv's are detected?
-    num_almost_overlaps_b_to_a = call_table.num_overlaps(id_b, id_a, min_score, blur_amount)
+    num_almost_overlaps_b_to_a = call_table_analyzer.num_overlaps(id_b, id_a, min_score, max_score+1, blur_amount)
     # how many of the sv's are detected?
-    num_overlaps_b_to_a = call_table.num_overlaps(id_b, id_a, min_score, 0)
+    num_overlaps_b_to_a = call_table_analyzer.num_overlaps(id_b, id_a, min_score, max_score+1, 0)
     num_errors = num_calls_b - num_overlaps_b_to_a # how many of the sv's are NOT detected?
     num_way_off = num_calls_b - num_almost_overlaps_b_to_a # how many of the sv's are NOT detected?
-    num_invalid_calls = call_table.num_invalid_calls(id_a, min_score, 0)
-    return (num_calls_a, num_overlaps_b_to_a, num_almost_overlaps_b_to_a, num_errors, num_way_off, 
+    num_invalid_calls = call_table_analyzer.num_invalid_calls(id_a, min_score, max_score+1, 0)
+    return (num_calls_a, num_overlaps_a_to_b, num_almost_overlaps_a_to_b, num_errors, num_way_off, 
             rel_call_area_a, num_invalid_calls)
 
 
 def compare_all_callers_against(dataset_name, json_info_file, out_file_name=None, outfile_2_name=None):
     db_conn = DbConn(dataset_name)
+    pool = PoolContainer(ParameterSetManager().get_num_threads() + 1, dataset_name)
+    call_table_analyzer = libMA.SvCallTableAnalyzer(pool)
     run_table = SvCallerRunTable(db_conn)
     call_table = SvCallTable(db_conn)
     out = []
@@ -564,10 +567,10 @@ def compare_all_callers_against(dataset_name, json_info_file, out_file_name=None
             date_a = run_table.getDate(id_a)
             print("analyzing", id_a, name_a, date_a)
             out.append([dataset_name, dataset_size, seq, cov, caller, aligner, str(id_a),
-                        *(str(x) for x in compare_caller(call_table, id_a, id_b, 0))])
+                        *(str(x) for x in compare_caller(call_table_analyzer, call_table, id_a, id_b, 0))])
             if str(name_a[:4]) not in out_2:
                 out_2[str(name_a[:4])] = {}
-            out_2[str(name_a[:4])][str((aligner, caller))] = analyze_by_score(call_table, id_a, id_b)
+            out_2[str(name_a[:4])][str((aligner, caller))] = analyze_by_score(call_table_analyzer, call_table, id_a, id_b)
             #compute_diagonal_threshold_picture(db_conn, id_a, id_b)
 
     out.sort()
@@ -635,4 +638,4 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 
 
 if __name__ == "__main__":
-    analyze_sample_dataset("minimal", run_others=False, recompute_calls=True, recompute_jumps=True)
+    analyze_sample_dataset("comprehensive", run_others=False, recompute_calls=False, recompute_jumps=False)
