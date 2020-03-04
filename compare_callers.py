@@ -393,10 +393,10 @@ def analyze_by_score(call_table_analyzer, call_table, id_a, id_b):
         return [], [], [], 0, 0
     min_score = call_table.min_score(id_a)
     max_score = call_table.max_score(id_a)
-    p = min_score
     inc = (max_score - min_score) / 50
     if max_score <= min_score:
         inc = 1
+    p = max_score + 1
     #xs = []
     xs_2 = []
     #ys = []
@@ -407,17 +407,20 @@ def analyze_by_score(call_table_analyzer, call_table, id_a, id_b):
         #print(num_calls_a, min_score, max_score)
         return [], [], [], 0, 0
     num_almost_overlaps_b_to_a = 0
-    while p <= max_score:
+    while p > min_score:
         #print(min_score, p, max_score)
-        ps.append(p)
+        ps.append(max(p - inc, 0))
         # how many of the sv's are detected?
         #num_overlaps_b_to_a = call_table.num_overlaps(id_b, id_a, p, 0)
-        num_almost_overlaps_b_to_a += call_table_analyzer.num_overlaps(id_a, id_b, p, p + inc, blur_amount)
+        num_almost_overlaps_b_to_a += call_table_analyzer.num_overlaps(id_a, id_b, p - inc, p, blur_amount)
 
         #xs.append(num_overlaps_b_to_a/num_calls_b)
         xs_2.append(num_almost_overlaps_b_to_a/num_calls_b)
 
-        num_calls_a = call_table.num_calls(id_a, p) # num calls made
+        num_calls_a = call_table.num_calls(id_a, p - inc) # num calls made
+
+        assert num_almost_overlaps_b_to_a <= num_calls_b
+        assert num_almost_overlaps_b_to_a <= num_calls_a
 
         if num_calls_a == 0:
             #ys.append(0)
@@ -427,11 +430,17 @@ def analyze_by_score(call_table_analyzer, call_table, id_a, id_b):
             # assert(num_almost_overlaps_b_to_a <= num_calls_a)
             ys_2.append(num_almost_overlaps_b_to_a/num_calls_a)
 
-        p += inc
+        p -= inc
+
+    # we have computed the lists in reverse order -> fix that
+    xs_2.reverse()
+    ys_2.reverse()
+    ps.reverse()
 
     #num_invalid_calls = call_table.num_invalid_calls(id_a, 0, 0)
     num_invalid_calls_fuzzy = call_table_analyzer.num_invalid_calls(id_a, 0, max_score + 1, blur_amount)
-    avg_blur = round(call_table_analyzer.blur_on_overlaps(id_b, id_a, 0, max_score + 1, blur_amount), 1)
+    avg_blur = round(call_table_analyzer.blur_on_overlaps(id_a, id_b, 0, max_score + 1, blur_amount), 1)
+    assert avg_blur <= blur_amount
 
     return xs_2, ys_2, ps, num_invalid_calls_fuzzy, avg_blur
     #return xs, ys, xs_2, ys_2, ps, num_invalid_calls, num_invalid_calls_fuzzy, avg_blur

@@ -171,8 +171,10 @@ def render_from_list(tsv_list, json_dict, dataset_name, plot_category=(0,0), plo
             return 0
         ret = 0
         for x_1, x_2, y_2, y_1 in zip(xs[1:], xs[:-1], ys[1:], ys[:-1]):
-            assert x_2 >= x_1
+            #assert x_2 >= x_1
             w = x_2 - x_1
+            if x_2 < x_1:
+                return 0
             h_1 = min(y_1, y_2)
             h_2 = max(y_1, y_2) - h_1
             #rectangular area:
@@ -381,4 +383,4 @@ def render_from_tsv(dataset_name):
     render_from_list(tsv_list, json_dict, dataset_name)
 
 if __name__ == "__main__":
-    render_from_tsv("minimal")
+    render_from_tsv("comprehensive")
