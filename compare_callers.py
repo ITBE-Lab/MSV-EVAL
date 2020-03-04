@@ -647,4 +647,4 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 
 
 if __name__ == "__main__":
-    analyze_sample_dataset("comprehensive", run_others=False, recompute_calls=False, recompute_jumps=False)
+    analyze_sample_dataset("comprehensive", run_others=False, recompute_calls=True, recompute_jumps=True)
