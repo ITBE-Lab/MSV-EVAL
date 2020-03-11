@@ -1,4 +1,6 @@
+from MS import *
 from MA import *
+from MSV import *
 import math
 import os
 import json
@@ -552,7 +554,7 @@ def compare_caller(call_table_analyzer, call_table, id_a, id_b, min_score):
 def compare_all_callers_against(dataset_name, json_info_file, out_file_name=None, outfile_2_name=None):
     db_conn = DbConn(dataset_name)
     pool = PoolContainer(ParameterSetManager().get_num_threads() + 1, dataset_name)
-    call_table_analyzer = libMA.SvCallTableAnalyzer(pool)
+    call_table_analyzer = SvCallTableAnalyzer(pool)
     run_table = SvCallerRunTable(db_conn)
     call_table = SvCallTable(db_conn)
     out = []
@@ -647,4 +649,4 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 
 
 if __name__ == "__main__":
-    analyze_sample_dataset("comprehensive", run_others=False, recompute_calls=True, recompute_jumps=True)
+    analyze_sample_dataset("minimal", run_others=False, recompute_calls=True, recompute_jumps=True)

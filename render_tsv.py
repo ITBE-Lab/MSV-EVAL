@@ -5,7 +5,9 @@ from bokeh.palettes import Category20, Category10
 from bokeh.transform import dodge
 from bokeh.core.properties import value
 import json
-from MA import DbConn, SvCallerRunTable, SvCallTable, ParameterSetManager
+from MS import *
+from MA import *
+from MSV import *
 from bokeh.models import Legend
 import math
 
@@ -383,4 +385,4 @@ def render_from_tsv(dataset_name):
     render_from_list(tsv_list, json_dict, dataset_name)
 
 if __name__ == "__main__":
-    render_from_tsv("comprehensive")
+    render_from_tsv("minimal")

@@ -1,4 +1,6 @@
+from MS import *
 from MA import *
+from MSV import *
 import os
 import textwrap
 import time
@@ -329,8 +331,8 @@ if __name__ == "__main__":
     survivor_error_profile_pac_b = survivor_error_profile_dir + "HG002_Pac_error_profile_bwa.txt"
     survivor_error_profile_ont = survivor_error_profile_dir + "NA12878_nano_error_profile_bwa.txt"
 
-    create_dataset(genome_dir + "/GRCh38.p12-chr1-full",
-                   "comprehensive",
+    create_dataset(genome_dir + "/GRCh38.p12-chr1",
+                   "minimal",
                    [
                     ( separate_svs, "del-0100", ( (sv_deletion, tuple()), 100, 5000 ) ),
 #                    ( separate_svs, "del-1000", ( (sv_deletion, tuple()), 1000, 50000 ) ),
