@@ -60,12 +60,12 @@ def default_vcf_interpreter(call, call_inserter, pack, error_file):
             #print(call)
             from_pos = int(call["START"]) + pack.start_of_sequence(call["CHROM"])
             to_pos = int(call["END"]) + pack.start_of_sequence(call["CHROM"])
-            call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call), 1))
         elif call["ALT"] == "<DEL>" and "PRECISE" in call["INFO"]:
             #print(call)
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
             to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-            call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call), 1))
         elif call["ALT"] == "<DEL>" and "IMPRECISE" in call["INFO"]:
             #print(call)
             std_from, std_to = find_std_from_std_to(call)
@@ -74,73 +74,73 @@ def default_vcf_interpreter(call, call_inserter, pack, error_file):
                 to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
             else:
                 to_pos = from_pos - int(call["INFO"]["SVLEN"]) - int(std_to/2)
-            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
         elif call["ALT"] == "<DUP>" and "PRECISE" in call["INFO"]:
             #print(call)
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
             to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-            call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, 1, 1, False, find_confidence(call), 1))
         elif call["ALT"] == "<DUP>" and "IMPRECISE" in call["INFO"]:
             #print(call)
             std_from, std_to = find_std_from_std_to(call)
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
             to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
-            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
         elif call["ALT"] == "<DUP>": # pbsv
             #print(call)
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
             to_pos = from_pos + int(call["INFO"]["SVLEN"])
-            call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, 1, 1, False, find_confidence(call), 1))
         elif call["ALT"] == "<INS>" and "PRECISE" in call["INFO"]:
             #print(call)
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-            call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, from_pos, 1, 1, False, find_confidence(call), 1))
         elif call["TYPE"] == "INS":
             #print(call)
             from_pos = int(call["START"]) + pack.start_of_sequence(call["CHROM"])
-            call_inserter.insert_call(SvCall(from_pos, from_pos, 1, 1, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, from_pos, 1, 1, False, find_confidence(call), 1))
         elif call["ALT"] == "<INS>" and "IMPRECISE" in call["INFO"]:
             #print(call)
             from_start = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
             from_end = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-            call_inserter.insert_call(SvCall(from_start, from_start, from_end - from_start,
+            call_inserter.insert(SvCall(from_start, from_start, from_end - from_start,
                                                 from_end - from_start, False, find_confidence(call), 1))
         elif call["INFO"]["SVTYPE"] == "INS": #pbsv
             #print(call)
             from_start = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-            call_inserter.insert_call(SvCall(from_start, from_start, 1, 1, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_start, from_start, 1, 1, False, find_confidence(call), 1))
         elif call["ALT"] == "<INV>" and "PRECISE" in call["INFO"]:
             #print(call)
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
             to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"])
-            call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, True, find_confidence(call), 1))
-            call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, 1, 1, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, 1, 1, True, find_confidence(call), 1))
         elif call["ALT"] == "<INV>" and "IMPRECISE" in call["INFO"]:
             #print(call)
             std_from, std_to = find_std_from_std_to(call)
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
             to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - int(std_to/2)
-            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, to_pos, True, find_confidence(call), 1))
-            call_inserter.insert_call(SvCall(to_pos, from_pos, from_pos, to_pos, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, std_from, to_pos, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, from_pos, to_pos, True, find_confidence(call), 1))
         elif call["ALT"] == "<INV>": # pbsv
             #print(call)
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
             to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["CHROM"])
-            call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, True, find_confidence(call), 1))
-            call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, 1, 1, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, 1, 1, True, find_confidence(call), 1))
         elif call["INFO"]["SVTYPE"] == "DEL": # Manta
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
             to_pos = from_pos - int(call["INFO"]["SVLEN"])
-            call_inserter.insert_call(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, 1, 1, False, find_confidence(call), 1))
         elif call["INFO"]["SVTYPE"] == "DUP" and "IMPRECISE" in call["INFO"]: # Manta
             std_from, std_to = find_std_from_std_to(call)
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_from/2)
             to_pos = from_pos + int(call["INFO"]["SVLEN"]) - int(std_to/2)
-            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
         elif call["INFO"]["SVTYPE"] == "DUP": # Manta
             from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
             to_pos = from_pos + int(call["INFO"]["SVLEN"])
-            call_inserter.insert_call(SvCall(to_pos, from_pos, 1, 1, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, 1, 1, False, find_confidence(call), 1))
         elif call["INFO"]["SVTYPE"] == "BND" and "IMPRECISE" in call["INFO"]: # Manta
             if call["INFO"]["MATEID"] in bnd_mate_dict:
                 mate = bnd_mate_dict[call["INFO"]["MATEID"]]
@@ -149,9 +149,9 @@ def default_vcf_interpreter(call, call_inserter, pack, error_file):
                 from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"]) - int(std_from/2)
                 to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - int(std_to/2)
                 save_as_inversion = create_sv_func == "sv_inversion"
-                call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, save_as_inversion,
+                call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, save_as_inversion,
                                                     find_confidence(call), 1))
-                call_inserter.insert_call(SvCall(from_pos, to_pos, std_to, std_from, save_as_inversion,
+                call_inserter.insert(SvCall(from_pos, to_pos, std_to, std_from, save_as_inversion,
                                                     find_confidence(call), 1))
                 del bnd_mate_dict[call["INFO"]["MATEID"]]
             else:
@@ -199,21 +199,21 @@ def sniffles_interpreter(call, call_inserter, pack, error_file):
         if "/" in call["ALT"]:
             to_recognize = 2
         if "DEL" in call["ALT"]:
-            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
             to_recognize -= 1
         if "INV" in call["ALT"]:
-            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, True, find_confidence(call), 1))
-            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, True, find_confidence(call), 1))
             to_recognize -= 1
         if "INS" in call["ALT"]:
-            call_inserter.insert_call(SvCall(from_pos, from_pos + 1, std_from, std_from, False,
+            call_inserter.insert(SvCall(from_pos, from_pos + 1, std_from, std_from, False,
                                       find_confidence(call), 1))
             to_recognize -= 1
         if "DUP" in call["ALT"]:
-            call_inserter.insert_call(SvCall(to_pos, from_pos, std_to, std_from, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, std_to, std_from, False, find_confidence(call), 1))
             to_recognize -= 1
         if "TRA" in call["ALT"]:
-            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
             to_recognize -= 1
 
         if to_recognize != 0:
@@ -248,17 +248,17 @@ def pb_sv_interpreter(call, call_inserter, pack, error_file):
     try:
         from_pos, to_pos = find_from_and_to_pos(call)
         if call["INFO"]["SVTYPE"] == "DEL":
-            call_inserter.insert_call(SvCall(from_pos, to_pos, 0, 0, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, 0, 0, False, find_confidence(call), 1))
             return
         if call["INFO"]["SVTYPE"] == "INS":
-            call_inserter.insert_call(SvCall(from_pos, from_pos + 1, 0, 0, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, from_pos + 1, 0, 0, False, find_confidence(call), 1))
             return
         if call["INFO"]["SVTYPE"] == "INV":
-            call_inserter.insert_call(SvCall(from_pos, to_pos, 0, 0, True, find_confidence(call), 1))
-            call_inserter.insert_call(SvCall(to_pos, from_pos, 0, 0, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, 0, 0, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, 0, 0, True, find_confidence(call), 1))
             return
         if call["INFO"]["SVTYPE"] == "DUP":
-            call_inserter.insert_call(SvCall(to_pos, from_pos, 0, 0, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, 0, 0, False, find_confidence(call), 1))
             return
         if call["INFO"]["SVTYPE"] == "cnv":
             return
@@ -269,8 +269,8 @@ def pb_sv_interpreter(call, call_inserter, pack, error_file):
                 std_to = find_std_from(mate)
                 from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"]) - std_from//2
                 to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - std_to//2
-                call_inserter.insert_call(SvCall(from_pos, to_pos, from_pos, std_to, False, find_confidence(call), 1))
-                call_inserter.insert_call(SvCall(to_pos, from_pos, std_to, from_pos, False, find_confidence(mate), 1))
+                call_inserter.insert(SvCall(from_pos, to_pos, from_pos, std_to, False, find_confidence(call), 1))
+                call_inserter.insert(SvCall(to_pos, from_pos, std_to, from_pos, False, find_confidence(mate), 1))
                 del bnd_mate_dict_pb_sv[call["INFO"]["MATEID"]]
             else:
                 bnd_mate_dict_pb_sv[call["ID"]] = call
@@ -318,28 +318,28 @@ def delly_interpreter(call, call_inserter, pack, error_file):
             raise Exception("found neither precise nor imprecise in INFO")
 
         if call["ALT"] == "<DEL>":
-            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
             return
         if call["ALT"] == "<INV>" and False:
             from_pos, to_pos = find_from_and_to_pos(call)
             # delly calls inversion twice once 3t3 once 5t5 (or heat to head and tail to tail) of reads
-            call_inserter.insert_call(SvCall(from_pos, to_pos, 0, 0, True, find_confidence(call), 1))
-            call_inserter.insert_call(SvCall(to_pos, from_pos, 0, 0, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, 0, 0, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, 0, 0, True, find_confidence(call), 1))
             return
         if call["ALT"] == "<INV>":
             # delly calls inversion twice once 3t3 once 5t5 (or heat to head and tail to tail) of reads
-            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, True, find_confidence(call), 1))
-            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, True, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, True, find_confidence(call), 1))
             return
         if call["ALT"] == "<DUP>":
-            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
             return
         if call["ALT"] == "<INS>":
-            call_inserter.insert_call(SvCall(from_pos, from_pos + 1, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, from_pos + 1, std_from, std_to, False, find_confidence(call), 1))
             return
         if call["INFO"]["SVTYPE"] == "BND":
-            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
-            call_inserter.insert_call(SvCall(from_pos, to_pos, std_to, std_from, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, std_to, std_from, False, find_confidence(call), 1))
             return
         raise Exception("could not classify call")
 
@@ -385,13 +385,13 @@ def manta_interpreter(call, call_inserter, pack, error_file):
             std_from, std_to = (0, 0)
 
         if call["ALT"] == "<DUP:TANDEM>":
-            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
             return
         if call["ALT"] == "<DUP>":
-            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
             return
         if call["INFO"]["SVTYPE"] == "DEL":
-            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
             return
         if call["INFO"]["SVTYPE"] == "BND":
             if call["INFO"]["MATEID"] in bnd_mate_dict_manta:
@@ -400,8 +400,8 @@ def manta_interpreter(call, call_inserter, pack, error_file):
                 std_to = find_std_from(mate)
                 from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"]) - std_from//2
                 to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - std_to//2
-                call_inserter.insert_call(SvCall(from_pos, to_pos, from_pos, std_to, False, find_confidence(call), 1))
-                call_inserter.insert_call(SvCall(to_pos, from_pos, std_to, from_pos, False, find_confidence(mate), 1))
+                call_inserter.insert(SvCall(from_pos, to_pos, from_pos, std_to, False, find_confidence(call), 1))
+                call_inserter.insert(SvCall(to_pos, from_pos, std_to, from_pos, False, find_confidence(mate), 1))
                 del bnd_mate_dict_manta[call["INFO"]["MATEID"]]
             else:
                 bnd_mate_dict_manta[call["ID"]] = call
@@ -446,13 +446,13 @@ def smoove_interpreter(call, call_inserter, pack, error_file):
             std_from, std_to = (0, 0)
 
         if call["ALT"] == "<DUP:TANDEM>":
-            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
             return
         if call["ALT"] == "<DUP>":
-            call_inserter.insert_call(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
             return
         if call["INFO"]["SVTYPE"] == "DEL":
-            call_inserter.insert_call(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
+            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
             return
         if call["INFO"]["SVTYPE"] == "BND":
             if call["INFO"]["MATEID"] in bnd_mate_dict_manta:
@@ -461,8 +461,8 @@ def smoove_interpreter(call, call_inserter, pack, error_file):
                 std_to = find_std_from(mate)
                 from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"]) - std_from//2
                 to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - std_to//2
-                call_inserter.insert_call(SvCall(from_pos, to_pos, from_pos, std_to, False, find_confidence(call), 1))
-                call_inserter.insert_call(SvCall(to_pos, from_pos, std_to, from_pos, False, find_confidence(mate), 1))
+                call_inserter.insert(SvCall(from_pos, to_pos, from_pos, std_to, False, find_confidence(call), 1))
+                call_inserter.insert(SvCall(to_pos, from_pos, std_to, from_pos, False, find_confidence(mate), 1))
                 del bnd_mate_dict_manta[call["INFO"]["MATEID"]]
             else:
                 bnd_mate_dict_manta[call["ID"]] = call

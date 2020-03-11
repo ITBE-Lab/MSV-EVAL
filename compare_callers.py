@@ -522,12 +522,12 @@ def compute_diagonal_threshold_picture(db_conn, id_a, id_b):
 
 
 def compare_caller(call_table_analyzer, call_table, id_a, id_b, min_score):
-    max_score = call_table.max_score(id_a)
     num_calls_a = call_table.num_calls(id_a, min_score) # num calls made
     num_calls_b = call_table.num_calls(id_b, min_score) # num actual calls
-    if num_calls_b == 0:
+    if num_calls_a == 0:
         print("no calls")
         return (0, 0, 0, 0, 0, 0, 0)
+    max_score = call_table.max_score(id_a)
     call_area_a = call_table.call_area(id_a, min_score)
     if num_calls_a > 0:
         rel_call_area_a = int(math.sqrt(call_area_a/num_calls_a)) # get the edge length
@@ -649,4 +649,4 @@ def analyze_sample_dataset(dataset_name, run_callers=True, recompute_jumps=False
 
 
 if __name__ == "__main__":
-    analyze_sample_dataset("minimal", run_others=False, recompute_calls=True, recompute_jumps=True)
+    analyze_sample_dataset("minimal", recompute_calls=True)
