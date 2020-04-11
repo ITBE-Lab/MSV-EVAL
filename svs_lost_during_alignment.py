@@ -39,13 +39,16 @@ def create_reads(pack, size, amount, func_get_seeds_and_read):
     return seeds_by_name, read_by_name
 
 
-def compare(params, ground_truth, data, unlock_targets=None):
+def compare(params, ground_truth, data, reads, pack_pledge, unlock_targets=None):
     collect = CollectSeedSetComps(params)
     compare_module = CompareSeedSets(params)
+    lumper = SeedLumping(params)
 
     res = VectorPledge()
     for idx in range(params.get_num_threads()):
-        comp = promise_me(compare_module, ground_truth[idx], data[idx])
+        lumped_g_t = promise_me(lumper, ground_truth[idx], reads[idx], pack_pledge)
+        lumped_data = promise_me(lumper, data[idx], reads[idx], pack_pledge)
+        comp = promise_me(compare_module, lumped_g_t, lumped_data)
         empty = promise_me(collect, comp)
         if unlock_targets is None:
             unlock = empty
@@ -53,29 +56,71 @@ def compare(params, ground_truth, data, unlock_targets=None):
             unlock = promise_me(UnLock(params, unlock_targets[idx]), empty)
         res.append(unlock)
 
-    print("simultaneous_get...")
     res.simultaneous_get(params.get_num_threads())
-    print("simultaneous_get done")
     return collect.cpp_module.collection
 
-def compare_alignment(params, reads_by_name, seeds_by_name, alignments, unlock_targets=None):
-    ground_truth = []
-    data = []
-    align_to_seeds = AlignmentToSeeds(params)
-    get_seeds_by_name = GetSeedsByName(params)
+
+def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack):
+    splitter = NucSeqSplitter(params)
+    lock = Lock(params)
+    reads_by_name_pledge = Pledge()
+    reads_by_name_pledge.set(reads_by_name)
+    pack_pledge = Pledge()
+    pack_pledge.set(pack)
+    fm_index_pledge = Pledge()
+    fm_index_pledge.set(fm_index)
     seeds_by_name_pledge = Pledge()
     seeds_by_name_pledge.set(seeds_by_name)
+
+    seeding_module = BinarySeeding(params)
+    extract_seeds = ExtractSeeds(params)
+    get_seeds_by_name = GetSeedsByReadName(params)
+
+    reads_vec = ContainerVectorNucSeq()
+    for name, read in reads_by_name:
+        reads_vec.append(read)
+    reads_vec_pledge = Pledge()
+    reads_vec_pledge.set(reads_vec)
+
+    ground_truth = []
+    data = []
+    reads = []
+    unlock_targets = []
+    read = promise_me(splitter, reads_vec_pledge)
+    for _ in range(params.get_num_threads()):
+        locked_read = promise_me(lock, read)
+        unlock_targets.append(locked_read)
+        reads.append(locked_read)
+        segments = promise_me(seeding_module, fm_index_pledge, locked_read)
+        seeds = promise_me(extract_seeds, segments, fm_index_pledge, locked_read)
+        data.append(seeds)
+        ground_truth_seeds = promise_me(get_seeds_by_name, locked_read, seeds_by_name_pledge)
+        ground_truth.append(ground_truth_seeds)
+
+    return compare(params, ground_truth, data, reads, pack_pledge, unlock_targets)
+
+def compare_alignment(params, reads_by_name_pledge, seeds_by_name, alignments, pack_pledge, unlock_targets=None):
+    align_to_seeds = AlignmentToSeeds(params)
+    get_seeds_by_name = GetSeedsByName(params)
+    get_read_by_name = GetReadByName(params)
+    seeds_by_name_pledge = Pledge()
+    seeds_by_name_pledge.set(seeds_by_name)
+    ground_truth = []
+    data = []
+    reads = []
     for idx in range(params.get_num_threads()):
         alignment_seeds = promise_me(align_to_seeds, alignments[idx])
         data.append(alignment_seeds)
         ground_truth_seeds = promise_me(get_seeds_by_name, alignments[idx], seeds_by_name_pledge)
         ground_truth.append(ground_truth_seeds)
+        read = promise_me(get_read_by_name, alignments[idx], reads_by_name_pledge)
+        reads.append(read)
 
-    return compare(params, ground_truth, data, unlock_targets)
+    return compare(params, ground_truth, data, reads, pack_pledge, unlock_targets)
+
+
 
 def compare_alignment_from_file_queue(params, reads_by_name, seeds_by_name, pack, queue_pledge):
-    alignments = []
-    locked_files = []
     file_reader = SamFileReader(params)
     queue_picker = FilePicker(params)
     queue_placer = FileAlignmentPlacer(params)
@@ -84,6 +129,9 @@ def compare_alignment_from_file_queue(params, reads_by_name, seeds_by_name, pack
     reads_by_name_pledge.set(reads_by_name)
     pack_pledge = Pledge()
     pack_pledge.set(pack)
+
+    alignments = []
+    locked_files = []
     for _ in range(params.get_num_threads()):
         picked_file = promise_me(queue_picker, queue_pledge)
         locked_file = promise_me(lock, picked_file)
@@ -92,7 +140,7 @@ def compare_alignment_from_file_queue(params, reads_by_name, seeds_by_name, pack
         locked_files.append(locked_file)
         alignments.append(alignment)
 
-    return compare_alignment(params, reads_by_name, seeds_by_name, alignments, locked_files)
+    return compare_alignment(params, reads_by_name_pledge, seeds_by_name, alignments, pack_pledge, locked_files)
 
 
 def compare_alignment_from_file_paths(params, reads_by_name, seeds_by_name, pack, file_paths):
@@ -124,20 +172,37 @@ def no_sv(genome_section, ref_start):
     seeds.append(Seed(0, len(genome_section), ref_start, True))
     return seeds, genome_section
 
+only_sv = True
+no_sv = False
 def translocation(offset, sv_size, gap_size, genome_section, ref_start):
     seeds = Seeds()
-    seeds.append(Seed(0, offset, ref_start, True))
-    seeds.append(Seed(offset + sv_size, offset, ref_start + offset + sv_size, True))
-    seeds.append(Seed(offset + sv_size + gap_size, offset, ref_start + offset + sv_size, True))
-    seeds.append(Seed(offset + sv_size, offset, ref_start + offset + sv_size + gap_size, True))
-    total_size = sv_size + gap_size * 2
-    seeds.append(Seed(offset + total_size, len(genome_section) - total_size, ref_start + total_size, True))
+    total_size = sv_size*2 + gap_size + offset
     g = str(genome_section)
+    # before translocation
+    if not only_sv:
+        seeds.append(Seed(0, offset, ref_start, True))
     read = g[:offset] 
+
+    # section a
+    if not no_sv:
+        seeds.append(Seed(offset + sv_size + gap_size, sv_size, ref_start + offset, True))
     read += g[offset + sv_size + gap_size:total_size] 
+
+    # within translocation
+    if not only_sv:
+        seeds.append(Seed(offset + sv_size, gap_size, ref_start + offset + sv_size, True))
     read += g[offset + sv_size:offset + sv_size + gap_size]
+
+    # section b
+    if not no_sv:
+        seeds.append(Seed(offset, sv_size, ref_start + offset + sv_size + gap_size, True))
     read += g[offset:offset + sv_size]
+
+    # after tranlocation
+    if not only_sv:
+        seeds.append(Seed(total_size, len(genome_section) - total_size, ref_start + total_size, True))
     read += g[total_size:]
+
     return seeds, NucSeq(read)
 
 def main():
@@ -145,16 +210,18 @@ def main():
 
     pack = Pack()
     pack.load(genome_dir + "/ma/genome")
+    fm_index = FMIndex()
+    fm_index.load(genome_dir + "/ma/genome")
 
-    print("creating reads...")
     seeds_by_name, read_by_name = create_reads(pack, 1000, 100, lambda x,y: translocation(100, 20, 10, x,y))
-    print("creating alignments...")
     path_sam = create_alignment(read_by_name, mm2, "mm2")
-    print("compating alignments...")
+    print("Minimap 2 alignment:")
     comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam)
     print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
-    print("entropy:",100 * comp.nt_overlap / comp.nt_data, "% (nt)",
-          100 * comp.amount_overlap / comp.amount_data, "% (seeds)")
+    print("SMEMs:")
+    comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack)
+    print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
+          100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
 
 main()
