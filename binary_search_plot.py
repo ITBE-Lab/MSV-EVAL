@@ -1,7 +1,7 @@
 from svs_lost_during_alignment import *
 
 
-def plot_gap_size():
+def plot_gap_size(sv_func):
     params = ParameterSetManager()
 
     pack = Pack()
@@ -11,13 +11,13 @@ def plot_gap_size():
 
     print("gap_size","mm2","max. sp", sep="\t")
     for gap_size in range(0, 50, 5):
-        seeds_by_name, read_by_name = create_reads(pack, 1000, 100, lambda x,y: translocation(100, gap_size, x,y))
+        seeds_by_name, read_by_name, gt_comp = create_reads(pack, 1000, 100, lambda x,y: sv_func(100, gap_size, x,y))
         path_sam = create_alignment(read_by_name, mm2, "mm2-gap_size=" + str(gap_size))
-        comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam)
-        comp2 = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack)
+        comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp)
+        comp2 = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, gt_comp)
         print(gap_size, 100 * comp.nt_overlap / comp.nt_ground_truth, 100 * comp2.nt_overlap / comp2.nt_ground_truth, sep="\t")
 
-def plot_quads():
+def plot_quads(sv_func):
     params = ParameterSetManager()
 
     pack = Pack()
@@ -42,16 +42,16 @@ def plot_quads():
     for sv_size in range(3, 200, h):
         print("sv_size", sv_size)
         for gap_size in range(3, 70, w):
-            seeds_by_name, read_by_name = create_reads(pack, 1000, 100,
-                                                        lambda x,y: translocation(sv_size, gap_size, x,y))
+            seeds_by_name, read_by_name, gt_comp = create_reads(pack, 1000, 100,
+                                                        lambda x,y: sv_func(sv_size, gap_size, x,y))
             path_sam = create_alignment(read_by_name, mm2, "mm2-sv_size=" + str(sv_size) + "-gap_size=" + str(gap_size))
-            comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam)
+            comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp)
             rects_align["y"].append(sv_size)
             rects_align["x"].append(gap_size)
             c = format(light_spec_approximation(comp.nt_overlap / comp.nt_ground_truth))
             rects_align["fill_color"].append(c)
             rects_align["val"].append(100 * comp.nt_overlap / comp.nt_ground_truth)
-            comp2 = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack)
+            comp2 = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, gt_comp)
             rects_seeds["y"].append(sv_size)
             rects_seeds["x"].append(gap_size)
             c2 = format(light_spec_approximation(comp2.nt_overlap / comp2.nt_ground_truth))
@@ -75,9 +75,9 @@ def plot_quads():
 class MM2TestSet:
     def __init__(self):
         pass
-    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix):
+    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp):
         path_sam = create_alignment(read_by_name, mm2, "mm2-" + suffix)
-        comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam)
+        comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp)
         return comp.nt_overlap / comp.nt_ground_truth
     def name(self):
         return "mm2"
@@ -94,9 +94,9 @@ class MM2TestSet:
 class NgmlrTestSet:
     def __init__(self):
         pass
-    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix):
+    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp):
         path_sam = create_alignment(read_by_name, ngmlr, "ngmlr-" + suffix)
-        comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam)
+        comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp)
         return comp.nt_overlap / comp.nt_ground_truth
     def name(self):
         return "ngmlr"
@@ -114,8 +114,8 @@ class NgmlrTestSet:
 class SeedsTestSet:
     def __init__(self):
         pass
-    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix):
-        comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack)
+    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp):
+        comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, gt_comp)
         return comp.nt_overlap / comp.nt_ground_truth
     def name(self):
         return "seeds"
@@ -162,13 +162,13 @@ def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_r
                 print_n_write("\t", file_out)
                 def test(sv_size):
                     if (sv_size, gap_size) in read_cache:
-                        seeds_by_name, read_by_name = read_cache[(sv_size, gap_size)]
+                        seeds_by_name, read_by_name, gt_comp = read_cache[(sv_size, gap_size)]
                     else:
-                        seeds_by_name, read_by_name = create_reads(pack, read_size, 1000,
+                        seeds_by_name, read_by_name, gt_comp = create_reads(pack, read_size, 1000,
                                                             lambda x,y: sv_func(sv_size, gap_size, x,y))
-                        read_cache[(sv_size, gap_size)] = (seeds_by_name, read_by_name)
-                    suffix = "-" + filename_out + "-sv_size=" + str(sv_size) + "-gap_size=" + str(gap_size)
-                    return test_set.test(params, seeds_by_name, read_by_name, fm_index, pack, suffix)
+                        read_cache[(sv_size, gap_size)] = (seeds_by_name, read_by_name, gt_comp)
+                    suffix = filename_out + "-sv_size=" + str(sv_size) + "-gap_size=" + str(gap_size)
+                    return test_set.test(params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp)
 
                 search_val_cache = {}
                 for o_p in overlap_percentages:
@@ -199,7 +199,6 @@ def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_r
 def print_binary_search_plot(file_name_in="translocation_overlap", title="SV Overlap - Translocation", 
                             test_sets=[MM2TestSet(), SeedsTestSet()],
                             sv_size_max=180, x_range=(-5, 85)):
-    
     with open(data_dir + "/" + file_name_in + ".tsv", "r") as file_in:
         lines = file_in.readlines()
         header = lines[0]

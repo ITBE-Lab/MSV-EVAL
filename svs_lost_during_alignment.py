@@ -6,6 +6,7 @@ from bokeh_style_helper import *
 from bokeh.plotting import ColumnDataSource
 from bokeh.layouts import column, row, grid
 from bokeh.models.tools import HoverTool
+from seed_printer import *
 
 genome_dir = "/MAdata/genome/human/GRCh38.p12-chr1"
 data_dir = "/MAdata/sv_lost_during_alignment"
@@ -25,6 +26,7 @@ def from_to(contig, f, t):
     return NucSeq(s)
 
 def create_reads(pack, size, amount, func_get_seeds_and_read):
+    gt_comp = SeedSetComp()
     read_by_name = ReadByName()
     seeds_by_name = SeedsByName()
     contigs = [(x, y) for x, y in zip(pack.contigSeqs(), pack.contigStarts()) if len(x) > size]
@@ -41,13 +43,23 @@ def create_reads(pack, size, amount, func_get_seeds_and_read):
         read.name = "read" + str(idx)
         read_by_name.append(read)
         seeds_by_name.append(seeds, read.name)
-    return seeds_by_name, read_by_name
+        gt_comp.add_ground_truth(seeds)
+    return seeds_by_name, read_by_name, gt_comp
 
 
-def compare(params, ground_truth, data, reads, pack_pledge, unlock_targets=None):
+def compare(params, ground_truth, data, reads, pack_pledge, gt_comp, unlock_targets=None, render_one=False):
     collect = CollectSeedSetComps(params)
+    collect.cpp_module.collection.merge(gt_comp)
     compare_module = CompareSeedSets(params)
     lumper = SeedLumping(params)
+
+    if render_one:
+        read = reads[0].get()
+        lumped_g_t = lumper.execute( ground_truth[0].get(), read, pack_pledge.get())
+        lumped_data = lumper.execute( data[0].get(), read, pack_pledge.get())
+        printer = SeedPrinter(params)
+        printer.execute( lumped_data, lumped_g_t )
+        UnLock(params, unlock_targets[0]).execute( Container() )
 
     res = VectorPledge()
     for idx in range(params.get_num_threads()):
@@ -61,11 +73,12 @@ def compare(params, ground_truth, data, reads, pack_pledge, unlock_targets=None)
             unlock = promise_me(UnLock(params, unlock_targets[idx]), empty)
         res.append(unlock)
 
-    res.simultaneous_get(params.get_num_threads())
+    res.simultaneous_get(1 if render_one else params.get_num_threads())
+
     return collect.cpp_module.collection
 
 
-def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack):
+def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, gt_comp, render_one=False):
     splitter = NucSeqSplitter(params)
     lock = Lock(params)
     reads_by_name_pledge = Pledge()
@@ -102,9 +115,10 @@ def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack):
         ground_truth_seeds = promise_me(get_seeds_by_name, locked_read, seeds_by_name_pledge)
         ground_truth.append(ground_truth_seeds)
 
-    return compare(params, ground_truth, data, reads, pack_pledge, unlock_targets)
+    return compare(params, ground_truth, data, reads, pack_pledge, gt_comp, unlock_targets, render_one)
 
-def compare_alignment(params, reads_by_name_pledge, seeds_by_name, alignments, pack_pledge, unlock_targets=None):
+def compare_alignment(params, reads_by_name_pledge, seeds_by_name, alignments, pack_pledge, gt_comp,
+                      unlock_targets=None, render_one=False):
     align_to_seeds = AlignmentToSeeds(params)
     get_seeds_by_name = GetSeedsByName(params)
     get_read_by_name = GetReadByName(params)
@@ -121,11 +135,12 @@ def compare_alignment(params, reads_by_name_pledge, seeds_by_name, alignments, p
         read = promise_me(get_read_by_name, alignments[idx], reads_by_name_pledge)
         reads.append(read)
 
-    return compare(params, ground_truth, data, reads, pack_pledge, unlock_targets)
+    return compare(params, ground_truth, data, reads, pack_pledge, gt_comp, unlock_targets, render_one)
 
 
 
-def compare_alignment_from_file_queue(params, reads_by_name, seeds_by_name, pack, queue_pledge):
+def compare_alignment_from_file_queue(params, reads_by_name, seeds_by_name, pack, queue_pledge, gt_comp,
+                                      render_one=False):
     file_reader = SamFileReader(params)
     queue_picker = FilePicker(params)
     queue_placer = FileAlignmentPlacer(params)
@@ -145,10 +160,12 @@ def compare_alignment_from_file_queue(params, reads_by_name, seeds_by_name, pack
         locked_files.append(locked_file)
         alignments.append(alignment)
 
-    return compare_alignment(params, reads_by_name_pledge, seeds_by_name, alignments, pack_pledge, locked_files)
+    return compare_alignment(params, reads_by_name_pledge, seeds_by_name, alignments, pack_pledge, gt_comp, 
+                             locked_files, render_one)
 
 
-def compare_alignment_from_file_paths(params, reads_by_name, seeds_by_name, pack, file_paths):
+def compare_alignment_from_file_paths(params, reads_by_name, seeds_by_name, pack, file_paths, gt_comp,
+                                      render_one=False):
     if file_paths is None:
         return None
     file_queue = FileQueue()
@@ -156,7 +173,8 @@ def compare_alignment_from_file_paths(params, reads_by_name, seeds_by_name, pack
         file_queue.add(FileStreamFromPath(string))
     queue_pledge = Pledge()
     queue_pledge.set(file_queue)
-    return compare_alignment_from_file_queue(params, reads_by_name, seeds_by_name, pack, queue_pledge)
+    return compare_alignment_from_file_queue(params, reads_by_name, seeds_by_name, pack, queue_pledge, gt_comp, 
+                                             render_one)
 
 def create_alignment(read_by_name, aligner, sam_name):
     reads_path = data_dir + "/reads/" + sam_name + ".fasta"
