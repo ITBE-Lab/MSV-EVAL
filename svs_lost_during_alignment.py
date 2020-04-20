@@ -8,38 +8,32 @@ from bokeh.layouts import column, row, grid
 from bokeh.models.tools import HoverTool
 from seed_printer import *
 
-genome_dir = "/MAdata/genome/human/GRCh38.p12-chr1"
+genome_dir = "/MAdata/genome/human/GRCh38.p12"
 data_dir = "/MAdata/sv_lost_during_alignment"
 
 def choice_adj_size(l, total_len):
     x = random.randrange(total_len)
     idx = 0
-    while x >= len(l[idx][0]):
-        x -= len(l[idx][0])
+    while x >= l[idx][0]:
+        x -= l[idx][0]
         idx += 1
     return l[idx]
-
-def from_to(contig, f, t):
-    s = ""
-    for x in range(f, f + t):
-        s += contig[x]
-    return NucSeq(s)
 
 def create_reads(pack, size, amount, func_get_seeds_and_read):
     gt_comp = SeedSetComp()
     read_by_name = ReadByName()
     seeds_by_name = SeedsByName()
-    contigs = [(x, y) for x, y in zip(pack.contigSeqs(), pack.contigStarts()) if len(x) > size]
-    total_len = sum(len(x) for x, _ in contigs)
+    contigs = [(x, y) for x, y in zip(pack.contigLengths(), pack.contigStarts()) if x > size]
+    total_len = sum(x for x, _ in contigs)
     def read_and_seeds():
-        contig, contig_start = choice_adj_size(contigs, total_len)
-        start = random.randrange(len(contig) - size)
-        genome_section = from_to(contig, start, size)
+        contig_len, contig_start = choice_adj_size(contigs, total_len)
+        start = random.randrange(contig_len - size)
+        genome_section = pack.extract_from_to(start, start+size)
         return func_get_seeds_and_read(genome_section, start + contig_start)
     for idx in range(amount):
-        seeds, read = read_and_seeds()
-        if 'n' in str(read) or 'N' in str(read):
-            continue
+        read = NucSeq("N")
+        while 'n' in str(read) or 'N' in str(read):
+            seeds, read = read_and_seeds()
         read.name = "read" + str(idx)
         read_by_name.append(read)
         seeds_by_name.append(seeds, read.name)
@@ -47,11 +41,52 @@ def create_reads(pack, size, amount, func_get_seeds_and_read):
     return seeds_by_name, read_by_name, gt_comp
 
 
-def compare(params, ground_truth, data, reads, pack_pledge, gt_comp, unlock_targets=None, render_one=False):
-    collect = CollectSeedSetComps(params)
-    collect.cpp_module.collection.merge(gt_comp)
+only_scattered_sv = True
+no_scattered_sv = False
+def create_scattered_read(pack, size, amount, num_pieces, size_pieces):
+    gt_comp = SeedSetComp()
+    read_by_name = ReadByName()
+    seeds_by_name = SeedsByName()
+    main_contigs = [(x, y) for x, y in zip(pack.contigLengths(), pack.contigStarts()) if x > size]
+    main_total_len = sum(x for x, _ in main_contigs)
+    contigs = [(x, y) for x, y in zip(pack.contigLengths(), pack.contigStarts()) if x > size_pieces]
+    total_len = sum(x for x, _ in contigs)
+    def read_and_seeds():
+        seeds = Seeds()
+        read = ""
+        main_contig_len, main_cont_start = choice_adj_size(main_contigs, main_total_len)
+        main_start = random.randrange(main_contig_len - size)
+        size_one = size//(num_pieces+1)
+        for idx in range(0, num_pieces+1):
+            if not only_scattered_sv:
+                seeds.append(Seed(len(read), size_one,
+                                  main_cont_start + main_start+idx*size_one, True))
+            read += str(pack.extract_from_to(main_cont_start+main_start+idx*size_one,
+                                             main_cont_start+main_start+(idx+1)*size_one))
+            if idx < num_pieces:
+                contig_size, contig_start = choice_adj_size(contigs, total_len)
+                start = random.randrange(contig_size - size_pieces)
+                if not no_scattered_sv:
+                    seeds.append(Seed(len(read), size_pieces, contig_start + start, True))
+                read += str(pack.extract_from_to(contig_start+start,contig_start+start+size_pieces))
+        return seeds, NucSeq(read)
+
+    for idx in range(amount):
+        read = NucSeq("N")
+        while 'n' in str(read) or 'N' in str(read):
+            seeds, read = read_and_seeds()
+        read.name = "read" + str(idx)
+        read_by_name.append(read)
+        seeds_by_name.append(seeds, read.name)
+        gt_comp.add_ground_truth(seeds)
+    return seeds_by_name, read_by_name, gt_comp
+
+
+def compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge, gt_comp,
+            unlock_targets=None, render_one=False):
     compare_module = CompareSeedSets(params)
     lumper = SeedLumping(params)
+    get_seed_set_comp = GetSeedSetCompByName(params)
 
     if render_one:
         read = reads[0].get()
@@ -65,17 +100,17 @@ def compare(params, ground_truth, data, reads, pack_pledge, gt_comp, unlock_targ
     for idx in range(params.get_num_threads()):
         lumped_g_t = promise_me(lumper, ground_truth[idx], reads[idx], pack_pledge)
         lumped_data = promise_me(lumper, data[idx], reads[idx], pack_pledge)
-        comp = promise_me(compare_module, lumped_g_t, lumped_data)
-        empty = promise_me(collect, comp)
+        seed_set_comp = promise_me(get_seed_set_comp, reads[idx], seeds_by_name_pledge)
+        comp = promise_me(compare_module, lumped_g_t, lumped_data, seed_set_comp)
         if unlock_targets is None:
-            unlock = empty
+            unlock = comp
         else:
-            unlock = promise_me(UnLock(params, unlock_targets[idx]), empty)
+            unlock = promise_me(UnLock(params, unlock_targets[idx]), comp)
         res.append(unlock)
 
     res.simultaneous_get(1 if render_one else params.get_num_threads())
 
-    return collect.cpp_module.collection
+    return seeds_by_name_pledge.get().mergeAll(gt_comp)
 
 
 def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, gt_comp, render_one=False):
@@ -115,7 +150,8 @@ def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, gt_comp,
         ground_truth_seeds = promise_me(get_seeds_by_name, locked_read, seeds_by_name_pledge)
         ground_truth.append(ground_truth_seeds)
 
-    return compare(params, ground_truth, data, reads, pack_pledge, gt_comp, unlock_targets, render_one)
+    return compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge,
+                   gt_comp, unlock_targets, render_one)
 
 def compare_alignment(params, reads_by_name_pledge, seeds_by_name, alignments, pack_pledge, gt_comp,
                       unlock_targets=None, render_one=False):
@@ -135,7 +171,8 @@ def compare_alignment(params, reads_by_name_pledge, seeds_by_name, alignments, p
         read = promise_me(get_read_by_name, alignments[idx], reads_by_name_pledge)
         reads.append(read)
 
-    return compare(params, ground_truth, data, reads, pack_pledge, gt_comp, unlock_targets, render_one)
+    return compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge, gt_comp,
+                   unlock_targets, render_one)
 
 
 

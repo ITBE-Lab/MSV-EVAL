@@ -53,8 +53,9 @@ def main():
     fm_index = FMIndex()
     fm_index.load(genome_dir + "/ma/genome")
 
-    seeds_by_name, read_by_name, gt_comp = create_reads(pack, 1000, 100, lambda x,y: inversion(500, 0, x,y))
-    path_sam = create_alignment(read_by_name, lambda x,y,z: mm2(x,y,z,True), "mm2")
+    seeds_by_name, read_by_name, gt_comp = create_reads(pack, 1000, 100, lambda x,y: inversion(500, 50, x, y))
+    #path_sam = create_alignment(read_by_name, lambda x,y,z: mm2(x,y,z,True), "mm2")
+    path_sam = create_alignment(read_by_name, mm2, "mm2")
     print("Minimap 2 alignment:")
     comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp, True)
     print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",

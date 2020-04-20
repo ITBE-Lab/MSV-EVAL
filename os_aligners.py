@@ -12,20 +12,19 @@ def bowtie(read_set, sam_file_path, json_dict):
                 index_str + " -1 " + read_set["fasta_file"] + " -2 " + read_set["fasta_file_mate"] + " -S " + sam_file_path
                 + " 2> /dev/null")
 
-def mm2(read_set, sam_file_path, json_dict, inv=False):
+def mm2(read_set, sam_file_path, json_dict, extra=""):
     presetting = None # noop
     if read_set["technology"] == "pb":
         presetting = "map-pb"
     if read_set["technology"] == "ont":
         presetting = "map-ont"
-    z = ""
-    if inv:
-        z = " -z 200,100 " 
     index_str = json_dict["reference_path"] + "/minimap/genome." + presetting + ".mmi"
     # -c output CIGAR in PAF; -a output SAM
-    os.system("~/workspace/minimap2/minimap2 --MD -c -a -t 32 -x " + presetting + " -R \"@RG\\tID:1\\tSM:"
-                + read_set["name"] + "\" " + index_str + " "
-                + read_set["fasta_file"] + " > " + z + sam_file_path + " 2> /dev/null")
+    s = "~/workspace/minimap2/minimap2 --MD -c -a -t 32 -x " + presetting + " " + extra + " -R \"@RG\\tID:1\\tSM:" \
+        + read_set["name"] + "\" " + index_str + " " \
+        + read_set["fasta_file"] + " > " + sam_file_path + " 2> /dev/null"
+    #print(s)
+    os.system(s)
 
 def pbmm2(read_set, sam_file_path, json_dict):
     presetting = None # noop

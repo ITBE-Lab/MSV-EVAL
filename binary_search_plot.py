@@ -17,7 +17,7 @@ def plot_gap_size(sv_func):
         comp2 = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, gt_comp)
         print(gap_size, 100 * comp.nt_overlap / comp.nt_ground_truth, 100 * comp2.nt_overlap / comp2.nt_ground_truth, sep="\t")
 
-def plot_quads(sv_func):
+def plot_quads(sv_func, sv_max=200, gap_max=70,w=5, h=5):
     params = ParameterSetManager()
 
     pack = Pack()
@@ -37,13 +37,15 @@ def plot_quads(sv_func):
         "fill_color": [],
         "val": [],
     }
-    w = 5
-    h = 5
-    for sv_size in range(3, 200, h):
+    for sv_size in range(1, sv_max, h):
         print("sv_size", sv_size)
-        for gap_size in range(3, 70, w):
-            seeds_by_name, read_by_name, gt_comp = create_reads(pack, 1000, 100,
-                                                        lambda x,y: sv_func(sv_size, gap_size, x,y))
+        for gap_size in range(1, gap_max, w):
+            if not sv_func is None:
+                seeds_by_name, read_by_name, gt_comp = create_reads(pack, 1000, 100,
+                                                            lambda x,y: sv_func(sv_size, gap_size, x,y))
+            else:
+                seeds_by_name, read_by_name, gt_comp = create_scattered_read(pack, 1000, 100,
+                                                                             gap_size, sv_size)
             path_sam = create_alignment(read_by_name, mm2, "mm2-sv_size=" + str(sv_size) + "-gap_size=" + str(gap_size))
             comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp)
             rects_align["y"].append(sv_size)
@@ -58,13 +60,13 @@ def plot_quads(sv_func):
             rects_seeds["fill_color"].append(c2)
             rects_seeds["val"].append(100 * comp2.nt_overlap / comp2.nt_ground_truth)
 
-    plot1 = figure(title="Minimap 2 Alignment", y_range=(200,0))
+    plot1 = figure(title="Minimap 2 Alignment", y_range=(sv_max,0))
     plot1.rect(x="x", y="y", width=w, height=h, color="fill_color", source=ColumnDataSource(rects_align))
     plot1.add_tools(HoverTool(tooltips=[("overlap", "@val%"),]))
     plot1.yaxis.axis_label = "SV Size"
     plot1.xaxis.axis_label = "Gap Size"
 
-    plot2 = figure(title="Max. Spanning Seeds", y_range=(200,0))
+    plot2 = figure(title="Max. Spanning Seeds", y_range=(sv_max,0))
     plot2.rect(x="x", y="y", width=w, height=h, color="fill_color", source=ColumnDataSource(rects_seeds))
     plot2.add_tools(HoverTool(tooltips=[("overlap", "@val%"),]))
     plot2.yaxis.axis_label = "SV Size"
@@ -73,12 +75,12 @@ def plot_quads(sv_func):
     show(column(plot1, plot2))
 
 class MM2TestSet:
-    def __init__(self):
+    def __init__(self, mm_extra=""):
+        self.mm2 = lambda x,y,z: mm2(x,y,z,extra=mm_extra)
         pass
     def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp):
-        path_sam = create_alignment(read_by_name, mm2, "mm2-" + suffix)
-        comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp)
-        return comp.nt_overlap / comp.nt_ground_truth
+        path_sam = create_alignment(read_by_name, self.mm2, "mm2-" + suffix)
+        return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp)
     def name(self):
         return "mm2"
     def display_name(self):
@@ -90,14 +92,15 @@ class MM2TestSet:
 
     def color(self):
         return "red"
+    def color_light(self):
+        return "lightred"
 
 class NgmlrTestSet:
     def __init__(self):
         pass
     def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp):
         path_sam = create_alignment(read_by_name, ngmlr, "ngmlr-" + suffix)
-        comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp)
-        return comp.nt_overlap / comp.nt_ground_truth
+        return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp)
     def name(self):
         return "ngmlr"
 
@@ -110,13 +113,14 @@ class NgmlrTestSet:
 
     def color(self):
         return "green"
+    def color_light(self):
+        return "lightgreen"
 
 class SeedsTestSet:
     def __init__(self):
         pass
     def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp):
-        comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, gt_comp)
-        return comp.nt_overlap / comp.nt_ground_truth
+        return compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, gt_comp)
     def name(self):
         return "seeds"
     def display_name(self):
@@ -128,6 +132,8 @@ class SeedsTestSet:
 
     def color(self):
         return "blue"
+    def color_light(self):
+        return "lightblue"
 
 def print_n_write(s, f):
     print(s, end="")
@@ -136,7 +142,7 @@ def print_n_write(s, f):
 def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_range=range(0, 81, 2),
                        overlap_percentages=[0.05, 0.45, 0.95], test_sets=[
                            MM2TestSet(), SeedsTestSet()
-                       ], sv_size_max=200, read_size=1000):
+                       ], sv_size_max=200, read_size=1000, num_reads=1000):
     params = ParameterSetManager()
 
     pack = Pack()
@@ -164,11 +170,16 @@ def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_r
                     if (sv_size, gap_size) in read_cache:
                         seeds_by_name, read_by_name, gt_comp = read_cache[(sv_size, gap_size)]
                     else:
-                        seeds_by_name, read_by_name, gt_comp = create_reads(pack, read_size, 1000,
+                        if not sv_func is None:
+                            seeds_by_name, read_by_name, gt_comp = create_reads(pack, read_size, num_reads,
                                                             lambda x,y: sv_func(sv_size, gap_size, x,y))
+                        else:
+                            seeds_by_name, read_by_name, gt_comp = create_scattered_read(pack, read_size, num_reads,
+                                                                                         gap_size, sv_size)
                         read_cache[(sv_size, gap_size)] = (seeds_by_name, read_by_name, gt_comp)
                     suffix = filename_out + "-sv_size=" + str(sv_size) + "-gap_size=" + str(gap_size)
-                    return test_set.test(params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp)
+                    comp = test_set.test(params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp)
+                    return comp.nt_overlap / comp.nt_ground_truth
 
                 search_val_cache = {}
                 for o_p in overlap_percentages:

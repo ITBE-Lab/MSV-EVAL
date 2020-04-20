@@ -54,7 +54,8 @@ def main():
     print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
 
-main()
-if False:
-    binary_search_plot(translocation)
-    print_binary_search_plot()
+#main()
+if True:
+    test_sets=[MM2TestSet("--splice"), SeedsTestSet()]
+    binary_search_plot(translocation, test_sets=test_sets)
+    print_binary_search_plot(test_sets=test_sets)

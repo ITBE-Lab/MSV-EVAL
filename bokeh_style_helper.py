@@ -11,6 +11,7 @@ def color_scheme(idx):
         "green": "#7d9263",
         "lightgreen" : "#c9d3be",
         "red" : "#c00000",
+        "lightred" : "#ffafaf",
         "orange" : "#dd7e0e",
         "yellow" : "#dfcf04",
         "pink" : "#b55475",
