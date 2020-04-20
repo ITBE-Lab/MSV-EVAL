@@ -65,9 +65,9 @@ def main():
     print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
 
-plot_quads(inversion)
+#plot_quads(inversion)
 #main()
-if False:
-    test_sets=[MM2TestSet(), SeedsTestSet()]
+if True:
+    test_sets=[MM2TestSet("--splice"), SeedsTestSet(), NgmlrTestSet()]
     binary_search_plot(inversion, "inversion_overlap", test_sets=test_sets)
-    print_binary_search_plot("inversion_overlap", "SV Overlap - Inversion", test_sets=test_sets)
+    #print_binary_search_plot("inversion_overlap", "SV Overlap - Inversion", test_sets=test_sets)

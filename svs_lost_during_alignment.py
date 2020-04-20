@@ -28,7 +28,7 @@ def create_reads(pack, size, amount, func_get_seeds_and_read):
     def read_and_seeds():
         contig_len, contig_start = choice_adj_size(contigs, total_len)
         start = random.randrange(contig_len - size)
-        genome_section = pack.extract_from_to(start, start+size)
+        genome_section = pack.extract_from_to(start+contig_start, start+size+contig_start)
         return func_get_seeds_and_read(genome_section, start + contig_start)
     for idx in range(amount):
         read = NucSeq("N")

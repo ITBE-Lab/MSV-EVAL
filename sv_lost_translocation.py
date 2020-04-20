@@ -1,6 +1,6 @@
 from binary_search_plot import *
 
-only_sv = False
+only_sv = True
 no_sv = False
 def translocation(sv_size, gap_size, genome_section, ref_start, min_dist=50):
     seeds = Seeds()
@@ -56,6 +56,6 @@ def main():
 
 #main()
 if True:
-    test_sets=[MM2TestSet("--splice"), SeedsTestSet()]
-    binary_search_plot(translocation, test_sets=test_sets)
-    print_binary_search_plot(test_sets=test_sets)
+    test_sets=[MM2TestSet("--splice"), SeedsTestSet(), NgmlrTestSet()]
+    binary_search_plot(translocation, test_sets=test_sets, num_reads=100)
+    #print_binary_search_plot(test_sets=test_sets)

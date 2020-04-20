@@ -54,9 +54,9 @@ def main():
     print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
 
-main()
-if False:
-    test_sets=[NgmlrTestSet(), SeedsTestSet()]
-    #binary_search_plot(duplication, "duplication_overlap", sv_size_max=1000, read_size=5000,
-    #                    test_sets=test_sets)
-    print_binary_search_plot("duplication_overlap", "SV Overlap - Duplication", test_sets=test_sets, sv_size_max=500)
+#main()
+if True:
+    test_sets=[MM2TestSet("--splice"), SeedsTestSet(), NgmlrTestSet()]
+    binary_search_plot(duplication, "duplication_overlap", sv_size_max=1000, read_size=5000,
+                        test_sets=test_sets, gap_size_range=range(500,10))
+    #print_binary_search_plot("duplication_overlap", "SV Overlap - Duplication", test_sets=test_sets, sv_size_max=1000)

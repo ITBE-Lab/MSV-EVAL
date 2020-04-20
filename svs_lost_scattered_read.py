@@ -132,5 +132,5 @@ mm_extra += "--splice" # Enable the splice alignment mode.
 #mm_extra += " -P"      # Retain all chains 
 
 test_sets=[MM2TestSet(mm_extra), SeedsTestSet(), NgmlrTestSet()]
-plot_scatter(num_reads=100, sv_size_range=[2**x for x in range(14)], test_sets=test_sets, num_scatters=100)
+#plot_scatter(num_reads=100, sv_size_range=[2**x for x in range(14)], test_sets=test_sets, num_scatters=100)
 draw_scatter_plot(test_sets=test_sets)
