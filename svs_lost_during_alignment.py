@@ -20,6 +20,7 @@ def choice_adj_size(l, total_len):
     return l[idx]
 
 def create_reads(pack, size, amount, func_get_seeds_and_read):
+    lumper = SeedLumping(ParameterSetManager())
     gt_comp = SeedSetComp()
     read_by_name = ReadByName()
     seeds_by_name = SeedsByName()
@@ -36,8 +37,9 @@ def create_reads(pack, size, amount, func_get_seeds_and_read):
             seeds, read = read_and_seeds()
         read.name = "read" + str(idx)
         read_by_name.append(read)
-        seeds_by_name.append(seeds, read.name)
-        gt_comp.add_ground_truth(seeds)
+        lumped_seeds = lumper.execute(seeds, read, pack)
+        seeds_by_name.append(lumped_seeds, read.name)
+        gt_comp.add_ground_truth(lumped_seeds)
     return seeds_by_name, read_by_name, gt_comp
 
 
@@ -89,26 +91,29 @@ def compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge
     get_seed_set_comp = GetSeedSetCompByName(params)
 
     if render_one:
-        read = reads[0].get()
-        lumped_g_t = lumper.execute( ground_truth[0].get(), read, pack_pledge.get())
-        lumped_data = lumper.execute( data[0].get(), read, pack_pledge.get())
-        printer = SeedPrinter(params)
-        printer.execute( lumped_data, lumped_g_t )
-        UnLock(params, unlock_targets[0]).execute( Container() )
+        for idx in range(params.get_num_threads()):
+            read = reads[idx].get()
+            while not read is None:
+                #lumped_g_t = lumper.execute( ground_truth[0].get(), read, pack_pledge.get())
+                lumped_data = lumper.execute( data[idx].get(), read, pack_pledge.get())
+                printer = SeedPrinter(params)
+                printer.execute( lumped_data, ground_truth[idx].get() )
+                UnLock(params, unlock_targets[idx]).execute( Container() )
+                read = reads[idx].get()
+    else:
+        res = VectorPledge()
+        for idx in range(params.get_num_threads()):
+            #lumped_g_t = promise_me(lumper, ground_truth[idx], reads[idx], pack_pledge)
+            lumped_data = promise_me(lumper, data[idx], reads[idx], pack_pledge)
+            seed_set_comp = promise_me(get_seed_set_comp, reads[idx], seeds_by_name_pledge)
+            comp = promise_me(compare_module, ground_truth[idx], lumped_data, seed_set_comp)
+            if unlock_targets is None:
+                unlock = comp
+            else:
+                unlock = promise_me(UnLock(params, unlock_targets[idx]), comp)
+            res.append(unlock)
 
-    res = VectorPledge()
-    for idx in range(params.get_num_threads()):
-        lumped_g_t = promise_me(lumper, ground_truth[idx], reads[idx], pack_pledge)
-        lumped_data = promise_me(lumper, data[idx], reads[idx], pack_pledge)
-        seed_set_comp = promise_me(get_seed_set_comp, reads[idx], seeds_by_name_pledge)
-        comp = promise_me(compare_module, lumped_g_t, lumped_data, seed_set_comp)
-        if unlock_targets is None:
-            unlock = comp
-        else:
-            unlock = promise_me(UnLock(params, unlock_targets[idx]), comp)
-        res.append(unlock)
-
-    res.simultaneous_get(1 if render_one else params.get_num_threads())
+        res.simultaneous_get(1 if render_one else params.get_num_threads())
 
     return seeds_by_name_pledge.get().mergeAll(gt_comp)
 
@@ -164,7 +169,7 @@ def compare_alignment(params, reads_by_name_pledge, seeds_by_name, alignments, p
     data = []
     reads = []
     for idx in range(params.get_num_threads()):
-        alignment_seeds = promise_me(align_to_seeds, alignments[idx])
+        alignment_seeds = promise_me(align_to_seeds, alignments[idx], pack_pledge)
         data.append(alignment_seeds)
         ground_truth_seeds = promise_me(get_seeds_by_name, alignments[idx], seeds_by_name_pledge)
         ground_truth.append(ground_truth_seeds)

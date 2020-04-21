@@ -8,7 +8,7 @@ def duplication(sv_size, gap_size, genome_section, ref_start, min_dist=50):
     offset = random.randint(min_dist, (len(genome_section) - total_size)-min_dist)
     total_size += offset
     g = str(genome_section)
-    # before translocation
+    # before duplication
     if not only_sv:
         seeds.append(Seed(0, offset, ref_start, True))
     read = g[:offset] 
@@ -28,7 +28,7 @@ def duplication(sv_size, gap_size, genome_section, ref_start, min_dist=50):
         seeds.append(Seed(offset + sv_size + gap_size, sv_size, ref_start + offset, True))
     read += g[offset:offset + sv_size]
 
-    # after tranlocation
+    # after duplication
     if not only_sv:
         seeds.append(Seed(total_size, len(genome_section) - total_size, ref_start + offset + sv_size + gap_size, True))
     read += g[offset + sv_size + gap_size:len(genome_section)-sv_size]
@@ -58,5 +58,5 @@ def main():
 if True:
     test_sets=[MM2TestSet("--splice"), SeedsTestSet(), NgmlrTestSet()]
     binary_search_plot(duplication, "duplication_overlap", sv_size_max=1000, read_size=5000,
-                        test_sets=test_sets, gap_size_range=range(500,10))
-    #print_binary_search_plot("duplication_overlap", "SV Overlap - Duplication", test_sets=test_sets, sv_size_max=1000)
+                        test_sets=test_sets, gap_size_range=range(1,500,10))
+    print_binary_search_plot("duplication_overlap", "SV Overlap - Duplication", test_sets=test_sets, sv_size_max=1000)

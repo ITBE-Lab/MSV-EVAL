@@ -57,5 +57,5 @@ def main():
 #main()
 if True:
     test_sets=[MM2TestSet("--splice"), SeedsTestSet(), NgmlrTestSet()]
-    binary_search_plot(translocation, test_sets=test_sets, num_reads=100)
-    #print_binary_search_plot(test_sets=test_sets)
+    #binary_search_plot(translocation, test_sets=test_sets, num_reads=100)
+    print_binary_search_plot(test_sets=test_sets)
