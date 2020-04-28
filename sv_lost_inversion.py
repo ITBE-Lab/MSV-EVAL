@@ -82,22 +82,33 @@ def main():
     fm_index = FMIndex()
     fm_index.load(genome_dir + "/ma/genome")
 
-    seeds_by_name, read_by_name, gt_comp = create_reads(pack, 1000, 100, lambda x,y: inversion(50, 0, x, y))
-    path_sam = create_alignment(read_by_name, lambda x,y,z: mm2(x,y,z,"-z 400,1"), "mm2-inversion-main")
+    seeds_by_name, read_by_name = create_reads(pack, 1000, 1, lambda x,y: inversion(10, 0, x, y))
 
-    print(path_sam)
-    print("Minimap 2 alignment:")
-    comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp, False)
+    if False:
+        print("Minimap 2 alignment:")
+        path_sam = create_alignment(read_by_name, lambda x,y,z: mm2(x,y,z,"-z 400,1"), "mm2-inversion-main")
+        print(path_sam)
+        comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, False)
+        print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
+            100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
+    if False:
+        print("MA alignment:")
+        comp = MATestSet(render_one=False).test(params, seeds_by_name, read_by_name, fm_index,
+                                               pack, "ma-inversion-main")
+        print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
+            100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
+    print("reseeding:")
+    compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, render_one=True)
+    comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack)
     print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
-    print("SMEMs:")
-    comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, gt_comp, False)
-    print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
-          100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
 
+#main()
 #plot_quads(inversion)
-print_sam_file()
-if False:
-    test_sets=[MM2TestSet("--splice"), SeedsTestSet(), NgmlrTestSet()]
-    #binary_search_plot(inversion, "inversion_overlap", test_sets=test_sets)
-    print_binary_search_plot("inversion_overlap", "SV Overlap - Inversion", test_sets=test_sets)
+#print_sam_file()
+if True:
+    #test_set = [SeedsTestSet()]
+    binary_search_plot(inversion, "inversion_overlap")#, test_sets=test_set)
+    #print_binary_search_plot("inversion_overlap", "SV Overlap - Inversion")#, test_sets=test_set)
+    
+    # 25 30 53

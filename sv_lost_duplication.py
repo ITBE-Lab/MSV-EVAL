@@ -43,20 +43,18 @@ def main():
     fm_index = FMIndex()
     fm_index.load(genome_dir + "/ma/genome")
 
-    seeds_by_name, read_by_name, gt_comp = create_reads(pack, 1000, 100, lambda x,y: duplication(100, 20, x,y))
+    seeds_by_name, read_by_name = create_reads(pack, 1000, 100, lambda x,y: duplication(100, 20, x,y))
     path_sam = create_alignment(read_by_name, mm2, "mm2")
     print("Minimap 2 alignment:")
-    comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp)
+    comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam)
     print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
     print("SMEMs:")
-    comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, gt_comp, True)
+    comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, True)
     print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
 
 #main()
 if True:
-    test_sets=[MM2TestSet("--splice"), SeedsTestSet(), NgmlrTestSet()]
-    binary_search_plot(duplication, "duplication_overlap", sv_size_max=1000, read_size=5000,
-                        test_sets=test_sets, gap_size_range=range(1,500,10))
-    print_binary_search_plot("duplication_overlap", "SV Overlap - Duplication", test_sets=test_sets, sv_size_max=1000)
+    binary_search_plot(duplication, "duplication_overlap", sv_size_max=1000, read_size=5000, gap_size_range=range(1,500,25))
+    #print_binary_search_plot("duplication_overlap", "SV Overlap - Duplication", sv_size_max=1000)

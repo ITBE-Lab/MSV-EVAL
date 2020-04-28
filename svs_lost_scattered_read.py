@@ -109,18 +109,18 @@ def main():
     sv_size = 1000
     print_one = False
 
-    seeds_by_name, read_by_name, gt_comp = create_scattered_read(pack, 1000, amount, num_scatters, sv_size)
+    seeds_by_name, read_by_name = create_scattered_read(pack, 1000, amount, num_scatters, sv_size)
     #path_sam = create_alignment(read_by_name, lambda x,y,z: mm2(x,y,z,True), "mm2")
     path_sam = create_alignment(read_by_name, mm2, "mm2")
     print("Minimap 2 alignment:")
-    comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp, print_one)
+    comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, print_one)
     print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
     for key in comp.seeds_found:
         val = comp.seeds_found[key] # pybind11 std::map type
         print("found", key, "of", num_scatters, 100*val/amount, "% of times")
     print("SMEMs:")
-    comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, gt_comp, print_one)
+    comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, print_one)
     print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
     for key in comp.seeds_found:

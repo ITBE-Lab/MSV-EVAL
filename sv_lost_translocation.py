@@ -2,7 +2,7 @@ from binary_search_plot import *
 
 only_sv = True
 no_sv = False
-def translocation(sv_size, gap_size, genome_section, ref_start, min_dist=50):
+def translocation(sv_size, gap_size, genome_section, ref_start, min_dist=100):
     seeds = Seeds()
     total_size = sv_size*2 + gap_size
     offset = random.randint(min_dist, (len(genome_section) - total_size)-min_dist)
@@ -43,19 +43,20 @@ def main():
     fm_index = FMIndex()
     fm_index.load(genome_dir + "/ma/genome")
 
-    seeds_by_name, read_by_name, gt_comp = create_reads(pack, 1000, 100, lambda x,y: translocation(100, 100, x,y))
-    path_sam = create_alignment(read_by_name, mm2, "mm2")
-    print("Minimap 2 alignment:")
-    comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp)
-    print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
-          100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
-    print("SMEMs:")
-    comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, gt_comp, True)
+    seeds_by_name, read_by_name = create_reads(pack, 1000, 1, lambda x,y: translocation(10, 0, x,y))
+    if False:
+        path_sam = create_alignment(read_by_name, mm2, "mm2")
+        print("Minimap 2 alignment:")
+        comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam)
+        print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
+            100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
+    print("reseeding:")
+    compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, render_one=True)
+    comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack)
     print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
 
 #main()
 if True:
-    test_sets=[MM2TestSet("--splice"), SeedsTestSet(), NgmlrTestSet()]
-    #binary_search_plot(translocation, test_sets=test_sets, num_reads=100)
-    print_binary_search_plot(test_sets=test_sets)
+    binary_search_plot(translocation)
+    #print_binary_search_plot()

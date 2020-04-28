@@ -1,5 +1,5 @@
 from svs_lost_during_alignment import *
-
+from MA import *
 
 def plot_gap_size(sv_func):
     params = ParameterSetManager()
@@ -74,15 +74,56 @@ def plot_quads(sv_func, sv_max=200, gap_max=70,w=5, h=5):
 
     show(column(plot1, plot2))
 
-class MM2TestSet:
-    def __init__(self, mm_extra=""):
-        self.mm2 = lambda x,y,z: mm2(x,y,z,extra=mm_extra)
-        pass
-    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp):
-        path_sam = create_alignment(read_by_name, self.mm2, "mm2-" + suffix)
-        return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp)
+class MATestSet:
+    def __init__(self, params=ParameterSetManager(), name="ma", render_one=False):
+        params.by_name("Detect Small Inversions").set(True)
+        self.params = params
+        self._name = name
+        self.render_one = render_one
+
+    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix):
+        path_sam = self._name + suffix + ".sam"
+        # write reads
+        reads_path = data_dir + "/reads/" + path_sam + ".fasta"
+        with open(reads_path, 'w') as fasta_file:
+            for name, read in read_by_name:
+                fasta_file.write(">" + name + "\n")
+                fasta_file.write(str(read) + "\n")
+        # align
+        quick_align_paths([reads_path], genome_dir + "/ma/genome", self.params, path_sam)
+        return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, fm_index, [path_sam],
+                                                 self.render_one)
     def name(self):
-        return "mm2"
+        return self._name
+    def display_name(self):
+        return "MA"
+
+    def bokeh_func(self, plot, x, y, c, l):
+        plot.x(x=x, y=y, line_color=c, legend_label=l,
+                size=point_to_px(7), line_width=point_to_px(2))
+
+    def color(self):
+        return "orange"
+    def color_light(self):
+        return "yellow"
+
+class MM2TestSet:
+    def __init__(self, mm_extra="", name="mm2"):
+        self.mm2 = lambda x,y,z: mm2(x,y,z,extra=mm_extra)
+        self._name = name
+        self.c = "red"
+        if len(mm_extra) > 0:
+            self.c = "black"
+
+        self.c2 = "lightred"
+        if len(mm_extra) > 0:
+            self.c2 = "grey"
+        pass
+    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix):
+        path_sam = create_alignment(read_by_name, self.mm2, self._name + suffix)
+        return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, fm_index, path_sam)
+    def name(self):
+        return self._name
     def display_name(self):
         return "Minimap 2 Alignment"
 
@@ -91,16 +132,16 @@ class MM2TestSet:
                 size=point_to_px(7), line_width=point_to_px(2))
 
     def color(self):
-        return "red"
+        return self.c
     def color_light(self):
-        return "lightred"
+        return self.c2
 
 class NgmlrTestSet:
     def __init__(self):
         pass
-    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp):
+    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix):
         path_sam = create_alignment(read_by_name, ngmlr, "ngmlr-" + suffix)
-        return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, gt_comp)
+        return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, fm_index, path_sam)
     def name(self):
         return "ngmlr"
 
@@ -117,13 +158,16 @@ class NgmlrTestSet:
         return "lightgreen"
 
 class SeedsTestSet:
-    def __init__(self):
-        pass
-    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp):
-        return compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, gt_comp)
+    def __init__(self, reseeding):
+        self.reseeding = reseeding
+
+    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix):
+        return compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, self.reseeding)
     def name(self):
         return "seeds"
     def display_name(self):
+        if self.reseeding:
+            return "Reseeding"
         return "Max. Spanning Seeding"
 
     def bokeh_func(self, plot, x, y, c, l):
@@ -139,10 +183,12 @@ def print_n_write(s, f):
     print(s, end="")
     f.write(s)
 
-def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_range=range(0, 81, 2),
-                       overlap_percentages=[0.05, 0.45, 0.95], test_sets=[
-                           MM2TestSet(), SeedsTestSet()
-                       ], sv_size_max=200, read_size=1000, num_reads=1000):
+
+default_test_set = [MATestSet(), MM2TestSet(), MM2TestSet("-z 400,1 --splice -P", "extra_sensitive"), 
+                    SeedsTestSet(True), NgmlrTestSet()]
+#default_test_set = [MATestSet(), MM2TestSet(), SeedsTestSet(True)]
+def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_range=[*range(0, 81, 10), 500],
+                       overlap_percentages=[0.05, 0.45, 0.95], test_sets=default_test_set, sv_size_max=200, read_size=10000, num_reads=100):
     params = ParameterSetManager()
 
     pack = Pack()
@@ -168,18 +214,18 @@ def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_r
                 print_n_write("\t", file_out)
                 def test(sv_size):
                     if (sv_size, gap_size) in read_cache:
-                        seeds_by_name, read_by_name, gt_comp = read_cache[(sv_size, gap_size)]
+                        seeds_by_name, read_by_name = read_cache[(sv_size, gap_size)]
                     else:
                         if not sv_func is None:
-                            seeds_by_name, read_by_name, gt_comp = create_reads(pack, read_size, num_reads,
+                            seeds_by_name, read_by_name = create_reads(pack, read_size, num_reads,
                                                             lambda x,y: sv_func(sv_size, gap_size, x,y))
                         else:
-                            seeds_by_name, read_by_name, gt_comp = create_scattered_read(pack, read_size, num_reads,
+                            seeds_by_name, read_by_name = create_scattered_read(pack, read_size, num_reads,
                                                                                          gap_size, sv_size)
-                        read_cache[(sv_size, gap_size)] = (seeds_by_name, read_by_name, gt_comp)
+                        read_cache[(sv_size, gap_size)] = (seeds_by_name, read_by_name)
                     suffix = filename_out + "-sv_size=" + str(sv_size) + "-gap_size=" + str(gap_size)
-                    comp = test_set.test(params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp)
-                    return comp.nt_overlap / comp.nt_ground_truth
+                    comp = test_set.test(params, seeds_by_name, read_by_name, fm_index, pack, suffix)
+                    return comp.amount_overlap_all / num_reads
 
                 search_val_cache = {}
                 for o_p in overlap_percentages:
@@ -208,7 +254,7 @@ def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_r
                 print_n_write("\n", file_out)
 
 def print_binary_search_plot(file_name_in="translocation_overlap", title="SV Overlap - Translocation", 
-                            test_sets=[MM2TestSet(), SeedsTestSet()],
+                            test_sets=default_test_set,
                             sv_size_max=180, x_range=(-5, 85)):
     with open(data_dir + "/" + file_name_in + ".tsv", "r") as file_in:
         lines = file_in.readlines()

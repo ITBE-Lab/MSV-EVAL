@@ -13,11 +13,18 @@ class SeedPrinter(Module):
     # @details
     # Reimplemented from MA.aligner.Module.execute.
     def execute(self, *input):
-        assert(len(input) == 2)
+        assert(len(input) >= 2)
         seeds_a = input[0]
         seeds_b = input[1]
 
         plot = figure(title="Seeds")
+        if len(input) > 2:
+            helper_ret = input[2]
+            for rect in helper_ret.rectangles:
+                plot.quad(left=rect.x_axis.start, right=rect.x_axis.start+rect.x_axis.size,
+                          bottom=rect.y_axis.start, top=rect.y_axis.start+rect.y_axis.size, color="lightgrey",
+                          alpha=0.2)
+
         def render(seed, name, dash=(10,0), width=2):
             print(name, seed.start, seed.start_ref, seed.size, "forw" if seed.on_forward_strand else "rev")
             if seed.on_forward_strand:
@@ -28,9 +35,9 @@ class SeedPrinter(Module):
                             legend_label=name + " - reverse", line_color="orange", line_dash=dash,
                             line_width=point_to_px(width))
         for seed in seeds_b:
-            render(seed, self.name_b)
+            render(seed, self.name_b, dash=(10,10), width=6)
         for seed in seeds_a:
-            render(seed, self.name_a, dash=(10,10), width=6)
+            render(seed, self.name_a)
         show(plot)
 
 
