@@ -45,6 +45,7 @@ def create_reads(pack, size, amount, func_get_seeds_and_read):
 only_scattered_sv = True
 no_scattered_sv = False
 def create_scattered_read(pack, size, amount, num_pieces, size_pieces):
+    lumper = SeedLumping(ParameterSetManager())
     read_by_name = ReadByName()
     seeds_by_name = SeedsByName()
     main_contigs = [(x, y) for x, y in zip(pack.contigLengths(), pack.contigStarts()) if x > size]
@@ -77,12 +78,13 @@ def create_scattered_read(pack, size, amount, num_pieces, size_pieces):
             seeds, read = read_and_seeds()
         read.name = "read" + str(idx)
         read_by_name.append(read)
-        seeds_by_name.append(seeds, read.name)
+        lumped_seeds = lumper.execute(seeds, read, pack)
+        seeds_by_name.append(lumped_seeds, read.name)
     return seeds_by_name, read_by_name
 
 
 def compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge, fm_index_pledge,
-            unlock_targets=None, render_one=False, segments_list=None):
+            unlock_targets=None, render_one=False, original_seeds_list=None):
     compare_module = CompareSeedSets(params)
     lumper = SeedLumping(params)
     get_seed_set_comp = GetSeedSetCompByName(params)
@@ -95,9 +97,10 @@ def compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge
                 #lumped_g_t = lumper.execute( ground_truth[0].get(), read, pack_pledge.get())
                 lumped_data = lumper.execute( data[idx].get(), read, pack_pledge.get())
                 printer = SeedPrinter(params)
-                if not segments_list is None:
-                    rectangles = get_rectangles.cpp_module.execute_helper(segments_list[idx].get(), pack_pledge.get(),
-                                                               fm_index_pledge.get(), read)
+                if not original_seeds_list is None:
+                    rectangles = get_rectangles.cpp_module.execute_helper(original_seeds_list[idx].get(),
+                                                                          pack_pledge.get(),
+                                                                          fm_index_pledge.get(), read)
                     printer.execute( lumped_data, ground_truth[idx].get(), rectangles )
                 else:
                     printer.execute( lumped_data, ground_truth[idx].get() )
@@ -121,7 +124,7 @@ def compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge
     return seeds_by_name_pledge.get().mergeAll()
 
 
-def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, reseeding=True, render_one=False):
+def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, mems=True, reseeding=True, render_one=False):
     splitter = NucSeqSplitter(params)
     lock = Lock(params)
     reads_by_name_pledge = Pledge()
@@ -133,8 +136,12 @@ def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, reseedin
     seeds_by_name_pledge = Pledge()
     seeds_by_name_pledge.set(seeds_by_name)
 
-    seeding_module = BinarySeeding(params)
-    extract_seeds = ExtractSeeds(params)
+    if mems:
+        seeding_module = MinimizerSeeding(params) # @todo NO use MEMs here!
+        seed_lumping = SeedLumping(params)
+    else:
+        seeding_module = BinarySeeding(params)
+        extract_seeds = ExtractSeeds(params)
     get_seeds_by_name = GetSeedsByReadName(params)
 
     reads_vec = ContainerVectorNucSeq()
@@ -147,26 +154,34 @@ def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, reseedin
     data = []
     reads = []
     unlock_targets = []
-    segments_list = []
+    original_seeds_list = []
     read = promise_me(splitter, reads_vec_pledge)
     for _ in range(params.get_num_threads()):
         locked_read = promise_me(lock, read)
         unlock_targets.append(locked_read)
         reads.append(locked_read)
-        segments = promise_me(seeding_module, fm_index_pledge, locked_read)
-        if reseeding:
-            recursive_reseeding = RecursiveReseeding(params, pack)
-            segments_list.append(segments)
-            seeds = promise_me(recursive_reseeding, segments, pack_pledge, fm_index_pledge, locked_read)
+        if mems:
+            minimizers = promise_me(seeding_module, fm_index_pledge, locked_read, pack_pledge)
+            seeds = promise_me(seed_lumping, minimizers, locked_read, pack_pledge)
+            if reseeding:
+                recursive_reseeding = RecursiveReseeding(params, pack)
+                seeds = promise_me(recursive_reseeding, seeds, pack_pledge, locked_read)
+                original_seeds_list.append(seeds)
+            else:
+                original_seeds_list = None
         else:
-            rectangles = None
+            segments = promise_me(seeding_module, fm_index_pledge, locked_read)
             seeds = promise_me(extract_seeds, segments, fm_index_pledge, locked_read)
+            original_seeds_list.append(seeds)
+            if reseeding:
+                recursive_reseeding = RecursiveReseedingSegments(params, pack)
+                seeds = promise_me(recursive_reseeding, segments, pack_pledge, fm_index_pledge, locked_read)
         data.append(seeds)
         ground_truth_seeds = promise_me(get_seeds_by_name, locked_read, seeds_by_name_pledge)
         ground_truth.append(ground_truth_seeds)
 
     return compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge, fm_index_pledge,
-                   unlock_targets, render_one, segments_list=segments_list)
+                   unlock_targets, render_one, original_seeds_list=original_seeds_list)
 
 def compare_alignment(params, reads_by_name_pledge, seeds_by_name, alignments, pack_pledge, fm_index_pledge,
                       unlock_targets=None, render_one=False):

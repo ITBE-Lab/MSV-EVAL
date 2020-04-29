@@ -108,7 +108,7 @@ def main():
 #print_sam_file()
 if True:
     #test_set = [SeedsTestSet()]
-    binary_search_plot(inversion, "inversion_overlap")#, test_sets=test_set)
-    #print_binary_search_plot("inversion_overlap", "SV Overlap - Inversion")#, test_sets=test_set)
+    #binary_search_plot(inversion, "inversion_overlap")#, test_sets=test_set)
+    print_binary_search_plot("inversion_overlap", "SV Overlap - Inversion")#, test_sets=test_set)
     
     # 25 30 53

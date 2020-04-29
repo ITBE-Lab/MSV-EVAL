@@ -11,9 +11,11 @@ from binary_search_plot import *
 
 
 
-def plot_scatter(filename_out="scattered_overlap",  test_sets=[MM2TestSet(), SeedsTestSet()],
+default_test_set = [MATestSet(), MM2TestSet(), MM2TestSet("-z 400,1 --splice -P", "extra_sensitive"), 
+                    SeedsTestSet(False), NgmlrTestSet()]
+def plot_scatter(filename_out="scattered_overlap",  test_sets=default_test_set,
                  sv_size_range=range(1, 200, 10),
-                     read_size=1000, num_reads=1000, num_scatters=10):
+                     read_size=1000, num_reads=1000, num_scatters=4):
     params = ParameterSetManager()
 
     pack = Pack()
@@ -30,7 +32,7 @@ def plot_scatter(filename_out="scattered_overlap",  test_sets=[MM2TestSet(), See
 
         # body of outfile
         for sv_size in sv_size_range:
-            seeds_by_name, read_by_name, gt_comp = create_scattered_read(pack, read_size, num_reads,
+            seeds_by_name, read_by_name = create_scattered_read(pack, read_size, num_reads,
                                                                          num_scatters, sv_size)
             for test_set in test_sets:
                 print_n_write(str(sv_size), file_out)
@@ -39,7 +41,7 @@ def plot_scatter(filename_out="scattered_overlap",  test_sets=[MM2TestSet(), See
                 print_n_write("\t", file_out)
                 
                 suffix = filename_out + "-sv_size=" + str(sv_size)
-                comp = test_set.test(params, seeds_by_name, read_by_name, fm_index, pack, suffix, gt_comp)
+                comp = test_set.test(params, seeds_by_name, read_by_name, fm_index, pack, suffix)
                 for idx in range(num_scatters+1):
                     if idx in comp.seeds_found:
                         print_n_write(str(100*comp.seeds_found[idx]/num_reads) + "\t", file_out)
@@ -63,7 +65,7 @@ def q2(l):
         above -= l[idx]
     return idx
 
-def draw_scatter_plot(filename_out="scattered_overlap", test_sets=[MM2TestSet(), SeedsTestSet()]):
+def draw_scatter_plot(filename_out="scattered_overlap", test_sets=default_test_set):
     data = {}
     for test_set in test_sets:
         data[test_set.name()] = {"x": [], "min": [], "q2": [], "max": []}
@@ -86,10 +88,15 @@ def draw_scatter_plot(filename_out="scattered_overlap", test_sets=[MM2TestSet(),
     plot.yaxis.axis_label = "Num Scatters"
     for test_set_name, test_set_data in data.items():
         test_set = test_set_dict[test_set_name]
-        color = color_scheme(test_set.color())
         plot.patch(x=test_set_data["x"] + test_set_data["x"][::-1], 
                    y=test_set_data["min"] + test_set_data["max"][::-1], 
-                   fill_color=color_scheme(test_set.color_light()), line_color=None)
+                   fill_color=color_scheme(test_set.color_light()), line_color=None, fill_alpha=0.5)
+    for test_set_name, test_set_data in data.items():
+        test_set = test_set_dict[test_set_name]
+        color = color_scheme(test_set.color())
+        plot.line(x=test_set_data["x"] + test_set_data["x"][::-1], 
+                   y=test_set_data["min"] + test_set_data["max"][::-1], 
+                   line_color=color_scheme(test_set.color_light()), line_width=point_to_px(4), line_dash=(10,10))
         plot.line(x=test_set_data["x"], y=test_set_data["q2"], line_color=color, line_width=point_to_px(4),
                   legend_label=test_set_name)
     plot.legend.location = "top_left"
@@ -103,34 +110,36 @@ def main():
     pack.load(genome_dir + "/ma/genome")
     fm_index = FMIndex()
     fm_index.load(genome_dir + "/ma/genome")
+    mm_index = MinimizerIndex(params, genome_dir + "/ma/genome.mmi")
 
-    num_scatters = 10
-    amount = 100
+    num_scatters = 4
+    amount = 1
     sv_size = 1000
     print_one = False
 
     seeds_by_name, read_by_name = create_scattered_read(pack, 1000, amount, num_scatters, sv_size)
-    #path_sam = create_alignment(read_by_name, lambda x,y,z: mm2(x,y,z,True), "mm2")
-    path_sam = create_alignment(read_by_name, mm2, "mm2")
-    print("Minimap 2 alignment:")
-    comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, print_one)
-    print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
-          100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
-    for key in comp.seeds_found:
-        val = comp.seeds_found[key] # pybind11 std::map type
-        print("found", key, "of", num_scatters, 100*val/amount, "% of times")
-    print("SMEMs:")
-    comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, print_one)
+    if False:
+        #path_sam = create_alignment(read_by_name, lambda x,y,z: mm2(x,y,z,True), "mm2")
+        path_sam = create_alignment(read_by_name, mm2, "mm2")
+        print("Minimap 2 alignment:")
+        comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam, print_one)
+        print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
+            100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
+        for key in comp.seeds_found:
+            val = comp.seeds_found[key] # pybind11 std::map type
+            print("found", key, "of", num_scatters, 100*val/amount, "% of times")
+    print("MEMs:")
+    compare_seeds(params, read_by_name, seeds_by_name, mm_index, pack, True, False, True)
+    comp = compare_seeds(params, read_by_name, seeds_by_name, mm_index, pack, True, False, False)
     print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
     for key in comp.seeds_found:
         val = comp.seeds_found[key] # pybind11 std::map type
         print("found", key, "of", num_scatters, 100*val/amount, "% of times")
 
-mm_extra = ""
-mm_extra += "--splice" # Enable the splice alignment mode.
-#mm_extra += " -P"      # Retain all chains 
-
-test_sets=[MM2TestSet(mm_extra), SeedsTestSet(), NgmlrTestSet()]
-#plot_scatter(num_reads=100, sv_size_range=[2**x for x in range(14)], test_sets=test_sets, num_scatters=100)
-draw_scatter_plot(test_sets=test_sets)
+#main()
+#plot_scatter(num_reads=100, sv_size_range=[2**x for x in range(14)])
+if True:
+    binary_search_plot(None, "scattered_overlap", overlap_percentages=[0.05, 0.25, 0.5, 0.75, 0.95],
+                       sv_size_max=2000, read_size=1000, gap_size_range=[1,2,3,4])
+    print_binary_search_plot_box_plot()

@@ -58,5 +58,5 @@ def main():
 
 #main()
 if True:
-    binary_search_plot(translocation)
-    #print_binary_search_plot()
+    #binary_search_plot(translocation)
+    print_binary_search_plot()

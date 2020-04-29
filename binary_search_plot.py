@@ -1,5 +1,7 @@
 from svs_lost_during_alignment import *
 from MA import *
+from bokeh.models import FactorRange
+from bokeh.models import PrintfTickFormatter
 
 def plot_gap_size(sv_func):
     params = ParameterSetManager()
@@ -81,7 +83,7 @@ class MATestSet:
         self._name = name
         self.render_one = render_one
 
-    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix):
+    def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix):
         path_sam = self._name + suffix + ".sam"
         # write reads
         reads_path = data_dir + "/reads/" + path_sam + ".fasta"
@@ -119,7 +121,7 @@ class MM2TestSet:
         if len(mm_extra) > 0:
             self.c2 = "grey"
         pass
-    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix):
+    def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix):
         path_sam = create_alignment(read_by_name, self.mm2, self._name + suffix)
         return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, fm_index, path_sam)
     def name(self):
@@ -139,7 +141,7 @@ class MM2TestSet:
 class NgmlrTestSet:
     def __init__(self):
         pass
-    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix):
+    def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix):
         path_sam = create_alignment(read_by_name, ngmlr, "ngmlr-" + suffix)
         return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, fm_index, path_sam)
     def name(self):
@@ -161,8 +163,8 @@ class SeedsTestSet:
     def __init__(self, reseeding):
         self.reseeding = reseeding
 
-    def test(self, params, seeds_by_name, read_by_name, fm_index, pack, suffix):
-        return compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, self.reseeding)
+    def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix):
+        return compare_seeds(params, read_by_name, seeds_by_name, mm_index, pack, True, self.reseeding)
     def name(self):
         return "seeds"
     def display_name(self):
@@ -186,15 +188,17 @@ def print_n_write(s, f):
 
 default_test_set = [MATestSet(), MM2TestSet(), MM2TestSet("-z 400,1 --splice -P", "extra_sensitive"), 
                     SeedsTestSet(True), NgmlrTestSet()]
-#default_test_set = [MATestSet(), MM2TestSet(), SeedsTestSet(True)]
+#default_test_set = [MATestSet(), MM2TestSet(), SeedsTestSet(False)]
+default_test_set = [SeedsTestSet(False)]
 def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_range=[*range(0, 81, 10), 500],
-                       overlap_percentages=[0.05, 0.45, 0.95], test_sets=default_test_set, sv_size_max=200, read_size=10000, num_reads=100):
+                       overlap_percentages=[0.05, 0.45, 0.95], test_sets=default_test_set, sv_size_max=200, read_size=2000, num_reads=100):
     params = ParameterSetManager()
 
     pack = Pack()
     pack.load(genome_dir + "/ma/genome")
     fm_index = FMIndex()
     fm_index.load(genome_dir + "/ma/genome")
+    mm_index = MinimizerIndex(params, genome_dir + "/ma/genome.mmi")
 
     with open(data_dir + "/" + filename_out + ".tsv", "w") as file_out:
         # header of outfile
@@ -205,6 +209,7 @@ def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_r
         print_n_write("\n", file_out)
 
         # body of outfile
+        max_gap_size = max(gap_size_range)
         for gap_size in gap_size_range:
             read_cache = {}
             for test_set in test_sets:
@@ -221,11 +226,25 @@ def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_r
                                                             lambda x,y: sv_func(sv_size, gap_size, x,y))
                         else:
                             seeds_by_name, read_by_name = create_scattered_read(pack, read_size, num_reads,
-                                                                                         gap_size, sv_size)
+                                                                                max_gap_size, sv_size)
                         read_cache[(sv_size, gap_size)] = (seeds_by_name, read_by_name)
                     suffix = filename_out + "-sv_size=" + str(sv_size) + "-gap_size=" + str(gap_size)
-                    comp = test_set.test(params, seeds_by_name, read_by_name, fm_index, pack, suffix)
-                    return comp.amount_overlap_all / num_reads
+                    comp = test_set.test(params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix)
+                    if not sv_func is None:
+                        return comp.amount_overlap_all / num_reads
+                    else:
+                        print(sv_size)
+                        for idx in range(0, max_gap_size+1):
+                            if idx in comp.seeds_found:
+                                print(comp.seeds_found[idx], end=", ")
+                            else:
+                                print(0, end=", ")
+                        print()
+                        s = 0
+                        for idx in range(gap_size, max_gap_size+1):
+                            if idx in comp.seeds_found:
+                                s += comp.seeds_found[idx]
+                        return s / num_reads
 
                 search_val_cache = {}
                 for o_p in overlap_percentages:
@@ -303,4 +322,60 @@ def print_binary_search_plot(file_name_in="translocation_overlap", title="SV Ove
             plot.line(x=[0,1], y=[-10, -10], line_width=point_to_px(4), 
                       legend_label=test_set.display_name(), color=color_scheme(test_set.color()))
         plot.legend.location = "bottom_left"
+        show(plot)
+
+def print_binary_search_plot_box_plot(file_name_in="scattered_overlap", title="Overlap - Scattered read", 
+                            test_sets=default_test_set,
+                            sv_size_max=2000, max_scatters=4):
+    with open(data_dir + "/" + file_name_in + ".tsv", "r") as file_in:
+        lines = file_in.readlines()
+        header = lines[0]
+
+        test_set_dict = {}
+        for test_set in test_sets:
+            test_set_dict[test_set.name()] = test_set
+
+        y_range = []
+        for idx in range(1, max_scatters+1):
+            for test_set in test_sets:
+                y_range.append((">=" + str(idx), test_set.display_name()))
+
+        plot = figure(title=title, x_range=(10, sv_size_max), y_range=FactorRange(*y_range), x_axis_type="log")
+        plot.xaxis.axis_label = "SV Size"
+        plot.xaxis[0].formatter = PrintfTickFormatter(format="%5f")
+        plot.yaxis.axis_label = "Num Scatters"
+
+        for line in lines[1:]:
+            cells = line.split("\t")
+            num_scatters = str(int(cells[0]))
+            test_set = test_set_dict[cells[1]]
+            color = color_scheme(test_set.color())
+            light_color = color_scheme(test_set.color_light())
+            def int_or_max_val(s):
+                if s == "None":
+                    return int(sv_size_max * 10)
+                return int(s)
+            min_val = int_or_max_val(cells[2])
+            quartile1 = int_or_max_val(cells[3])
+            median = int_or_max_val(cells[4])
+            quartile3 = int_or_max_val(cells[5])
+            max_val = int_or_max_val(cells[6])
+
+            line_width = point_to_px(2)
+
+            y_pos = (">=" + num_scatters, test_set.display_name())
+            plot.hbar(y=[y_pos], left=[quartile1], right=[median], height=0.7,
+                      line_color=color, line_width=line_width, 
+                      fill_color=light_color)
+            plot.hbar(y=[y_pos], left=[median], right=[quartile3], height=0.7,
+                      line_color=color, line_width=line_width,
+                      fill_color=light_color)
+            plot.line(x=[min_val, max_val], y=[y_pos,y_pos],
+                      line_color=color, line_width=line_width)
+            plot.hbar(y=[y_pos], left=[min_val], right=[min_val], height=0.2,
+                      line_color=color, line_width=line_width,
+                      fill_color=None)
+            plot.hbar(y=[y_pos], left=[max_val], right=[max_val], height=0.2,
+                      line_color=color, line_width=line_width,
+                      fill_color=None)
         show(plot)
