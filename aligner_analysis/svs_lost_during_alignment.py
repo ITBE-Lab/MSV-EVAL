@@ -1,13 +1,13 @@
 from MA import *
 from MSV import *
 import random
-from ..os_aligners import *
+from os_aligners import *
 from bokeh.plotting import figure, show
-from ..bokeh_style_helper import *
+from bokeh_style_helper import *
 from bokeh.plotting import ColumnDataSource
 from bokeh.layouts import column, row, grid
 from bokeh.models.tools import HoverTool
-from ..seed_printer import *
+from seed_printer import *
 
 genome_dir = "/MAdata/genome/human/GRCh38.p12"
 data_dir = "/MAdata/sv_lost_during_alignment"

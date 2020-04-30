@@ -2,6 +2,7 @@ from svs_lost_during_alignment import *
 from MA import *
 from bokeh.models import FactorRange
 from bokeh.models import PrintfTickFormatter
+from bokeh.transform import dodge
 
 def plot_gap_size(sv_func):
     params = ParameterSetManager()
@@ -354,31 +355,38 @@ def print_binary_search_plot_box_plot(file_name_in="scattered_overlap", title="O
             test_set = test_set_dict[cells[1]]
             color = color_scheme(test_set.color())
             light_color = color_scheme(test_set.color_light())
-            def int_or_max_val(s):
+            end_val = int(sv_size_max * 10)
+            def int_or_end_val(s):
                 if s == "None":
-                    return int(sv_size_max * 10)
+                    return end_val
                 return int(s)
-            min_val = int_or_max_val(cells[2])
-            quartile1 = int_or_max_val(cells[3])
-            median = int_or_max_val(cells[4])
-            quartile3 = int_or_max_val(cells[5])
-            max_val = int_or_max_val(cells[6])
+            min_val = int_or_end_val(cells[2])
+            quartile1 = int_or_end_val(cells[3])
+            median = int_or_end_val(cells[4])
+            quartile3 = int_or_end_val(cells[5])
+            max_val = int_or_end_val(cells[6])
 
             line_width = point_to_px(2)
 
             y_pos = (">=" + num_scatters, test_set.display_name())
-            plot.line(x=[min_val, max_val], y=[y_pos,y_pos],
-                      line_color=color, line_width=line_width)
-            plot.hbar(y=[y_pos], left=[quartile1], right=[median], height=0.7,
+            plot.hbar(y=[y_pos,y_pos,y_pos,y_pos,y_pos],
+                      left=[min_val, quartile1, median, quartile3, max_val],
+                      right=[end_val,end_val,end_val,end_val,end_val], 
+                      height=[0.05,0.25,0.5,0.75,0.95],
                       line_color=color, line_width=line_width, 
                       fill_color=light_color)
-            plot.hbar(y=[y_pos], left=[median], right=[quartile3], height=0.7,
-                      line_color=color, line_width=line_width,
-                      fill_color=light_color)
-            plot.hbar(y=[y_pos], left=[min_val], right=[min_val], height=0.2,
-                      line_color=color, line_width=line_width,
-                      fill_color=None)
-            plot.hbar(y=[y_pos], left=[max_val], right=[max_val], height=0.2,
-                      line_color=color, line_width=line_width,
-                      fill_color=None)
+            t1 = (min_val + min(quartile1, sv_size_max)) / 2
+            t2 = (quartile1 + min(median, sv_size_max)) / 2
+            t3 = (median + min(quartile3, sv_size_max)) / 2
+            t4 = (quartile3 + min(max_val, sv_size_max)) / 2
+            t5 = (max_val + sv_size_max) / 2
+            t = plot.text(x=[t1], y=[y_pos],
+                      text=[">=5%"], text_align="center", text_baseline="bottom")
+            t.glyph.text_font_size="7px"
+            t = plot.text(x=[t2], y=[y_pos],
+                      text=[">=25%"], text_align="center", text_baseline="top")
+            t.glyph.text_font_size="7px"
+            t = plot.text(x=[t3, t4, t5], y=[y_pos,y_pos,y_pos],
+                      text=[">=50%", ">=75%", ">=95%"], text_align="center", text_baseline="middle")
+            t.glyph.text_font_size="10px"
         show(plot)

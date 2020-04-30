@@ -13,9 +13,7 @@ class SeedPrinter(Module):
     # @details
     # Reimplemented from MA.aligner.Module.execute.
     def execute(self, *input):
-        assert(len(input) >= 2)
-        seeds_a = input[0]
-        seeds_b = input[1]
+        assert(len(input) >= 1)
 
         plot = figure(title="Seeds")
         if len(input) > 2:
@@ -54,7 +52,11 @@ class SeedPrinter(Module):
                         legend_label=name + " - reverse", line_color="orange", line_dash=dash,
                         line_width=point_to_px(width))
 
-        render(seeds_b, self.name_b, dash=(10,10), width=6)
+        if len(input) > 1:
+            seeds_b = input[1]
+            render(seeds_b, self.name_b, dash=(10,10), width=6)
+
+        seeds_a = input[0]
         render(seeds_a, self.name_a)
 
         show(plot)
