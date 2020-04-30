@@ -120,14 +120,17 @@ class MM2TestSet:
         self.c2 = "lightred"
         if len(mm_extra) > 0:
             self.c2 = "grey"
-        pass
+
+        self._display_name = "Minimap 2 Alignment"
+        if len(mm_extra) > 0:
+            self._display_name = "Minimap 2 Alignment extra sensitive"
     def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix):
         path_sam = create_alignment(read_by_name, self.mm2, self._name + suffix)
         return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, fm_index, path_sam)
     def name(self):
         return self._name
     def display_name(self):
-        return "Minimap 2 Alignment"
+        return self._display_name
 
     def bokeh_func(self, plot, x, y, c, l):
         plot.x(x=x, y=y, line_color=c, legend_label=l,
@@ -162,14 +165,20 @@ class NgmlrTestSet:
 class SeedsTestSet:
     def __init__(self, reseeding):
         self.reseeding = reseeding
+        self.mems = True
 
     def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix):
-        return compare_seeds(params, read_by_name, seeds_by_name, mm_index, pack, True, self.reseeding)
+        if self.mems:
+            return compare_seeds(params, read_by_name, seeds_by_name, mm_index, pack, True, self.reseeding)
+        else:
+            return compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, False, self.reseeding)
     def name(self):
         return "seeds"
     def display_name(self):
         if self.reseeding:
             return "Reseeding"
+        if self.mems:
+            return "MEMS"
         return "Max. Spanning Seeding"
 
     def bokeh_func(self, plot, x, y, c, l):
@@ -189,7 +198,7 @@ def print_n_write(s, f):
 default_test_set = [MATestSet(), MM2TestSet(), MM2TestSet("-z 400,1 --splice -P", "extra_sensitive"), 
                     SeedsTestSet(True), NgmlrTestSet()]
 #default_test_set = [MATestSet(), MM2TestSet(), SeedsTestSet(False)]
-default_test_set = [SeedsTestSet(False)]
+#default_test_set = [SeedsTestSet(False)]
 def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_range=[*range(0, 81, 10), 500],
                        overlap_percentages=[0.05, 0.45, 0.95], test_sets=default_test_set, sv_size_max=200, read_size=2000, num_reads=100):
     params = ParameterSetManager()
@@ -233,13 +242,6 @@ def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_r
                     if not sv_func is None:
                         return comp.amount_overlap_all / num_reads
                     else:
-                        print(sv_size)
-                        for idx in range(0, max_gap_size+1):
-                            if idx in comp.seeds_found:
-                                print(comp.seeds_found[idx], end=", ")
-                            else:
-                                print(0, end=", ")
-                        print()
                         s = 0
                         for idx in range(gap_size, max_gap_size+1):
                             if idx in comp.seeds_found:
@@ -340,7 +342,8 @@ def print_binary_search_plot_box_plot(file_name_in="scattered_overlap", title="O
             for test_set in test_sets:
                 y_range.append((">=" + str(idx), test_set.display_name()))
 
-        plot = figure(title=title, x_range=(10, sv_size_max), y_range=FactorRange(*y_range), x_axis_type="log")
+        plot = figure(title=title, x_range=(10, sv_size_max), y_range=FactorRange(*y_range), x_axis_type="log", 
+                      plot_width=800)
         plot.xaxis.axis_label = "SV Size"
         plot.xaxis[0].formatter = PrintfTickFormatter(format="%5f")
         plot.yaxis.axis_label = "Num Scatters"
@@ -364,14 +367,14 @@ def print_binary_search_plot_box_plot(file_name_in="scattered_overlap", title="O
             line_width = point_to_px(2)
 
             y_pos = (">=" + num_scatters, test_set.display_name())
+            plot.line(x=[min_val, max_val], y=[y_pos,y_pos],
+                      line_color=color, line_width=line_width)
             plot.hbar(y=[y_pos], left=[quartile1], right=[median], height=0.7,
                       line_color=color, line_width=line_width, 
                       fill_color=light_color)
             plot.hbar(y=[y_pos], left=[median], right=[quartile3], height=0.7,
                       line_color=color, line_width=line_width,
                       fill_color=light_color)
-            plot.line(x=[min_val, max_val], y=[y_pos,y_pos],
-                      line_color=color, line_width=line_width)
             plot.hbar(y=[y_pos], left=[min_val], right=[min_val], height=0.2,
                       line_color=color, line_width=line_width,
                       fill_color=None)

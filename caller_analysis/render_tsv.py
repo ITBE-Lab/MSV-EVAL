@@ -10,7 +10,7 @@ from MA import *
 from MSV import *
 from bokeh.models import Legend
 import math
-from bokeh_style_helper import *
+from ..bokeh_style_helper import *
 
 sv_data_dir = "/MAdata/sv_datasets/"
 sv_db_dir = "/MAdata/sv_datasets3/"

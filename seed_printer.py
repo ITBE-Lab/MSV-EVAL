@@ -1,7 +1,7 @@
 from MS import *
 from MA import *
 from bokeh.plotting import figure, show
-from bokeh_style_helper import *
+from ..bokeh_style_helper import *
 
 class SeedPrinter(Module):
     def __init__(self, parameter_manager, name_a="Data", name_b="Ground Truth"):

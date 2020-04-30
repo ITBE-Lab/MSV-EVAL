@@ -3,7 +3,7 @@ from MA import *
 from MSV import *
 import math
 import os
-from os_aligner import *
+from ..os_aligners import *
 import json
 import traceback
 from pathlib import Path
