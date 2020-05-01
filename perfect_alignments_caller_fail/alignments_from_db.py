@@ -37,11 +37,9 @@ def crop_seeds(seeds, insertions, read_start, read_end):
         s = max(seeds[idx].start, read_start)
         e = min(seeds[idx].start + seeds[idx].size, read_end)
         l = e-s
-        if seeds[idx].on_forward_strand:
-            s_r = (s - seeds[idx].start) + seeds[idx].start_ref
-        else:
-            # @todo this is not working....
-            s_r = (s - seeds[idx].start) + (seeds[idx].start_ref - seeds[idx].size )
+        s_r = seeds[idx].start_ref + s - seeds[idx].start
+        if not seeds[idx].on_forward_strand and seeds[idx].start < read_start:
+            s_r += seeds[idx].start - read_start
         if l > 0:
             ret_seeds.append(Seed(q_pos, l, s_r, seeds[idx].on_forward_strand))
             q_pos += l
@@ -60,7 +58,7 @@ def alignments_from_db(call_table, ref_pack, caller_run, size, amount, start=0, 
     seeds, insertions = call_table.calls_to_seeds(ref_pack, caller_run)
     contig_starts = contigs_from_seeds(seeds, ref_pack)
     seq_genome_size = max(seed.start + seed.size for seed in seeds)
-    for _ in range(amount):
+    for idx in range(amount):
         while True:
             # @note no reverse strand reads for now
             read_start = random.randrange(start, end - size)
@@ -78,15 +76,16 @@ def alignments_from_db(call_table, ref_pack, caller_run, size, amount, start=0, 
                 break
         c_seeds, c_ins = crop_seeds(seeds, insertions, read_start, read_end)
         read = call_table.reconstruct_sequenced_genome_from_seeds(c_seeds, c_ins, ref_pack).extract_forward_strand()
+        read.name = "read_" + str(idx)
         ret.append( (read, seeds_to_alignments(c_seeds, read_start, read_end, ref_pack)) )
     return ret
 
 def alignment_to_file(alignments_list, sam_file_path, ref_pack):
     params = ParameterSetManager()
     params.by_name("Emulate NGMLR's tag output").set(True)
-    file_writer = FileWriter(params, sam_file_path, ref_pack)
+    file_writer = FileWriter(params, sam_file_path + ".sam", ref_pack)
     for read, alignments in alignments_list:
         file_writer.execute(read, AlignmentVector(alignments), ref_pack)
-    file_writer.close()
+    file_writer.cpp_module.close()
     sam_to_bam(sam_file_path)
 

@@ -126,7 +126,7 @@ def run_callers_if_necessary(dataset_name, json_dict, pack, fm_index, run_others
                                 print("not creating calls for", read_set["name"], alignment, sv_call.__name__)
                                 continue
                             print("creating calls for", read_set["name"], alignment, sv_call.__name__)
-                            sv_call(bam_file_path, vcf_file_path)
+                            sv_call(bam_file_path, vcf_file_path, json_dict["reference_path"])
                             if not os.path.exists( vcf_file_path ):
                                 print("caller did not create calls: ", read_set["name"], alignment, sv_call.__name__)
                                 continue

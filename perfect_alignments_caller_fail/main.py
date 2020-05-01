@@ -3,11 +3,15 @@ from MA import *
 import random
 from perfect_alignments_caller_fail.alignments_from_db import *
 from bokeh.io.output import reset_output
+from caller_analysis.os_sv_callers import *
+from caller_analysis.vcf_interpreters import *
+import os
 
 global_prefix = "/MAdata/sv_lost_during_calling/"
 sam_folder = global_prefix + "sam/"
 vcf_folder = global_prefix + "vcf/"
 genome_dir = "/MAdata/genome/human"
+db_prefix = "/MAdata/sv_datasets/"
 
 def random_nuc_seq(l):
     ret = ""
@@ -43,37 +47,71 @@ def four_nested_svs_calls(db_conn, dataset_name, l, offset):
     return get_inserter.cpp_module.id
 
 db_name = "perfect_alignment_caller_fail"
-if __name__ == "__main__":
-    db_conn = DbConn({"SCHEMA": {"NAME": db_name, "FLAGS": ["DROP_ON_CLOSURE"]}})
+l = 1000
+coverage = 100
+read_size = l*3
+callers = [
+    (sniffles, "sniffles", sniffles_interpreter),
+    #(pbSv, "pbSv", pb_sv_interpreter),
+]
+genome = genome_dir + "/GRCh38.p12"
 
+if __name__ == "__main__":
+    if not os.path.exists( db_prefix + db_name ):
+        os.mkdir(db_prefix + db_name)
+    with open(db_prefix + db_name + "/info.json", "w") as json_file:
+        json_file.write("{\n")
+        json_file.write("\"reference_path\":\""+genome+"\"\n")
+        json_file.write("}\n")
+
+
+    db_conn = DbConn({"SCHEMA": {"NAME": db_name}}) # , "FLAGS": ["DROP_ON_CLOSURE"]
+
+    jump_table = SvJumpTable(db_conn) # initialize jump table
 
     reference = Pack()
-    reference.load(genome_dir + "/GRCh38.p12" + "/ma/genome")
+    reference.load(genome + "/ma/genome")
 
     chr1_len = reference.contigLengths()[0]
-    l = 100
+    section_size = l*10
     ref_section = "N"
     while 'n' in ref_section or 'N' in ref_section:
-        offset = random.randrange(1000, chr1_len - l*10)
-        ref_section = str(reference.extract_from_to(offset, offset+10*l))
+        offset = random.randrange(1000, chr1_len - section_size)
+        ref_section = str(reference.extract_from_to(offset, offset+section_size))
 
     run_id = four_nested_svs_calls(db_conn, db_name, l, offset)
 
     call_table = SvCallTable(db_conn)
     seeds, inserts = call_table.calls_to_seeds(reference, run_id)
 
-    seed_printer = SeedPrinter(ParameterSetManager(), "call seed", x_range=(offset, offset+10*l),
-                               y_range=(offset, offset+10*l), do_print=False)
-    seed_printer.execute(seeds)
+    if False:
+        seed_printer = SeedPrinter(ParameterSetManager(), "call seed", x_range=(offset, offset+10*l),
+                                   y_range=(offset, offset+10*l), do_print=False)
+        seed_printer.execute(seeds)
 
-    read_size = l*7
-    alignments_list = alignments_from_db(call_table, reference, run_id, read_size, 3, offset, offset + 10*l)
+    num_reads = (coverage * section_size) // read_size
+    alignments_list = alignments_from_db(call_table, reference, run_id, read_size, num_reads,
+                                         offset, offset + section_size)
 
-    seed_printer2 = SeedPrinter(ParameterSetManager(), "alignment seed", x_range=(offset, offset+10*l),
-                               y_range=(0, read_size), do_print=False)
-    for read, alignments in alignments_list[:1]:
-        alignment_seeds = Seeds()
-        for alignment in alignments:
-            print(alignment.cigarString(reference, read_size))
-            alignment_seeds.extend(alignment.to_seeds(reference) )
-        seed_printer2.execute(alignment_seeds)
+    if False:
+        seed_printer = SeedPrinter(ParameterSetManager(), "alignment seed", x_range=(offset, offset+section_size),
+                                y_range=(0, read_size), do_print=False)
+        for read, alignments in alignments_list[:1]:
+            alignment_seeds = Seeds()
+            for alignment in alignments:
+                print(alignment.cigarString(reference, read_size))
+                alignment_seeds.extend(alignment.to_seeds(reference) )
+            seed_printer.execute(alignment_seeds)
+
+    file_name = db_name + "-" + str(read_size) + "-" + str(coverage) + "-" + str(l)
+    sam_file_name = sam_folder + file_name
+    alignment_to_file(alignments_list, sam_file_name, reference)
+
+    with open(global_prefix + "/vcf_errors.log", "w") as error_file:
+        for caller, name, interpreter in callers:
+            vcf_file_path = vcf_folder + file_name + "-" + name + ".vcf"
+            caller(sam_file_name + ".sorted.bam", vcf_file_path, genome)
+            if not os.path.exists( vcf_file_path ):
+                print("caller did not create calls: ", name)
+                continue
+            vcf_to_db(name, "desc", db_name, vcf_file_path, reference, interpreter, error_file)
