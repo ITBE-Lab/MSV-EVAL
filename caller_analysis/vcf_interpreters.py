@@ -470,3 +470,81 @@ def smoove_interpreter(call, call_inserter, pack, error_file):
 
     except Exception as e:
         log_error(call, error_file, "smoove", e)
+
+
+def vcf_parser(file_name):
+    class VCFFile:
+        def __init__(self, d, names, layer, info):
+            self.data = d
+            self.names = names
+            self.layer = layer
+            self.info = info
+
+        def __getitem__(self, name):
+            if not name in self.data:
+                return []
+            return self.data[name]
+
+        def __contains__(self, name):
+            return name in self.data
+
+        def __str__(self):
+            s = ""
+            for info_line in self.info:
+                s += info_line + "\n"
+            s += "{\n"
+            for key, val in self.data.items():
+                for _ in range(self.layer + 1):
+                    s += "\t"
+                s += str(key) + ": " + str(val) + "\n"
+            for _ in range(self.layer):
+                s += "\t"
+            return s + "}"
+
+        def from_format(self, key, value_list_idx=-1):
+            idx = self["FORMAT"].split(":").index(key)
+            return self[self.names[value_list_idx]].split(":")[idx]
+
+        def has_format(self, key):
+            return key in self["FORMAT"].split(":")
+
+    with open(file_name, "r") as vcf_file:
+        names = []
+        info = []
+        for line in vcf_file:
+            if line[-1] == "\n":
+                line = line[:-1]
+            if line[:2] == "##":
+                info.append(line)
+            elif line[0] == "#":
+                names = line[1:].split("\t")
+            else:
+                d = {}
+                for name, field in zip(names, line.split("\t")):
+                    if name == "INFO":
+                        d2 = {}
+                        keys = []
+                        for key_value in field.split(";"):
+                            if "=" in key_value:
+                                key, value = key_value.split("=")
+                                keys.append(key)
+                                d2[key] = value
+                            else:
+                                d2[key_value] = True
+                        d[name] = VCFFile(d2, keys, 1, [])
+                    else:
+                        d[name] = field
+                yield VCFFile(d, names, 0, info)
+
+def vcf_to_db(name, desc, dataset_name, file_name, pack, vcf_interpreter, error_file=None, create_sv_func=None):
+    pooled_connection = PoolContainer(1, dataset_name)
+    # -1 since there are no related sv jumps...
+    get_inserter = GetCallInserter(ParameterSetManager(), DbConn(dataset_name), name, desc, -1)
+    call_inserter = get_inserter.execute(pooled_connection)
+
+    num_calls = 0
+    for call in vcf_parser(file_name):
+        num_calls += 1
+        vcf_interpreter(call, call_inserter, pack, error_file)
+    print("number of calls:", num_calls)
+    call_inserter.close(pooled_connection)

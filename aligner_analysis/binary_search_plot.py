@@ -1,4 +1,4 @@
-from svs_lost_during_alignment import *
+from aligner_analysis.svs_lost_during_alignment import *
 from MA import *
 from bokeh.models import FactorRange
 from bokeh.models import PrintfTickFormatter
@@ -85,9 +85,9 @@ class MATestSet:
         self.render_one = render_one
 
     def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix):
-        path_sam = self._name + suffix + ".sam"
+        path_sam = data_dir + "/sam/" + self._name + suffix + ".sam"
         # write reads
-        reads_path = data_dir + "/reads/" + path_sam + ".fasta"
+        reads_path = data_dir + "/reads/" + self._name + suffix + ".fasta"
         with open(reads_path, 'w') as fasta_file:
             for name, read in read_by_name:
                 fasta_file.write(">" + name + "\n")

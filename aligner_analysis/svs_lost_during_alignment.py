@@ -254,7 +254,7 @@ def create_alignment(read_by_name, aligner, sam_name):
 
     json_dict = {"reference_path":genome_dir}
     read_json = {"technology":"pb", "name":"n/a", "fasta_file":reads_path}
-    path_sam = data_dir + "/mm_sam/" + sam_name + ".sam"
+    path_sam = data_dir + "/sam/" + sam_name + ".sam"
     aligner(read_json, path_sam, json_dict)
 
     return [path_sam]
