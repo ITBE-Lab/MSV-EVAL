@@ -6,9 +6,11 @@ from bokeh.io.output import reset_output
 from caller_analysis.os_sv_callers import *
 from caller_analysis.vcf_interpreters import *
 import os
+from sv_util.os_aligners import *
 
 global_prefix = "/MAdata/sv_lost_during_calling/"
 sam_folder = global_prefix + "sam/"
+fasta_folder = global_prefix + "fasta/"
 vcf_folder = global_prefix + "vcf/"
 genome_dir = "/MAdata/genome/human"
 db_prefix = "/MAdata/sv_datasets/"
@@ -25,7 +27,7 @@ def random_nuc_seq(l):
 def four_nested_svs_calls(db_conn, dataset_name, l, offset):
     JumpRunTable(db_conn)
     SvCallerRunTable(db_conn)
-    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "simulated_sv",
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "four_nested_svs_calls",
                                    "the sv's that were simulated", -1)
     pool = PoolContainer(1, dataset_name)
     sv_inserter = get_inserter.execute(pool)
@@ -46,10 +48,75 @@ def four_nested_svs_calls(db_conn, dataset_name, l, offset):
     sv_inserter.close(pool)
     return get_inserter.cpp_module.id
 
+def inversion_in_inversion(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "inversion_in_inversion",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 4*l - 1, 0, 0, True, 1000)) # a
+    sv_inserter.insert(SvCall(offset + 2*l, offset + 3*l, 0, 0, True, 1000)) # b
+    sv_inserter.insert(SvCall(offset + 3*l - 1, offset + 2*l - 1, 0, 0, True, 1000)) # c
+    sv_inserter.insert(SvCall(offset + 4*l, offset + l, 0, 0, True, 1000)) # d
+
+    sv_inserter.close(pool)
+    return get_inserter.cpp_module.id
+
+def inversion_in_inversion_2(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "inversion_in_inversion_2",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 2*l, 0, 0, False, 1000)) # a
+    sv_inserter.insert(SvCall(offset + 3*l - 1, offset + 2*l - 1, 0, 0, True, 1000)) # b
+    sv_inserter.insert(SvCall(offset + 3*l, offset + l, 0, 0, True, 1000)) # c
+
+    sv_inserter.close(pool)
+    return get_inserter.cpp_module.id
+
+def insertion_in_inversion(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "insertion in inversion",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 3*l - 1, 0, 0, True, 1000)) # a
+
+    insertion = SvCall(offset + 2*l, offset + 2*l - 1, 0, 0, False, 1000)
+    insertion.inserted_sequence = NucSeq(random_nuc_seq(l))
+    sv_inserter.insert(insertion) # b
+
+    sv_inserter.insert(SvCall(offset + 3*l, offset + l, 0, 0, True, 1000)) # c
+
+    sv_inserter.close(pool)
+    return get_inserter.cpp_module.id
+
+def inversion(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "inversion",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 2*l - 1, 0, 0, True, 1000)) # a
+
+    sv_inserter.insert(SvCall(offset + 2*l, offset + l, 0, 0, True, 1000)) # b
+
+    sv_inserter.close(pool)
+    return get_inserter.cpp_module.id
+
 db_name = "perfect_alignment_caller_fail"
 l = 1000
 coverage = 100
-read_size = l*3
+read_size = l*3-1
 callers = [
     (sniffles, "sniffles", sniffles_interpreter),
     #(pbSv, "pbSv", pb_sv_interpreter),
@@ -67,26 +134,33 @@ if __name__ == "__main__":
 
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}}) # , "FLAGS": ["DROP_ON_CLOSURE"]
 
-    jump_table = SvJumpTable(db_conn) # initialize jump table
 
     reference = Pack()
     reference.load(genome + "/ma/genome")
 
     chr1_len = reference.contigLengths()[0]
-    section_size = l*10
+    #section_size = l*10
+    #section_size = l*5
+    #section_size = l*4
+    section_size = l*3
     ref_section = "N"
     while 'n' in ref_section or 'N' in ref_section:
-        offset = random.randrange(1000, chr1_len - section_size)
+        offset = 241244918#random.randrange(1000, chr1_len - section_size)
         ref_section = str(reference.extract_from_to(offset, offset+section_size))
 
-    run_id = four_nested_svs_calls(db_conn, db_name, l, offset)
+    #run_id = four_nested_svs_calls(db_conn, db_name, l, offset)
+    #run_id = inversion_in_inversion(db_conn, db_name, l, offset)
+    #run_id = inversion_in_inversion_2(db_conn, db_name, l, offset)
+    #run_id = insertion_in_inversion(db_conn, db_name, l, offset)
+    run_id = inversion(db_conn, db_name, l, offset)
 
     call_table = SvCallTable(db_conn)
+    jump_table = SvJumpTable(db_conn) # initialize jump table
     seeds, inserts = call_table.calls_to_seeds(reference, run_id)
 
-    if False:
-        seed_printer = SeedPrinter(ParameterSetManager(), "call seed", x_range=(offset, offset+10*l),
-                                   y_range=(offset, offset+10*l), do_print=False)
+    if True:
+        seed_printer = SeedPrinter(ParameterSetManager(), "call seed", x_range=(offset, offset+section_size),
+                                   y_range=(offset, offset+section_size), do_print=False)
         seed_printer.execute(seeds)
 
     num_reads = (coverage * section_size) // read_size
@@ -105,7 +179,21 @@ if __name__ == "__main__":
 
     file_name = db_name + "-" + str(read_size) + "-" + str(coverage) + "-" + str(l)
     sam_file_name = sam_folder + file_name
-    alignment_to_file(alignments_list, sam_file_name, reference)
+    if True: # write alignments myself
+        #alignment_to_file(alignments_list, sam_folder + "us", reference)
+        alignment_to_file(alignments_list, sam_file_name, reference)
+    if False: # use ngmlr
+        read_to_file(alignments_list, fasta_folder + file_name)
+        json_dict = { "reference_path": genome }
+        read_set = {
+            "fasta_file": fasta_folder + file_name + ".fasta",
+            "name": "perfect_alignments_caller_fail",
+            "technology": "pb"
+        }
+        ngmlr(read_set, sam_folder + "ngmlr.sam", json_dict)
+        #ngmlr(read_set, sam_file_name + "-2.sam", json_dict)
+        #mm2(read_set, sam_file_name + ".sam", json_dict)
+        sam_to_bam(sam_file_name)
 
     with open(global_prefix + "/vcf_errors.log", "w") as error_file:
         for caller, name, interpreter in callers:

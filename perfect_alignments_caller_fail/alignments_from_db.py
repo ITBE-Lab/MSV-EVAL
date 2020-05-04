@@ -83,9 +83,19 @@ def alignments_from_db(call_table, ref_pack, caller_run, size, amount, start=0, 
 def alignment_to_file(alignments_list, sam_file_path, ref_pack):
     params = ParameterSetManager()
     params.by_name("Emulate NGMLR's tag output").set(True)
+    params.by_name("Soft clip").set(True)
     file_writer = FileWriter(params, sam_file_path + ".sam", ref_pack)
     for read, alignments in alignments_list:
-        file_writer.execute(read, AlignmentVector(alignments), ref_pack)
+        for alignment in alignments:
+            alignment.mapping_quality = 60/254
+        file_writer.execute(read,
+                            AlignmentVector(sorted(alignments, key=lambda x: x.get_score(), reverse=True)),
+                            ref_pack)
     file_writer.cpp_module.close()
     sam_to_bam(sam_file_path)
 
+def read_to_file(alignments_list, file_path):
+    with open(file_path + ".fasta", "w") as fasta_file:
+        for read, alignments in alignments_list:
+            fasta_file.write(">" + str(read.name) + "\n")
+            fasta_file.write(str(read) + "\n")
