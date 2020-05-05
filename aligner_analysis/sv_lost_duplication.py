@@ -56,5 +56,5 @@ def main():
 
 #main()
 if True:
-    #binary_search_plot(duplication, "duplication_overlap", sv_size_max=1000, read_size=5000, gap_size_range=range(1,500,25))
-    print_binary_search_plot("duplication_overlap", "SV Overlap - Duplication", sv_size_max=1000)
+    binary_search_plot(duplication, "duplication_overlap")
+    #print_binary_search_plot("duplication_overlap", "SV Overlap - Duplication", sv_size_max=1000)

@@ -13,8 +13,10 @@ def seeds_to_alignments(seeds, start, end, ref_pack):
         else:
             ret.append(Alignment(ref_pack.pos_to_rev_strand(seed.start_ref), seed.start))
         ret[-1].append(MatchType.match, seed.size)
-        if len(ret) > 1:
-            ret[-1].supplementary = True
+        ret[-1].mapping_quality = 60/254
+    ret.sort(key=lambda x: x.get_score(), reverse=True)
+    for alignment in ret[1:]:
+        alignment.supplementary = True
     return ret
 
 def contigs_from_seeds(seeds, ref_pack):
@@ -86,11 +88,7 @@ def alignment_to_file(alignments_list, sam_file_path, ref_pack):
     params.by_name("Soft clip").set(True)
     file_writer = FileWriter(params, sam_file_path + ".sam", ref_pack)
     for read, alignments in alignments_list:
-        for alignment in alignments:
-            alignment.mapping_quality = 60/254
-        file_writer.execute(read,
-                            AlignmentVector(sorted(alignments, key=lambda x: x.get_score(), reverse=True)),
-                            ref_pack)
+        file_writer.execute(read, AlignmentVector(alignments), ref_pack)
     file_writer.cpp_module.close()
     sam_to_bam(sam_file_path)
 

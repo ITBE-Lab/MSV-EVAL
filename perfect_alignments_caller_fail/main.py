@@ -7,6 +7,7 @@ from caller_analysis.os_sv_callers import *
 from caller_analysis.vcf_interpreters import *
 import os
 from sv_util.os_aligners import *
+from perfect_alignments_caller_fail.compute_errors import *
 
 global_prefix = "/MAdata/sv_lost_during_calling/"
 sam_folder = global_prefix + "sam/"
@@ -113,10 +114,44 @@ def inversion(db_conn, dataset_name, l, offset):
     sv_inserter.close(pool)
     return get_inserter.cpp_module.id
 
+def inversion_in_translocation(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "touching inversion in translocation",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 3*l, 0, 0, False, 1000)) # a
+    sv_inserter.insert(SvCall(offset + 4*l-1, offset + 3*l-1, 0, 0, True, 1000)) # b
+    sv_inserter.insert(SvCall(offset + l, offset + 2*l, 0, 0, True, 1000)) # c
+    sv_inserter.insert(SvCall(offset + 2*l-1, offset + 4*l, 0, 0, False, 1000)) # d
+
+    sv_inserter.close(pool)
+    return get_inserter.cpp_module.id
+
+def proper_inversion_in_translocation(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "proper inversion in translocation",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 5*l, 0, 0, False, 1000)) # a
+    sv_inserter.insert(SvCall(offset + 6*l-1, offset + 2*l, 0, 0, False, 1000)) # b
+    sv_inserter.insert(SvCall(offset + 3*l-1, offset + 4*l-1, 0, 0, True, 1000)) # c
+    sv_inserter.insert(SvCall(offset + 4*l, offset + 3*l, 0, 0, True, 1000)) # d
+    sv_inserter.insert(SvCall(offset + 5*l-1, offset + l, 0, 0, False, 1000)) # e
+    sv_inserter.insert(SvCall(offset + 2*l-1, offset + 6*l, 0, 0, False, 1000)) # f
+
+    sv_inserter.close(pool)
+    return get_inserter.cpp_module.id
+
 db_name = "perfect_alignment_caller_fail"
 l = 1000
 coverage = 100
-read_size = l*3-1
+read_size = l*2-1
 callers = [
     (sniffles, "sniffles", sniffles_interpreter),
     #(pbSv, "pbSv", pb_sv_interpreter),
@@ -140,25 +175,28 @@ if __name__ == "__main__":
 
     chr1_len = reference.contigLengths()[0]
     #section_size = l*10
+    section_size = l*8
     #section_size = l*5
     #section_size = l*4
-    section_size = l*3
+    #section_size = l*3
     ref_section = "N"
     while 'n' in ref_section or 'N' in ref_section:
-        offset = 241244918#random.randrange(1000, chr1_len - section_size)
+        offset = random.randrange(1000, chr1_len - section_size)
         ref_section = str(reference.extract_from_to(offset, offset+section_size))
 
     #run_id = four_nested_svs_calls(db_conn, db_name, l, offset)
     #run_id = inversion_in_inversion(db_conn, db_name, l, offset)
     #run_id = inversion_in_inversion_2(db_conn, db_name, l, offset)
     #run_id = insertion_in_inversion(db_conn, db_name, l, offset)
-    run_id = inversion(db_conn, db_name, l, offset)
+    #run_id = inversion(db_conn, db_name, l, offset)
+    #run_id = inversion_in_translocation(db_conn, db_name, l, offset)
+    run_id = proper_inversion_in_translocation(db_conn, db_name, l, offset)
 
     call_table = SvCallTable(db_conn)
     jump_table = SvJumpTable(db_conn) # initialize jump table
     seeds, inserts = call_table.calls_to_seeds(reference, run_id)
 
-    if True:
+    if False:
         seed_printer = SeedPrinter(ParameterSetManager(), "call seed", x_range=(offset, offset+section_size),
                                    y_range=(offset, offset+section_size), do_print=False)
         seed_printer.execute(seeds)
@@ -179,11 +217,10 @@ if __name__ == "__main__":
 
     file_name = db_name + "-" + str(read_size) + "-" + str(coverage) + "-" + str(l)
     sam_file_name = sam_folder + file_name
-    if True: # write alignments myself
-        #alignment_to_file(alignments_list, sam_folder + "us", reference)
-        alignment_to_file(alignments_list, sam_file_name, reference)
+    if False: # write alignments myself
+        alignment_to_file(alignments_list[:1], sam_folder + "us", reference)
     if False: # use ngmlr
-        read_to_file(alignments_list, fasta_folder + file_name)
+        read_to_file(alignments_list[:1], fasta_folder + file_name)
         json_dict = { "reference_path": genome }
         read_set = {
             "fasta_file": fasta_folder + file_name + ".fasta",
@@ -191,10 +228,12 @@ if __name__ == "__main__":
             "technology": "pb"
         }
         ngmlr(read_set, sam_folder + "ngmlr.sam", json_dict)
-        #ngmlr(read_set, sam_file_name + "-2.sam", json_dict)
+        #ngmlr(read_set, sam_file_name + ".sam", json_dict)
         #mm2(read_set, sam_file_name + ".sam", json_dict)
-        sam_to_bam(sam_file_name)
+        #sam_to_bam(sam_file_name)
+    alignment_to_file(alignments_list, sam_file_name, reference)
 
+    caller_ids = []
     with open(global_prefix + "/vcf_errors.log", "w") as error_file:
         for caller, name, interpreter in callers:
             vcf_file_path = vcf_folder + file_name + "-" + name + ".vcf"
@@ -202,4 +241,11 @@ if __name__ == "__main__":
             if not os.path.exists( vcf_file_path ):
                 print("caller did not create calls: ", name)
                 continue
-            vcf_to_db(name, "desc", db_name, vcf_file_path, reference, interpreter, error_file)
+            call_id = vcf_to_db(name, "desc", db_name, vcf_file_path, reference, interpreter, error_file)
+            caller_seeds, inserts = call_table.calls_to_seeds(reference, call_id)
+            if False:
+                seed_printer = SeedPrinter(ParameterSetManager(), "caller seed",
+                                           x_range=(offset, offset+section_size),
+                                           y_range=(offset, offset+section_size), do_print=False)
+                seed_printer.execute(caller_seeds, seeds)
+    render(db_conn, caller_ids, run_id)

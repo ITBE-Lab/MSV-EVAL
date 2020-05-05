@@ -52,7 +52,7 @@ def ngmlr(read_set, sam_file_path, json_dict):
     # -c output CIGAR in PAF; -a output SAM
     os.system("~/workspace/ngmlr/bin/ngmlr-0.2.8/ngmlr -r " + index_str + " -q " + read_set["fasta_file"]
                 + " --rg-id 1, --rg-sm " + read_set["name"]
-                + " -t 32 -x " + presetting + " > " + sam_file_path ) # + " 2> /dev/null")
+                + " -t 32 -x " + presetting + " > " + sam_file_path + " 2> /dev/null")
 
 def blasr(read_set, sam_file_path, json_dict):
     s = "~/workspace/legacy_blasr/blasr " + read_set["fasta_file"] + " " + json_dict["reference_path"] \

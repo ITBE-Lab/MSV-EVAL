@@ -1,4 +1,4 @@
-from binary_search_plot import *
+from aligner_analysis.binary_search_plot import *
 
 only_sv = True
 no_sv = False
@@ -42,6 +42,7 @@ def main():
     pack.load(genome_dir + "/ma/genome")
     fm_index = FMIndex()
     fm_index.load(genome_dir + "/ma/genome")
+    mm_index = MinimizerIndex(params, genome_dir + "/ma/genome.mmi")
 
     seeds_by_name, read_by_name = create_reads(pack, 1000, 1, lambda x,y: translocation(10, 0, x,y))
     if False:
@@ -51,12 +52,12 @@ def main():
         print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
             100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
     print("reseeding:")
-    compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, render_one=True)
-    comp = compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack)
+    compare_seeds(params, read_by_name, seeds_by_name, mm_index, pack, render_one=True)
+    comp = compare_seeds(params, read_by_name, seeds_by_name, mm_index, pack)
     print("overlapped:", 100 * comp.nt_overlap / comp.nt_ground_truth, "% (nt)",
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
 
 #main()
 if True:
-    #binary_search_plot(translocation)
-    print_binary_search_plot()
+    binary_search_plot(translocation)
+    #print_binary_search_plot_box_plot(file_name_in="translocation_overlap", title="Overlap - translocation")

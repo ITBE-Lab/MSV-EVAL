@@ -1,13 +1,12 @@
 from MA import *
 from MSV import *
 import random
-from os_aligners import *
+from sv_util.os_aligners import *
 from bokeh.plotting import figure, show
-from bokeh_style_helper import *
+from sv_util.bokeh_style_helper import *
 from bokeh.plotting import ColumnDataSource
 from bokeh.layouts import column, row, grid
 from bokeh.models.tools import HoverTool
-from seed_printer import *
 
 genome_dir = "/MAdata/genome/human/GRCh38.p12"
 data_dir = "/MAdata/sv_lost_during_alignment"
@@ -99,8 +98,7 @@ def compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge
                 printer = SeedPrinter(params)
                 if not original_seeds_list is None:
                     rectangles = get_rectangles.cpp_module.execute_helper(original_seeds_list[idx].get(),
-                                                                          pack_pledge.get(),
-                                                                          fm_index_pledge.get(), read)
+                                                                          pack_pledge.get(), read)
                     printer.execute( lumped_data, ground_truth[idx].get(), rectangles )
                 else:
                     printer.execute( lumped_data, ground_truth[idx].get() )
@@ -124,7 +122,11 @@ def compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge
     return seeds_by_name_pledge.get().mergeAll()
 
 
-def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, mems=True, reseeding=True, render_one=False):
+def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, mems=True, reseeding=True,
+                 render_one=False):
+    #params.by_name("Number of Threads").set(1)
+    #params.by_name("Use all Processor Cores").set(False)
+
     splitter = NucSeqSplitter(params)
     lock = Lock(params)
     reads_by_name_pledge = Pledge()
@@ -135,9 +137,10 @@ def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, mems=Tru
     fm_index_pledge.set(fm_index)
     seeds_by_name_pledge = Pledge()
     seeds_by_name_pledge.set(seeds_by_name)
+    min_len = MinLength(params, params.by_name("Minimal Seed Size SV").get() + 1)
 
     if mems:
-        seeding_module = MinimizerSeeding(params) # @todo NO use MEMs here!
+        seeding_module = MinimizerSeeding(params)
         seed_lumping = SeedLumping(params)
     else:
         seeding_module = BinarySeeding(params)
@@ -164,8 +167,9 @@ def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, mems=Tru
             minimizers = promise_me(seeding_module, fm_index_pledge, locked_read, pack_pledge)
             seeds = promise_me(seed_lumping, minimizers, locked_read, pack_pledge)
             if reseeding:
+                min_len_seeds = promise_me(min_len, seeds)
                 recursive_reseeding = RecursiveReseeding(params, pack)
-                seeds = promise_me(recursive_reseeding, seeds, pack_pledge, locked_read)
+                seeds = promise_me(recursive_reseeding, min_len_seeds, pack_pledge, locked_read)
                 original_seeds_list.append(seeds)
             else:
                 original_seeds_list = None
