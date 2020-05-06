@@ -196,7 +196,7 @@ def binary_search_plot(sv_func, filename_out="translocation_overlap", gap_size_r
                             return bin_search(x, top, search_val, cache, func)
                         return x
                     
-                    sv_size = bin_search(0, sv_size_max, o_p, search_val_cache, func=test)
+                    sv_size = bin_search(1, sv_size_max, o_p, search_val_cache, func=test)
                     if sv_size == sv_size_max:
                         sv_size = None
                     print_n_write(str(sv_size), file_out)

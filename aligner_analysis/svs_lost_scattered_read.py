@@ -1,4 +1,4 @@
-from binary_search_plot import *
+from aligner_analysis.binary_search_plot import *
 
 
 
@@ -144,4 +144,4 @@ if True:
                     SeedsTestSet(False), NgmlrTestSet()]
     #binary_search_plot(None, "scattered_overlap", overlap_percentages=[0.05, 0.25, 0.5, 0.75, 0.95],
     #                   sv_size_max=2000, read_size=1000, gap_size_range=[1,2,3,4], test_sets=test_set)
-    print_binary_search_plot_box_plot(test_sets=test_set)
+    print_binary_search_plot_box_plot(test_sets=test_set, y_label="Num Scatters")

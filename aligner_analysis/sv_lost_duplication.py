@@ -1,4 +1,4 @@
-from binary_search_plot import *
+from aligner_analysis.binary_search_plot import *
 
 only_sv = True
 no_sv = False
@@ -56,5 +56,5 @@ def main():
 
 #main()
 if True:
-    binary_search_plot(duplication, "duplication_overlap")
-    #print_binary_search_plot("duplication_overlap", "SV Overlap - Duplication", sv_size_max=1000)
+    #binary_search_plot(duplication, "duplication_overlap")
+    print_binary_search_plot_box_plot(file_name_in="duplication_overlap", title="Overlap - Duplication")

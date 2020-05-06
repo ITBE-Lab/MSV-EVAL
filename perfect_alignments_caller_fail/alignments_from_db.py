@@ -39,9 +39,10 @@ def crop_seeds(seeds, insertions, read_start, read_end):
         s = max(seeds[idx].start, read_start)
         e = min(seeds[idx].start + seeds[idx].size, read_end)
         l = e-s
-        s_r = seeds[idx].start_ref + s - seeds[idx].start
-        if not seeds[idx].on_forward_strand and seeds[idx].start < read_start:
-            s_r += seeds[idx].start - read_start
+        if seeds[idx].on_forward_strand:
+            s_r = seeds[idx].start_ref + s - seeds[idx].start
+        else:
+            s_r = seeds[idx].start_ref - s + seeds[idx].start
         if l > 0:
             ret_seeds.append(Seed(q_pos, l, s_r, seeds[idx].on_forward_strand))
             q_pos += l
@@ -79,6 +80,7 @@ def alignments_from_db(call_table, ref_pack, caller_run, size, amount, start=0, 
         c_seeds, c_ins = crop_seeds(seeds, insertions, read_start, read_end)
         read = call_table.reconstruct_sequenced_genome_from_seeds(c_seeds, c_ins, ref_pack).extract_forward_strand()
         read.name = "read_" + str(idx)
+        read.id = idx
         ret.append( (read, seeds_to_alignments(c_seeds, read_start, read_end, ref_pack)) )
     return ret
 

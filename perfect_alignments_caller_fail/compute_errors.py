@@ -21,7 +21,7 @@ def match(a, b, max_dist, num_axis=2):
     return score >= num_axis
 
 def find(l, c):
-    for idx, ele in l:
+    for idx, ele in enumerate(l):
         if c(ele):
             return idx
     return None
@@ -30,7 +30,7 @@ def get_errors(db_con, caller_id, gt_id, max_dist=10):
     calls = call_to_points(db_con, caller_id)
     gts = call_to_points(db_con, gt_id)
 
-    classification = ["missing"]*len(gt)
+    classification = ["missing"]*len(gts)
 
     # look for proper matches
     for i, gt in enumerate(gts):
@@ -50,6 +50,8 @@ def get_errors(db_con, caller_id, gt_id, max_dist=10):
     # append left over calls
     for _ in calls:
         classification.append("additional")
+    
+    return classification
 
 
 def render(db_con, caller_ids, gt_id, max_dist=10):
@@ -65,14 +67,14 @@ def render(db_con, caller_ids, gt_id, max_dist=10):
 
     x_range = [str(idx) for idx in range(len(classifications[0]))]
     run_table = SvCallerRunTable(db_con)
-    y_range = [run_table.get_name(caller_id) for caller_id in caller_ids]
+    y_range = [run_table.getName(caller_id) for caller_id in caller_ids]
 
     repl_name_w_color = {
         "match": "green",
         "missing": "red",
         "one_axis_match": "orange",
         "additional": "magenta",
-        "none": "lightgrey"
+        "none": "white"
     }
     colors = [repl_name_w_color[item] for sublist in classifications for item in sublist]
     x = []
@@ -81,11 +83,11 @@ def render(db_con, caller_ids, gt_id, max_dist=10):
         x.extend(x_range)
         y.extend([y_ele]*len(x_range))
 
-    plot = figure(title=run_table.get_name(gt_id), x_range=FactorRange(*x_range), y_range=FactorRange(*y_range),
+    plot = figure(title=run_table.getName(gt_id), x_range=FactorRange(*x_range), y_range=FactorRange(*y_range),
                   plot_width=800)
     plot.xaxis.axis_label = "Break Points"
     plot.yaxis.axis_label = "Callers"
-    plot.rect(x=x, y=y, width=1, height=1, line_color=None, fill_color=colors)
+    plot.rect(x=x, y=y, width=0.8, height=0.8, line_color=None, fill_color=colors)
     show(plot)
 
 

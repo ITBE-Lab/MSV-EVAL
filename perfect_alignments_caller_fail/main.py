@@ -158,6 +158,35 @@ callers = [
 ]
 genome = genome_dir + "/GRCh38.p12"
 
+def run_msv(pack, alignments_list):
+    params = ParameterSetManager()
+
+    jumps_from_seeds = SvJumpsFromSeeds(params, pack)
+    get_jump_inserter = GetJumpInserter(params, DbConn(db_name), "MS-SV", "jumps from perfect seeds")
+    jump_inserter_module = JumpInserterModule(params)
+    pool = PoolContainer(1, db_name)
+    jump_inserter = get_jump_inserter.execute(pool)
+
+    for query, alignments in alignments_list:
+        alignment_seeds = Seeds()
+        for alignment in alignments:
+            alignment_seeds.extend(alignment.to_seeds(reference))
+        jumps = jumps_from_seeds.cpp_module.compute_jumps(alignment_seeds, query, pack)
+
+        if False:
+            if alignment_seeds[len(alignment_seeds)-1].on_forward_strand:
+                continue
+            seed_printer = SeedPrinter(ParameterSetManager(), "msv seeds", do_print=True)
+            seed_printer.execute(alignment_seeds, None,
+                                 jumps_from_seeds.cpp_module.execute_helper_no_reseed(alignment_seeds, pack, query))
+            exit()
+
+        jump_inserter_module.execute(jump_inserter, pool, jumps, query)
+    jump_inserter.close(pool)
+    jump_id = get_jump_inserter.cpp_module.id
+    return sweep_sv_jumps(params, db_name, jump_id, "MA_SV", "", [-1], pack)
+
+
 if __name__ == "__main__":
     if not os.path.exists( db_prefix + db_name ):
         os.mkdir(db_prefix + db_name)
@@ -174,78 +203,93 @@ if __name__ == "__main__":
     reference.load(genome + "/ma/genome")
 
     chr1_len = reference.contigLengths()[0]
-    #section_size = l*10
-    section_size = l*8
-    #section_size = l*5
-    #section_size = l*4
-    #section_size = l*3
-    ref_section = "N"
-    while 'n' in ref_section or 'N' in ref_section:
-        offset = random.randrange(1000, chr1_len - section_size)
-        ref_section = str(reference.extract_from_to(offset, offset+section_size))
 
-    #run_id = four_nested_svs_calls(db_conn, db_name, l, offset)
-    #run_id = inversion_in_inversion(db_conn, db_name, l, offset)
-    #run_id = inversion_in_inversion_2(db_conn, db_name, l, offset)
-    #run_id = insertion_in_inversion(db_conn, db_name, l, offset)
-    #run_id = inversion(db_conn, db_name, l, offset)
-    #run_id = inversion_in_translocation(db_conn, db_name, l, offset)
-    run_id = proper_inversion_in_translocation(db_conn, db_name, l, offset)
+    svs = [
+        (l*10, four_nested_svs_calls)
+        #section_size = l*10
+        #section_size = l*8
+        #section_size = l*5
+        #section_size = l*4
+        #section_size = l*3
+        #run_id = four_nested_svs_calls(db_conn, db_name, l, offset)
+        #run_id = inversion_in_inversion(db_conn, db_name, l, offset)
+        #run_id = inversion_in_inversion_2(db_conn, db_name, l, offset)
+        #run_id = insertion_in_inversion(db_conn, db_name, l, offset)
+        #run_id = inversion(db_conn, db_name, l, offset)
+        #run_id = inversion_in_translocation(db_conn, db_name, l, offset)
+        #run_id = proper_inversion_in_translocation(db_conn, db_name, l, offset)
+    ]
 
-    call_table = SvCallTable(db_conn)
-    jump_table = SvJumpTable(db_conn) # initialize jump table
-    seeds, inserts = call_table.calls_to_seeds(reference, run_id)
+    for section_size, sc_func in svs:
+        ref_section = "N"
+        while 'n' in ref_section or 'N' in ref_section:
+            offset = random.randrange(1000, chr1_len - section_size)
+            ref_section = str(reference.extract_from_to(offset, offset+section_size))
 
-    if False:
-        seed_printer = SeedPrinter(ParameterSetManager(), "call seed", x_range=(offset, offset+section_size),
-                                   y_range=(offset, offset+section_size), do_print=False)
-        seed_printer.execute(seeds)
+        run_id = sc_func(db_conn, db_name, l, offset)
 
-    num_reads = (coverage * section_size) // read_size
-    alignments_list = alignments_from_db(call_table, reference, run_id, read_size, num_reads,
-                                         offset, offset + section_size)
+        call_table = SvCallTable(db_conn)
+        jump_table = SvJumpTable(db_conn) # initialize jump table
+        seeds, inserts = call_table.calls_to_seeds(reference, run_id)
 
-    if False:
-        seed_printer = SeedPrinter(ParameterSetManager(), "alignment seed", x_range=(offset, offset+section_size),
-                                y_range=(0, read_size), do_print=False)
-        for read, alignments in alignments_list[:1]:
-            alignment_seeds = Seeds()
-            for alignment in alignments:
-                print(alignment.cigarString(reference, read_size))
-                alignment_seeds.extend(alignment.to_seeds(reference) )
-            seed_printer.execute(alignment_seeds)
+        if False:
+            seed_printer = SeedPrinter(ParameterSetManager(), "call seed", x_range=(offset, offset+section_size),
+                                    y_range=(offset, offset+section_size), do_print=False)
+            seed_printer.execute(seeds)
+            exit()
 
-    file_name = db_name + "-" + str(read_size) + "-" + str(coverage) + "-" + str(l)
-    sam_file_name = sam_folder + file_name
-    if False: # write alignments myself
-        alignment_to_file(alignments_list[:1], sam_folder + "us", reference)
-    if False: # use ngmlr
-        read_to_file(alignments_list[:1], fasta_folder + file_name)
-        json_dict = { "reference_path": genome }
-        read_set = {
-            "fasta_file": fasta_folder + file_name + ".fasta",
-            "name": "perfect_alignments_caller_fail",
-            "technology": "pb"
-        }
-        ngmlr(read_set, sam_folder + "ngmlr.sam", json_dict)
-        #ngmlr(read_set, sam_file_name + ".sam", json_dict)
-        #mm2(read_set, sam_file_name + ".sam", json_dict)
-        #sam_to_bam(sam_file_name)
-    alignment_to_file(alignments_list, sam_file_name, reference)
+        num_reads = (coverage * section_size) // read_size
+        alignments_list = alignments_from_db(call_table, reference, run_id, read_size, num_reads,
+                                            offset, offset + section_size)
 
-    caller_ids = []
-    with open(global_prefix + "/vcf_errors.log", "w") as error_file:
-        for caller, name, interpreter in callers:
-            vcf_file_path = vcf_folder + file_name + "-" + name + ".vcf"
-            caller(sam_file_name + ".sorted.bam", vcf_file_path, genome)
-            if not os.path.exists( vcf_file_path ):
-                print("caller did not create calls: ", name)
-                continue
-            call_id = vcf_to_db(name, "desc", db_name, vcf_file_path, reference, interpreter, error_file)
-            caller_seeds, inserts = call_table.calls_to_seeds(reference, call_id)
-            if False:
-                seed_printer = SeedPrinter(ParameterSetManager(), "caller seed",
-                                           x_range=(offset, offset+section_size),
-                                           y_range=(offset, offset+section_size), do_print=False)
-                seed_printer.execute(caller_seeds, seeds)
-    render(db_conn, caller_ids, run_id)
+        if False:
+            seed_printer = SeedPrinter(ParameterSetManager(), "alignment seed", x_range=(offset, offset+section_size),
+                                    y_range=(0, read_size), do_print=False)
+            for read, alignments in alignments_list[:1]:
+                alignment_seeds = Seeds()
+                for alignment in alignments:
+                    print(alignment.cigarString(reference, read_size, False))
+                    alignment_seeds.extend(alignment.to_seeds(reference) )
+                for seed in seeds:
+                    if seed.start >= offset:
+                        seed.start -= offset
+                seed_printer.execute(alignment_seeds, seeds)
+                exit()
+
+        file_name = db_name + "-" + str(read_size) + "-" + str(coverage) + "-" + str(l)
+        sam_file_name = sam_folder + file_name
+        if False: # write alignments myself
+            alignment_to_file(alignments_list[:1], sam_folder + "us", reference)
+        if False: # use ngmlr
+            read_to_file(alignments_list[:1], fasta_folder + file_name)
+            json_dict = { "reference_path": genome }
+            read_set = {
+                "fasta_file": fasta_folder + file_name + ".fasta",
+                "name": "perfect_alignments_caller_fail",
+                "technology": "pb"
+            }
+            ngmlr(read_set, sam_folder + "ngmlr.sam", json_dict)
+            #ngmlr(read_set, sam_file_name + ".sam", json_dict)
+            #mm2(read_set, sam_file_name + ".sam", json_dict)
+            #sam_to_bam(sam_file_name)
+        alignment_to_file(alignments_list, sam_file_name, reference)
+
+        caller_ids = [run_msv(reference, alignments_list)]
+        # other callers
+        with open(global_prefix + "/vcf_errors.log", "w") as error_file:
+            for caller, name, interpreter in callers:
+                vcf_file_path = vcf_folder + file_name + "-" + name + ".vcf"
+                caller(sam_file_name + ".sorted.bam", vcf_file_path, genome)
+                if not os.path.exists( vcf_file_path ):
+                    print("caller did not create calls: ", name)
+                    continue
+                call_id = vcf_to_db(name, "desc", db_name, vcf_file_path, reference, interpreter, error_file)
+                caller_ids.append(call_id)
+                caller_seeds, inserts = call_table.calls_to_seeds(reference, call_id)
+                if False:
+                    seed_printer = SeedPrinter(ParameterSetManager(), "caller seed",
+                                            x_range=(offset, offset+section_size),
+                                            y_range=(offset, offset+section_size), do_print=False)
+                    seed_printer.execute(caller_seeds, seeds)
+
+        render(db_conn, caller_ids, run_id)

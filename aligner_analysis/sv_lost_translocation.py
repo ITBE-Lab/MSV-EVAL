@@ -59,5 +59,5 @@ def main():
 
 #main()
 if True:
-    binary_search_plot(translocation)
-    #print_binary_search_plot_box_plot(file_name_in="translocation_overlap", title="Overlap - translocation")
+    #binary_search_plot(translocation)
+    print_binary_search_plot_box_plot(file_name_in="translocation_overlap", title="Overlap - translocation")
