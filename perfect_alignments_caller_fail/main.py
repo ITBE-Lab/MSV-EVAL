@@ -33,18 +33,18 @@ def four_nested_svs_calls(db_conn, dataset_name, l, offset):
     pool = PoolContainer(1, dataset_name)
     sv_inserter = get_inserter.execute(pool)
 
-    sv_inserter.insert(SvCall(offset + l - 1, offset + 9*l - 1, 0, 0, True, 1000)) # a
-    sv_inserter.insert(SvCall(offset + 4*l - 1, offset + 8*l, 0, 0, False, 1000)) # b
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 9*l - 1, 0, 0, True, False, 1000)) # a
+    sv_inserter.insert(SvCall(offset + 4*l - 1, offset + 8*l, 0, 0, True, True, 1000)) # b
 
-    insertion = SvCall(offset + 3*l - 1, offset + 3*l, 0, 0, False, 1000)
+    insertion = SvCall(offset + 3*l - 1, offset + 3*l, 0, 0, True, True, 1000)
     insertion.inserted_sequence = NucSeq(random_nuc_seq(l))
     sv_inserter.insert(insertion) # c
 
-    sv_inserter.insert(SvCall(offset + 5*l - 1, offset + 2*l, 0, 0, False, 1000)) # d
-    sv_inserter.insert(SvCall(offset + 8*l - 1, offset + 4*l, 0, 0, False, 1000)) # e
-    sv_inserter.insert(SvCall(offset + 6*l - 1, offset + 7*l, 0, 0, False, 1000)) # f
-    sv_inserter.insert(SvCall(offset + 2*l - 1, offset + 5*l, 0, 0, False, 1000)) # g
-    sv_inserter.insert(SvCall(offset + 9*l, offset + l, 0, 0, True, 1000)) # h
+    sv_inserter.insert(SvCall(offset + 2*l, offset + 5*l - 1, 0, 0, False, False, 1000)) # d
+    sv_inserter.insert(SvCall(offset + 4*l, offset + 8*l - 1, 0, 0, False, False, 1000)) # e
+    sv_inserter.insert(SvCall(offset + 6*l - 1, offset + 7*l, 0, 0, True, True, 1000)) # f
+    sv_inserter.insert(SvCall(offset + 2*l - 1, offset + 5*l, 0, 0, True, True, 1000)) # g
+    sv_inserter.insert(SvCall(offset + l, offset + 9*l, 0, 0, False, True, 1000)) # h
 
     sv_inserter.close(pool)
     return get_inserter.cpp_module.id
@@ -122,10 +122,10 @@ def inversion_in_translocation(db_conn, dataset_name, l, offset):
     pool = PoolContainer(1, dataset_name)
     sv_inserter = get_inserter.execute(pool)
 
-    sv_inserter.insert(SvCall(offset + l - 1, offset + 3*l, 0, 0, False, 1000)) # a
-    sv_inserter.insert(SvCall(offset + 4*l-1, offset + 3*l-1, 0, 0, True, 1000)) # b
-    sv_inserter.insert(SvCall(offset + l, offset + 2*l, 0, 0, True, 1000)) # c
-    sv_inserter.insert(SvCall(offset + 2*l-1, offset + 4*l, 0, 0, False, 1000)) # d
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 3*l, 0, 0, True, True, 1000)) # a
+    sv_inserter.insert(SvCall(offset + 3*l-1, offset + 4*l-1, 0, 0, True, False, 1000)) # b
+    sv_inserter.insert(SvCall(offset + l, offset + 2*l, 0, 0, False, True, 1000)) # c
+    sv_inserter.insert(SvCall(offset + 2*l-1, offset + 4*l, 0, 0, True, True, 1000)) # d
 
     sv_inserter.close(pool)
     return get_inserter.cpp_module.id
@@ -151,9 +151,9 @@ def proper_inversion_in_translocation(db_conn, dataset_name, l, offset):
 db_name = "perfect_alignment_caller_fail"
 l = 1000
 coverage = 100
-read_size = l*2-1
+read_size = l*5-1
 callers = [
-    (sniffles, "sniffles", sniffles_interpreter),
+    (sniffles, "sniffles", sniffles_interpreter, "single"),
     #(pbSv, "pbSv", pb_sv_interpreter),
 ]
 genome = genome_dir + "/GRCh38.p12"
@@ -174,8 +174,8 @@ def run_msv(pack, alignments_list):
         jumps = jumps_from_seeds.cpp_module.compute_jumps(alignment_seeds, query, pack)
 
         if False:
-            if alignment_seeds[len(alignment_seeds)-1].on_forward_strand:
-                continue
+            #if alignment_seeds[0].on_forward_strand:
+            #    continue
             seed_printer = SeedPrinter(ParameterSetManager(), "msv seeds", do_print=True)
             seed_printer.execute(alignment_seeds, None,
                                  jumps_from_seeds.cpp_module.execute_helper_no_reseed(alignment_seeds, pack, query))
@@ -184,7 +184,7 @@ def run_msv(pack, alignments_list):
         jump_inserter_module.execute(jump_inserter, pool, jumps, query)
     jump_inserter.close(pool)
     jump_id = get_jump_inserter.cpp_module.id
-    return sweep_sv_jumps(params, db_name, jump_id, "MA_SV", "", [-1], pack)
+    return sweep_sv_jumps(params, db_name, jump_id, "MA_SV", "", [-1], pack, silent=True)
 
 
 if __name__ == "__main__":
@@ -205,7 +205,8 @@ if __name__ == "__main__":
     chr1_len = reference.contigLengths()[0]
 
     svs = [
-        (l*10, four_nested_svs_calls)
+        #(l*10, four_nested_svs_calls),
+        (l*5, inversion_in_translocation),
         #section_size = l*10
         #section_size = l*8
         #section_size = l*5
@@ -220,6 +221,7 @@ if __name__ == "__main__":
         #run_id = proper_inversion_in_translocation(db_conn, db_name, l, offset)
     ]
 
+    sets = []
     for section_size, sc_func in svs:
         ref_section = "N"
         while 'n' in ref_section or 'N' in ref_section:
@@ -249,7 +251,7 @@ if __name__ == "__main__":
                 alignment_seeds = Seeds()
                 for alignment in alignments:
                     print(alignment.cigarString(reference, read_size, False))
-                    alignment_seeds.extend(alignment.to_seeds(reference) )
+                    alignment_seeds.extend( alignment.to_seeds(reference) )
                 for seed in seeds:
                     if seed.start >= offset:
                         seed.start -= offset
@@ -275,9 +277,10 @@ if __name__ == "__main__":
         alignment_to_file(alignments_list, sam_file_name, reference)
 
         caller_ids = [run_msv(reference, alignments_list)]
+        read_types = ["single"]
         # other callers
         with open(global_prefix + "/vcf_errors.log", "w") as error_file:
-            for caller, name, interpreter in callers:
+            for caller, name, interpreter, read_type in callers:
                 vcf_file_path = vcf_folder + file_name + "-" + name + ".vcf"
                 caller(sam_file_name + ".sorted.bam", vcf_file_path, genome)
                 if not os.path.exists( vcf_file_path ):
@@ -285,11 +288,12 @@ if __name__ == "__main__":
                     continue
                 call_id = vcf_to_db(name, "desc", db_name, vcf_file_path, reference, interpreter, error_file)
                 caller_ids.append(call_id)
+                read_types.append(read_type)
                 caller_seeds, inserts = call_table.calls_to_seeds(reference, call_id)
                 if False:
                     seed_printer = SeedPrinter(ParameterSetManager(), "caller seed",
                                             x_range=(offset, offset+section_size),
                                             y_range=(offset, offset+section_size), do_print=False)
                     seed_printer.execute(caller_seeds, seeds)
-
-        render(db_conn, caller_ids, run_id)
+        sets.append( (caller_ids, read_types, run_id) )
+    render(db_conn, sets)

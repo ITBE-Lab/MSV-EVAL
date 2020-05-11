@@ -1,4 +1,5 @@
 from MSV import *
+from bokeh.models import ColumnDataSource
 from bokeh.plotting import figure, show
 from bokeh.models import FactorRange
 
@@ -9,8 +10,9 @@ def call_to_points(db_con, caller_id):
         call = call_getter.next()
         x = call.x.start + call.x.size/2
         y = call.y.start + call.y.size/2
-        s = call.switch_strand
-        ret.append((x, y, s))
+        f = call.from_forward
+        t = call.to_forward
+        ret.append((x, y, f, t))
     return ret
 
 def match(a, b, max_dist, num_axis=2):
@@ -18,7 +20,7 @@ def match(a, b, max_dist, num_axis=2):
     for idx in [0, 1]:
         if abs(a[idx] - b[idx]) < max_dist:
             score += 1
-    return score >= num_axis
+    return score >= num_axis and a[2:] == b[2:]
 
 def find(l, c):
     for idx, ele in enumerate(l):
@@ -54,40 +56,43 @@ def get_errors(db_con, caller_id, gt_id, max_dist=10):
     return classification
 
 
-def render(db_con, caller_ids, gt_id, max_dist=10):
-    classifications = []
-    for caller_id in caller_ids:
-        classifications.append(get_errors(db_con, caller_id, gt_id, max_dist))
-    
-    # make classifications same length
-    max_len = max(len(x) for x in classifications)
-    for idx in range(len(classifications)):
-        while len(classifications[idx]) < max_len:
-            classifications[idx].append("none")
-
-    x_range = [str(idx) for idx in range(len(classifications[0]))]
-    run_table = SvCallerRunTable(db_con)
-    y_range = [run_table.getName(caller_id) for caller_id in caller_ids]
-
-    repl_name_w_color = {
-        "match": "green",
-        "missing": "red",
-        "one_axis_match": "orange",
-        "additional": "magenta",
-        "none": "white"
-    }
-    colors = [repl_name_w_color[item] for sublist in classifications for item in sublist]
+def render(db_con, sets, max_dist=10):
+    x_range = []
+    y_range = set()
     x = []
     y = []
-    for y_ele in y_range:
-        x.extend(x_range)
-        y.extend([y_ele]*len(x_range))
+    color = []
+    label = []
+    run_table = SvCallerRunTable(db_con)
+    for caller_ids, read_types, gt_id in sets:
+        repl_name_w_color = {
+            "match": "green",
+            "missing": "red",
+            "one_axis_match": "orange",
+            "additional": "magenta"
+        }
+        dataset_name = run_table.getName(gt_id)
+        max_len = 0
+        for caller_id, read_type in zip(caller_ids, read_types):
+            caller_name = run_table.getName(caller_id)
+            y_range.add((read_type, caller_name))
+            for idx, error in enumerate(get_errors(db_con, caller_id, gt_id, max_dist)):
+                if idx >= max_len:
+                    max_len = idx + 1
+                x.append((dataset_name, str(idx)))
+                y.append((read_type, caller_name))
+                color.append(repl_name_w_color[error])
+                label.append(error)
+        x_range.extend( [ (dataset_name, str(idx)) for idx in range(max_len)] )
 
-    plot = figure(title=run_table.getName(gt_id), x_range=FactorRange(*x_range), y_range=FactorRange(*y_range),
+    y_range.sort()
+
+    plot = figure(title="Matching Breakpoints", x_range=FactorRange(*x_range), y_range=FactorRange(*y_range),
                   plot_width=800)
-    plot.xaxis.axis_label = "Break Points"
+    plot.xaxis.axis_label = "Datasets & Break Points"
     plot.yaxis.axis_label = "Callers"
-    plot.rect(x=x, y=y, width=0.8, height=0.8, line_color=None, fill_color=colors)
+    r = plot.rect(x="x", y="y", width=0.8, height=0.8, line_color=None, legend_field='label', fill_color="color",
+                  source=ColumnDataSource({"x":x, "y":y, "color":color, "label":label}))
     show(plot)
 
 

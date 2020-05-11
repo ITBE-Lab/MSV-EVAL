@@ -546,7 +546,7 @@ def vcf_to_db(name, desc, dataset_name, file_name, pack, vcf_interpreter, error_
     for call in vcf_parser(file_name):
         num_calls += 1
         vcf_interpreter(call, call_inserter, pack, error_file)
-    print("number of calls:", num_calls)
+    #print("number of calls:", num_calls)
     call_inserter.close(pooled_connection)
 
     return get_inserter.cpp_module.id
