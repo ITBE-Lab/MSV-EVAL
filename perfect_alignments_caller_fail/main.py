@@ -57,10 +57,10 @@ def inversion_in_inversion(db_conn, dataset_name, l, offset):
     pool = PoolContainer(1, dataset_name)
     sv_inserter = get_inserter.execute(pool)
 
-    sv_inserter.insert(SvCall(offset + l - 1, offset + 4*l - 1, 0, 0, True, 1000)) # a
-    sv_inserter.insert(SvCall(offset + 2*l, offset + 3*l, 0, 0, True, 1000)) # b
-    sv_inserter.insert(SvCall(offset + 3*l - 1, offset + 2*l - 1, 0, 0, True, 1000)) # c
-    sv_inserter.insert(SvCall(offset + 4*l, offset + l, 0, 0, True, 1000)) # d
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 4*l - 1, 0, 0, True, False, 1000)) # a
+    sv_inserter.insert(SvCall(offset + 2*l, offset + 3*l, 0, 0, False, True, 1000)) # b
+    sv_inserter.insert(SvCall(offset + 2*l - 1, offset + 3*l - 1, 0, 0, True, False, 1000)) # c
+    sv_inserter.insert(SvCall(offset + l, offset + 4*l, 0, 0, False, True, 1000)) # d
 
     sv_inserter.close(pool)
     return get_inserter.cpp_module.id
@@ -73,9 +73,9 @@ def inversion_in_inversion_2(db_conn, dataset_name, l, offset):
     pool = PoolContainer(1, dataset_name)
     sv_inserter = get_inserter.execute(pool)
 
-    sv_inserter.insert(SvCall(offset + l - 1, offset + 2*l, 0, 0, False, 1000)) # a
-    sv_inserter.insert(SvCall(offset + 3*l - 1, offset + 2*l - 1, 0, 0, True, 1000)) # b
-    sv_inserter.insert(SvCall(offset + 3*l, offset + l, 0, 0, True, 1000)) # c
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 2*l, 0, 0, True, True, 1000)) # a
+    sv_inserter.insert(SvCall(offset + 2*l - 1, offset + 3*l - 1, 0, 0, True, False, 1000)) # b
+    sv_inserter.insert(SvCall(offset + l, offset + 3*l, 0, 0, False, True, 1000)) # c
 
     sv_inserter.close(pool)
     return get_inserter.cpp_module.id
@@ -88,13 +88,13 @@ def insertion_in_inversion(db_conn, dataset_name, l, offset):
     pool = PoolContainer(1, dataset_name)
     sv_inserter = get_inserter.execute(pool)
 
-    sv_inserter.insert(SvCall(offset + l - 1, offset + 3*l - 1, 0, 0, True, 1000)) # a
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 3*l - 1, 0, 0, True, False, 1000)) # a
 
-    insertion = SvCall(offset + 2*l, offset + 2*l - 1, 0, 0, False, 1000)
+    insertion = SvCall(offset + 2*l-1, offset + 2*l, 0, 0, True, True, 1000)
     insertion.inserted_sequence = NucSeq(random_nuc_seq(l))
     sv_inserter.insert(insertion) # b
 
-    sv_inserter.insert(SvCall(offset + 3*l, offset + l, 0, 0, True, 1000)) # c
+    sv_inserter.insert(SvCall(offset + l, offset + 3*l, 0, 0, False, True, 1000)) # c
 
     sv_inserter.close(pool)
     return get_inserter.cpp_module.id
@@ -107,9 +107,9 @@ def inversion(db_conn, dataset_name, l, offset):
     pool = PoolContainer(1, dataset_name)
     sv_inserter = get_inserter.execute(pool)
 
-    sv_inserter.insert(SvCall(offset + l - 1, offset + 2*l - 1, 0, 0, True, 1000)) # a
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 2*l - 1, 0, 0, True, False, 1000)) # a
 
-    sv_inserter.insert(SvCall(offset + 2*l, offset + l, 0, 0, True, 1000)) # b
+    sv_inserter.insert(SvCall(offset + l, offset + 2*l, 0, 0, False, True, 1000)) # b
 
     sv_inserter.close(pool)
     return get_inserter.cpp_module.id
@@ -138,12 +138,12 @@ def proper_inversion_in_translocation(db_conn, dataset_name, l, offset):
     pool = PoolContainer(1, dataset_name)
     sv_inserter = get_inserter.execute(pool)
 
-    sv_inserter.insert(SvCall(offset + l - 1, offset + 5*l, 0, 0, False, 1000)) # a
-    sv_inserter.insert(SvCall(offset + 6*l-1, offset + 2*l, 0, 0, False, 1000)) # b
-    sv_inserter.insert(SvCall(offset + 3*l-1, offset + 4*l-1, 0, 0, True, 1000)) # c
-    sv_inserter.insert(SvCall(offset + 4*l, offset + 3*l, 0, 0, True, 1000)) # d
-    sv_inserter.insert(SvCall(offset + 5*l-1, offset + l, 0, 0, False, 1000)) # e
-    sv_inserter.insert(SvCall(offset + 2*l-1, offset + 6*l, 0, 0, False, 1000)) # f
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 5*l, 0, 0, True, True, 1000)) # a
+    sv_inserter.insert(SvCall(offset + 2*l, offset + 6*l-1, 0, 0, False, False, 1000)) # b
+    sv_inserter.insert(SvCall(offset + 3*l-1, offset + 4*l-1, 0, 0, True, False, 1000)) # c
+    sv_inserter.insert(SvCall(offset + 3*l, offset + 4*l, 0, 0, False, True, 1000)) # d
+    sv_inserter.insert(SvCall(offset + l, offset + 5*l-1, 0, 0, False, False, 1000)) # e
+    sv_inserter.insert(SvCall(offset + 2*l-1, offset + 6*l, 0, 0, True, True, 1000)) # f
 
     sv_inserter.close(pool)
     return get_inserter.cpp_module.id
@@ -205,20 +205,13 @@ if __name__ == "__main__":
     chr1_len = reference.contigLengths()[0]
 
     svs = [
-        #(l*10, four_nested_svs_calls),
+        (l*10, four_nested_svs_calls),
+        (l*5, inversion_in_inversion),
+        (l*4, inversion_in_inversion_2),
+        (l*4, insertion_in_inversion),
+        (l*3, inversion),
         (l*5, inversion_in_translocation),
-        #section_size = l*10
-        #section_size = l*8
-        #section_size = l*5
-        #section_size = l*4
-        #section_size = l*3
-        #run_id = four_nested_svs_calls(db_conn, db_name, l, offset)
-        #run_id = inversion_in_inversion(db_conn, db_name, l, offset)
-        #run_id = inversion_in_inversion_2(db_conn, db_name, l, offset)
-        #run_id = insertion_in_inversion(db_conn, db_name, l, offset)
-        #run_id = inversion(db_conn, db_name, l, offset)
-        #run_id = inversion_in_translocation(db_conn, db_name, l, offset)
-        #run_id = proper_inversion_in_translocation(db_conn, db_name, l, offset)
+        (l*7, proper_inversion_in_translocation),
     ]
 
     sets = []
@@ -234,7 +227,7 @@ if __name__ == "__main__":
         jump_table = SvJumpTable(db_conn) # initialize jump table
         seeds, inserts = call_table.calls_to_seeds(reference, run_id)
 
-        if False:
+        if True:
             seed_printer = SeedPrinter(ParameterSetManager(), "call seed", x_range=(offset, offset+section_size),
                                     y_range=(offset, offset+section_size), do_print=False)
             seed_printer.execute(seeds)
