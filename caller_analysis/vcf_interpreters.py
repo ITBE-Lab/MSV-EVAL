@@ -219,7 +219,7 @@ def sniffles_interpreter(call, call_inserter, pack, error_file, call_desc):
             to_recognize -= 1
         for call_to_insert in to_insert:
             call_inserter.insert(call_to_insert)
-            call_desc.insert(call_to_insert.id, call["ALT"] + " - " + call["ID"])
+            call_desc.insert(call_to_insert.id, call["ALT"][1:-1] + call["ID"])
 
         if to_recognize != 0:
             raise Exception("could not classify call")
@@ -285,8 +285,7 @@ def pb_sv_interpreter(call, call_inserter, pack, error_file):
     except Exception as e:
         log_error(call, error_file, "pb_sv", e)
 
-def delly_interpreter(call, call_inserter, pack, error_file):
-    raise NotImplementedError()
+def delly_interpreter(call, call_inserter, pack, error_file, call_desc):
     def find_confidence(call):
         if call["FILTER"] != "PASS":
             return 0
@@ -324,38 +323,34 @@ def delly_interpreter(call, call_inserter, pack, error_file):
         else:
             raise Exception("found neither precise nor imprecise in INFO")
 
+        to_insert = []
         if call["ALT"] == "<DEL>":
-            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
-            return
-        if call["ALT"] == "<INV>" and False:
-            from_pos, to_pos = find_from_and_to_pos(call)
-            # delly calls inversion twice once 3t3 once 5t5 (or heat to head and tail to tail) of reads
-            call_inserter.insert(SvCall(from_pos, to_pos, 0, 0, True, find_confidence(call), 1))
-            call_inserter.insert(SvCall(to_pos, from_pos, 0, 0, True, find_confidence(call), 1))
-            return
-        if call["ALT"] == "<INV>":
-            # delly calls inversion twice once 3t3 once 5t5 (or heat to head and tail to tail) of reads
-            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, True, find_confidence(call), 1))
-            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, True, find_confidence(call), 1))
-            return
-        if call["ALT"] == "<DUP>":
-            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
-            return
-        if call["ALT"] == "<INS>":
-            call_inserter.insert(SvCall(from_pos, from_pos + 1, std_from, std_to, False, find_confidence(call), 1))
-            return
-        if call["INFO"]["SVTYPE"] == "BND":
-            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
-            call_inserter.insert(SvCall(from_pos, to_pos, std_to, std_from, False, find_confidence(call), 1))
-            return
-        raise Exception("could not classify call")
+            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, True, find_confidence(call), 1))
+        elif call["ALT"] == "<INV>":
+            # delly calls inversion twice once 3t3 once 5t5 (or head to head and tail to tail) of reads
+            if call["INFO"]["CT"] == "3to3":
+                to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, False, find_confidence(call), 1))
+            else:
+                assert call["INFO"]["CT"] == "5to5"
+                to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, False, True, find_confidence(call), 1))
+        elif call["ALT"] == "<DUP>":
+            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, False, False, find_confidence(call), 1))
+        elif call["ALT"] == "<INS>":
+            to_insert.append(SvCall(from_pos, from_pos + 1, std_from, std_to, True, True, find_confidence(call), 1))
+        elif call["INFO"]["SVTYPE"] == "BND":
+            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, False, find_confidence(call), 1))
+            to_insert.append(SvCall(from_pos, to_pos, std_to, std_from, False, True, find_confidence(call), 1))
+        else:
+            raise Exception("could not classify call")
+        for call_to_insert in to_insert:
+            call_inserter.insert(call_to_insert)
+            call_desc.insert(call_to_insert.id, call["ALT"][1:-1] + str(int(call["ID"][4:])))
 
     except Exception as e:
         log_error(call, error_file, "delly", e)
 
 bnd_mate_dict_manta = {}
-def manta_interpreter(call, call_inserter, pack, error_file):
-    raise NotImplementedError()
+def manta_interpreter(call, call_inserter, pack, error_file, call_desc):
     def find_confidence(call):
         if call["FILTER"] != "PASS":
             return 0
@@ -392,28 +387,30 @@ def manta_interpreter(call, call_inserter, pack, error_file):
         else:
             std_from, std_to = (0, 0)
 
+        to_insert = []
         if call["ALT"] == "<DUP:TANDEM>":
-            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
-            return
-        if call["ALT"] == "<DUP>":
-            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, False, find_confidence(call), 1))
-            return
-        if call["INFO"]["SVTYPE"] == "DEL":
-            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
-            return
-        if call["INFO"]["SVTYPE"] == "BND":
+            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, False, False, find_confidence(call), 1))
+        elif call["ALT"] == "<DUP>":
+            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, False, False, find_confidence(call), 1))
+        elif call["INFO"]["SVTYPE"] == "DEL":
+            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, True, find_confidence(call), 1))
+        elif call["INFO"]["SVTYPE"] == "BND":
             if call["INFO"]["MATEID"] in bnd_mate_dict_manta:
                 mate = bnd_mate_dict_manta[call["INFO"]["MATEID"]]
                 std_from = find_std_from(call)
                 std_to = find_std_from(mate)
                 from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"]) - std_from//2
                 to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - std_to//2
-                call_inserter.insert(SvCall(from_pos, to_pos, from_pos, std_to, False, find_confidence(call), 1))
-                call_inserter.insert(SvCall(to_pos, from_pos, std_to, from_pos, False, find_confidence(mate), 1))
+                to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, False, find_confidence(call), 1))
+                to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, False, True, find_confidence(mate), 1))
                 del bnd_mate_dict_manta[call["INFO"]["MATEID"]]
             else:
                 bnd_mate_dict_manta[call["ID"]] = call
-        raise Exception("could not classify call")
+        else:
+            raise Exception("could not classify call")
+        for call_to_insert in to_insert:
+            call_inserter.insert(call_to_insert)
+            call_desc.insert(call_to_insert.id, call["ALT"] + " - " + call["ID"])
 
     except Exception as e:
         log_error(call, error_file, "manta", e)

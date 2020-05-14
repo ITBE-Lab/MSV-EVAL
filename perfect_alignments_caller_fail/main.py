@@ -47,7 +47,7 @@ def four_nested_svs_calls(db_conn, dataset_name, l, offset):
     sv_inserter.insert(SvCall(offset + l, offset + 9*l, 0, 0, False, True, 1000)) # h
 
     sv_inserter.close(pool)
-    return get_inserter.cpp_module.id
+    return get_inserter.cpp_module.id, None
 
 def inversion_in_inversion(db_conn, dataset_name, l, offset):
     JumpRunTable(db_conn)
@@ -63,7 +63,7 @@ def inversion_in_inversion(db_conn, dataset_name, l, offset):
     sv_inserter.insert(SvCall(offset + l, offset + 4*l, 0, 0, False, True, 1000)) # d
 
     sv_inserter.close(pool)
-    return get_inserter.cpp_module.id
+    return get_inserter.cpp_module.id, None
 
 def inversion_in_inversion_2(db_conn, dataset_name, l, offset):
     JumpRunTable(db_conn)
@@ -78,7 +78,7 @@ def inversion_in_inversion_2(db_conn, dataset_name, l, offset):
     sv_inserter.insert(SvCall(offset + l, offset + 3*l, 0, 0, False, True, 1000)) # c
 
     sv_inserter.close(pool)
-    return get_inserter.cpp_module.id
+    return get_inserter.cpp_module.id, None
 
 def insertion_in_inversion(db_conn, dataset_name, l, offset):
     JumpRunTable(db_conn)
@@ -97,7 +97,7 @@ def insertion_in_inversion(db_conn, dataset_name, l, offset):
     sv_inserter.insert(SvCall(offset + l, offset + 3*l, 0, 0, False, True, 1000)) # c
 
     sv_inserter.close(pool)
-    return get_inserter.cpp_module.id
+    return get_inserter.cpp_module.id, None
 
 def inversion(db_conn, dataset_name, l, offset):
     JumpRunTable(db_conn)
@@ -112,7 +112,7 @@ def inversion(db_conn, dataset_name, l, offset):
     sv_inserter.insert(SvCall(offset + l, offset + 2*l, 0, 0, False, True, 1000)) # b
 
     sv_inserter.close(pool)
-    return get_inserter.cpp_module.id
+    return get_inserter.cpp_module.id, None
 
 def inversion_in_translocation(db_conn, dataset_name, l, offset):
     JumpRunTable(db_conn)
@@ -128,7 +128,7 @@ def inversion_in_translocation(db_conn, dataset_name, l, offset):
     sv_inserter.insert(SvCall(offset + 2*l-1, offset + 4*l, 0, 0, True, True, 1000)) # d
 
     sv_inserter.close(pool)
-    return get_inserter.cpp_module.id
+    return get_inserter.cpp_module.id, None
 
 def proper_inversion_in_translocation(db_conn, dataset_name, l, offset):
     JumpRunTable(db_conn)
@@ -146,7 +146,96 @@ def proper_inversion_in_translocation(db_conn, dataset_name, l, offset):
     sv_inserter.insert(SvCall(offset + 2*l-1, offset + 6*l, 0, 0, True, True, 1000)) # f
 
     sv_inserter.close(pool)
-    return get_inserter.cpp_module.id
+    return get_inserter.cpp_module.id, None
+
+def inversions_in_duplication(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "inversions_in_duplication",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 2*l - 1, 0, 0, True, False, 1000)) # a
+    sv_inserter.insert(SvCall(offset + l, offset + 2*l, 0, 0, False, True, 1000)) # b
+    sv_inserter.insert(SvCall(offset + l, offset + 3*l-1, 0, 0, False, False, 1000)) # c
+    sv_inserter.insert(SvCall(offset + 2*l-1, offset + 3*l-1, 0, 0, True, False, 1000)) # d
+    sv_inserter.insert(SvCall(offset + 2*l, offset + 3*l, 0, 0, False, True, 1000)) # e
+
+    sv_inserter.close(pool)
+    return get_inserter.cpp_module.id, None
+
+def duplication_in_inversion(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "duplication_in_inversion",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 3*l - 1, 0, 0, True, False, 1000)) # a
+    sv_inserter.insert(SvCall(offset + 2*l, offset + 3*l, 0, 0, False, True, 1000)) # b
+    sv_inserter.insert(SvCall(offset + 2*l-1, offset + 4*l-1, 0, 0, True, False, 1000)) # c
+    sv_inserter.insert(SvCall(offset + l, offset + 3*l, 0, 0, False, True, 1000)) # d
+
+    sv_inserter.close(pool)
+    return get_inserter.cpp_module.id, None
+
+def inversion_overlapping_duplication(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "inversion_overlapping_duplication",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 2*l - 1, 0, 0, True, False, 1000)) # a
+    sv_inserter.insert(SvCall(offset, offset + l, 0, 0, False, True, 1000)) # b
+
+    sv_inserter.close(pool)
+
+    seeds = Seeds()
+    seeds.append(Seed(0, offset, 0, True)) # before
+    seeds.append(Seed(offset, l, offset, True)) # A
+    seeds.append(Seed(offset+l, 2*l, offset+2*l, False)) # ~B~A
+    seeds.append(Seed(offset+3*l, l, offset+l, True)) # B
+    seeds.append(Seed(offset+4*l, 10000, offset+2*l, True)) # after
+
+    return get_inserter.cpp_module.id, seeds
+
+def duplication_in_duplication(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "duplication_in_duplication",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 2*l, 0, 0, True, True, 1000)) # a
+    sv_inserter.insert(SvCall(offset + l, offset + 3*l-1, 0, 0, False, False, 1000)) # b
+    sv_inserter.insert(SvCall(offset, offset + 2*l-1, 0, 0, False, False, 1000)) # c
+
+    sv_inserter.close(pool)
+
+    return get_inserter.cpp_module.id, None
+
+def duplication_of_inversion(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "duplication_of_inversion",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 3*l - 1, 0, 0, True, False, 1000)) # a / c
+    sv_inserter.insert(SvCall(offset, offset + 2*l, 0, 0, False, True, 1000)) # b
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 3*l - 1, 0, 0, True, False, 1000)) # a / c
+    sv_inserter.insert(SvCall(offset + l, offset + 2*l, 0, 0, False, True, 1000)) # d
+    sv_inserter.insert(SvCall(offset + 2*l - 1, offset + 3*l, 0, 0, True, True, 1000)) # e
+
+    sv_inserter.close(pool)
+
+    return get_inserter.cpp_module.id, None
 
 db_name = "perfect_alignment_caller_fail"
 l = 1000
@@ -154,6 +243,8 @@ coverage = 100
 read_size = l*2-1
 callers = [
     (sniffles, "sniffles", sniffles_interpreter, "single"),
+    #(manta, "manta", manta_interpreter, "paired"),
+    (delly, "delly", delly_interpreter, "paired"),
     #(pbSv, "pbSv", pb_sv_interpreter),
 ]
 paired_dist = 100
@@ -201,7 +292,8 @@ def run_msv(pack, alignments_list, paired=False):
             jump_inserter_module.execute(jump_inserter, pool, jumps, query)
     jump_inserter.close(pool)
     jump_id = get_jump_inserter.cpp_module.id
-    return sweep_sv_jumps(params, db_name, jump_id, "MA_SV", "", [-1], pack, silent=False)
+    return sweep_sv_jumps(params, db_name, jump_id, "MS-SV-paired" if paired else"MS-SV", "calls from perfect seeds",
+                          [-1], pack, silent=True)
 
 
 if __name__ == "__main__":
@@ -227,20 +319,26 @@ if __name__ == "__main__":
         (l*3, inversion),
         (l*5, inversion_in_translocation),
         (l*7, proper_inversion_in_translocation),
+        (l*6, inversions_in_duplication),
+        (l*5, duplication_in_inversion),
+        (l*4, inversion_overlapping_duplication),
+        (l*6, duplication_in_duplication),
+        (l*6, duplication_of_inversion),
     ]
 
     sets = []
-    for section_size, sc_func in svs:
+    for section_size, sv_func in svs:
         ref_section = "N"
         while 'n' in ref_section or 'N' in ref_section:
-            offset = random.randrange(1000, chr1_len - section_size)
-            ref_section = str(reference.extract_from_to(offset, offset+section_size))
+            offset = random.randrange(1000, chr1_len - section_size*3)
+            ref_section = str(reference.extract_from_to(offset, offset+section_size*3))
 
-        run_id = sc_func(db_conn, db_name, l, offset)
+        run_id, seeds = sv_func(db_conn, db_name, l, offset)
 
         call_table = SvCallTable(db_conn)
         jump_table = SvJumpTable(db_conn) # initialize jump table
-        seeds, inserts = call_table.calls_to_seeds(reference, run_id)
+        if seeds is None:
+            seeds, inserts = call_table.calls_to_seeds(reference, run_id)
 
         if False:
             seed_printer = SeedPrinter(ParameterSetManager(), "call seed", x_range=(offset, offset+section_size),
@@ -249,12 +347,20 @@ if __name__ == "__main__":
             exit()
 
         num_reads = (coverage * section_size) // read_size
+        # alignments with SVs
         alignments_list = alignments_from_db(call_table, reference, run_id, read_size, num_reads,
                                             offset, offset + section_size)
+        # perfect alignments (for parameter estimation)
+        alignments_list.extend(alignments_from_db(call_table, reference, run_id, read_size, num_reads,
+                                            offset + section_size*2, offset + section_size*3))
 
         num_reads_paired = (coverage * section_size) // (paired_size*2)
+        # alignments with SVs
         alignments_list_paired = alignments_from_db(call_table, reference, run_id, paired_size, num_reads_paired,
                                             offset, offset + section_size, paired_dist=paired_dist)
+        # perfect alignments (for parameter estimation)
+        alignments_list_paired.extend(alignments_from_db(call_table, reference, run_id, paired_size, num_reads_paired,
+                                            offset + section_size*2, offset + section_size*3, paired_dist=paired_dist))
 
         if False:
             seed_printer = SeedPrinter(ParameterSetManager(), "alignment seed", x_range=(offset, offset+section_size),
