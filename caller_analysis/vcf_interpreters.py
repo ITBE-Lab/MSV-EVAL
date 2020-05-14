@@ -26,6 +26,7 @@ def log_error(call, error_file, interpreter_name, e=None):
 
 bnd_mate_dict = {}
 def default_vcf_interpreter(call, call_inserter, pack, error_file):
+    raise NotImplementedError()
     def find_confidence(call):
         if call["FILTER"] != "PASS":
             return 0
@@ -162,7 +163,7 @@ def default_vcf_interpreter(call, call_inserter, pack, error_file):
     except Exception as e:
         log_error(call, error_file, "default", e)
 
-def sniffles_interpreter(call, call_inserter, pack, error_file):
+def sniffles_interpreter(call, call_inserter, pack, error_file, call_desc):
     def find_confidence(call):
         if call["FILTER"] != "PASS":
             return 0
@@ -196,25 +197,29 @@ def sniffles_interpreter(call, call_inserter, pack, error_file):
             raise Exception("found neither precise nor imprecise in INFO")
 
         to_recognize = 1
+        to_insert = []
         if "/" in call["ALT"]:
             to_recognize = 2
         if "DEL" in call["ALT"]:
-            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
+            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, True, find_confidence(call), 1))
             to_recognize -= 1
         if "INV" in call["ALT"]:
-            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, True, find_confidence(call), 1))
-            call_inserter.insert(SvCall(to_pos, from_pos, std_from, std_to, True, find_confidence(call), 1))
+            to_insert.append(SvCall(from_pos, to_pos-1, std_from, std_to, True, False, find_confidence(call), 1))
+            to_insert.append(SvCall(from_pos+1, to_pos, std_from, std_to, False, True, find_confidence(call), 1))
             to_recognize -= 1
         if "INS" in call["ALT"]:
-            call_inserter.insert(SvCall(from_pos, from_pos + 1, std_from, std_from, False,
+            to_insert.append(SvCall(from_pos, from_pos + 1, std_from, std_from, True, True,
                                       find_confidence(call), 1))
             to_recognize -= 1
         if "DUP" in call["ALT"]:
-            call_inserter.insert(SvCall(to_pos, from_pos, std_to, std_from, False, find_confidence(call), 1))
+            to_insert.append(SvCall(from_pos, to_pos, std_to, std_from, False, False, find_confidence(call), 1))
             to_recognize -= 1
         if "TRA" in call["ALT"]:
-            call_inserter.insert(SvCall(from_pos, to_pos, std_from, std_to, False, find_confidence(call), 1))
+            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, True, find_confidence(call), 1))
             to_recognize -= 1
+        for call_to_insert in to_insert:
+            call_inserter.insert(call_to_insert)
+            call_desc.insert(call_to_insert.id, call["ALT"] + " - " + call["ID"])
 
         if to_recognize != 0:
             raise Exception("could not classify call")
@@ -223,6 +228,7 @@ def sniffles_interpreter(call, call_inserter, pack, error_file):
 
 bnd_mate_dict_pb_sv = {}
 def pb_sv_interpreter(call, call_inserter, pack, error_file):
+    raise NotImplementedError()
     def find_confidence(call):
         if call["FILTER"] != "PASS":
             return 0
@@ -235,9 +241,9 @@ def pb_sv_interpreter(call, call_inserter, pack, error_file):
             return int(call.from_format("DP"))
         return 0
     def find_from_and_to_pos(call):
-        from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+        from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - 1
         if "END" in call["INFO"]:
-            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["CHROM"])
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["CHROM"]) - 1
         else:
             to_pos = None
         return from_pos, to_pos
@@ -280,6 +286,7 @@ def pb_sv_interpreter(call, call_inserter, pack, error_file):
         log_error(call, error_file, "pb_sv", e)
 
 def delly_interpreter(call, call_inserter, pack, error_file):
+    raise NotImplementedError()
     def find_confidence(call):
         if call["FILTER"] != "PASS":
             return 0
@@ -348,6 +355,7 @@ def delly_interpreter(call, call_inserter, pack, error_file):
 
 bnd_mate_dict_manta = {}
 def manta_interpreter(call, call_inserter, pack, error_file):
+    raise NotImplementedError()
     def find_confidence(call):
         if call["FILTER"] != "PASS":
             return 0
@@ -411,6 +419,7 @@ def manta_interpreter(call, call_inserter, pack, error_file):
         log_error(call, error_file, "manta", e)
 
 def smoove_interpreter(call, call_inserter, pack, error_file):
+    raise NotImplementedError()
     def find_confidence(call):
         return int(float(call["QUAL"])*100)
 
@@ -541,11 +550,12 @@ def vcf_to_db(name, desc, dataset_name, file_name, pack, vcf_interpreter, error_
     # -1 since there are no related sv jumps...
     get_inserter = GetCallInserter(ParameterSetManager(), DbConn(dataset_name), name, desc, -1)
     call_inserter = get_inserter.execute(pooled_connection)
+    call_desc = CallDescTable( DbConn(dataset_name))
 
     num_calls = 0
     for call in vcf_parser(file_name):
         num_calls += 1
-        vcf_interpreter(call, call_inserter, pack, error_file)
+        vcf_interpreter(call, call_inserter, pack, error_file, call_desc)
     #print("number of calls:", num_calls)
     call_inserter.close(pooled_connection)
 

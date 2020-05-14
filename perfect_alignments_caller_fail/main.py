@@ -83,7 +83,7 @@ def inversion_in_inversion_2(db_conn, dataset_name, l, offset):
 def insertion_in_inversion(db_conn, dataset_name, l, offset):
     JumpRunTable(db_conn)
     SvCallerRunTable(db_conn)
-    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "insertion in inversion",
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "insertion_in_inversion",
                                    "the sv's that were simulated", -1)
     pool = PoolContainer(1, dataset_name)
     sv_inserter = get_inserter.execute(pool)
@@ -117,7 +117,7 @@ def inversion(db_conn, dataset_name, l, offset):
 def inversion_in_translocation(db_conn, dataset_name, l, offset):
     JumpRunTable(db_conn)
     SvCallerRunTable(db_conn)
-    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "touching inversion in translocation",
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "touching_inversion_in_translocation",
                                    "the sv's that were simulated", -1)
     pool = PoolContainer(1, dataset_name)
     sv_inserter = get_inserter.execute(pool)
@@ -133,7 +133,7 @@ def inversion_in_translocation(db_conn, dataset_name, l, offset):
 def proper_inversion_in_translocation(db_conn, dataset_name, l, offset):
     JumpRunTable(db_conn)
     SvCallerRunTable(db_conn)
-    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "proper inversion in translocation",
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "proper_inversion_in_translocation",
                                    "the sv's that were simulated", -1)
     pool = PoolContainer(1, dataset_name)
     sv_inserter = get_inserter.execute(pool)
@@ -151,40 +151,57 @@ def proper_inversion_in_translocation(db_conn, dataset_name, l, offset):
 db_name = "perfect_alignment_caller_fail"
 l = 1000
 coverage = 100
-read_size = l*5-1
+read_size = l*2-1
 callers = [
     (sniffles, "sniffles", sniffles_interpreter, "single"),
     #(pbSv, "pbSv", pb_sv_interpreter),
 ]
+paired_dist = 100
+paired_size = 250
 genome = genome_dir + "/GRCh38.p12"
 
-def run_msv(pack, alignments_list):
+def run_msv(pack, alignments_list, paired=False):
     params = ParameterSetManager()
 
     jumps_from_seeds = SvJumpsFromSeeds(params, pack)
-    get_jump_inserter = GetJumpInserter(params, DbConn(db_name), "MS-SV", "jumps from perfect seeds")
+    get_jump_inserter = GetJumpInserter(params, DbConn(db_name), "MS-SV-paired" if paired else"MS-SV",
+                                        "jumps from perfect seeds")
     jump_inserter_module = JumpInserterModule(params)
     pool = PoolContainer(1, db_name)
     jump_inserter = get_jump_inserter.execute(pool)
 
     for query, alignments in alignments_list:
-        alignment_seeds = Seeds()
-        for alignment in alignments:
-            alignment_seeds.extend(alignment.to_seeds(reference))
-        jumps = jumps_from_seeds.cpp_module.compute_jumps(alignment_seeds, query, pack)
+        if paired:
+            alignment_seeds_2 = Seeds()
+            alignment_seeds = Seeds()
+            for alignment in alignments:
+                if alignment.stats.first:
+                    alignment_seeds.extend(alignment.to_seeds(reference))
+                else:
+                    alignment_seeds_2.extend(alignment.to_seeds(reference))
+            jumps = jumps_from_seeds.cpp_module.compute_jumps(alignment_seeds, query[0], pack)
+            jumps_2 = jumps_from_seeds.cpp_module.compute_jumps(alignment_seeds_2, query[1], pack)
 
-        if False:
-            #if alignment_seeds[0].on_forward_strand:
-            #    continue
-            seed_printer = SeedPrinter(ParameterSetManager(), "msv seeds", do_print=True)
-            seed_printer.execute(alignment_seeds, None,
-                                 jumps_from_seeds.cpp_module.execute_helper_no_reseed(alignment_seeds, pack, query))
-            exit()
+            jump_inserter_module.execute(jump_inserter, pool, jumps, query[0])
+            jump_inserter_module.execute(jump_inserter, pool, jumps_2, query[1])
+        else:
+            alignment_seeds = Seeds()
+            for alignment in alignments:
+                alignment_seeds.extend(alignment.to_seeds(reference))
+            jumps = jumps_from_seeds.cpp_module.compute_jumps(alignment_seeds, query, pack)
 
-        jump_inserter_module.execute(jump_inserter, pool, jumps, query)
+            if False:
+                #if alignment_seeds[0].on_forward_strand:
+                #    continue
+                seed_printer = SeedPrinter(ParameterSetManager(), "msv seeds", do_print=True)
+                seed_printer.execute(alignment_seeds, None,
+                                    jumps_from_seeds.cpp_module.execute_helper_no_reseed(alignment_seeds, pack, query))
+                exit()
+
+            jump_inserter_module.execute(jump_inserter, pool, jumps, query)
     jump_inserter.close(pool)
     jump_id = get_jump_inserter.cpp_module.id
-    return sweep_sv_jumps(params, db_name, jump_id, "MA_SV", "", [-1], pack, silent=True)
+    return sweep_sv_jumps(params, db_name, jump_id, "MA_SV", "", [-1], pack, silent=False)
 
 
 if __name__ == "__main__":
@@ -195,9 +212,7 @@ if __name__ == "__main__":
         json_file.write("\"reference_path\":\""+genome+"\"\n")
         json_file.write("}\n")
 
-
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}}) # , "FLAGS": ["DROP_ON_CLOSURE"]
-
 
     reference = Pack()
     reference.load(genome + "/ma/genome")
@@ -208,7 +223,7 @@ if __name__ == "__main__":
         (l*10, four_nested_svs_calls),
         (l*5, inversion_in_inversion),
         (l*4, inversion_in_inversion_2),
-        (l*4, insertion_in_inversion),
+        (l*5, insertion_in_inversion),
         (l*3, inversion),
         (l*5, inversion_in_translocation),
         (l*7, proper_inversion_in_translocation),
@@ -227,7 +242,7 @@ if __name__ == "__main__":
         jump_table = SvJumpTable(db_conn) # initialize jump table
         seeds, inserts = call_table.calls_to_seeds(reference, run_id)
 
-        if True:
+        if False:
             seed_printer = SeedPrinter(ParameterSetManager(), "call seed", x_range=(offset, offset+section_size),
                                     y_range=(offset, offset+section_size), do_print=False)
             seed_printer.execute(seeds)
@@ -237,22 +252,24 @@ if __name__ == "__main__":
         alignments_list = alignments_from_db(call_table, reference, run_id, read_size, num_reads,
                                             offset, offset + section_size)
 
+        num_reads_paired = (coverage * section_size) // (paired_size*2)
+        alignments_list_paired = alignments_from_db(call_table, reference, run_id, paired_size, num_reads_paired,
+                                            offset, offset + section_size, paired_dist=paired_dist)
+
         if False:
             seed_printer = SeedPrinter(ParameterSetManager(), "alignment seed", x_range=(offset, offset+section_size),
                                     y_range=(0, read_size), do_print=False)
-            for read, alignments in alignments_list[:1]:
+            for _, alignments in alignments_list:
                 alignment_seeds = Seeds()
                 for alignment in alignments:
-                    print(alignment.cigarString(reference, read_size, False))
+                    print(alignment.cigarString(reference, paired_size, False))
                     alignment_seeds.extend( alignment.to_seeds(reference) )
-                for seed in seeds:
-                    if seed.start >= offset:
-                        seed.start -= offset
-                seed_printer.execute(alignment_seeds, seeds)
+                seed_printer.execute(alignment_seeds)
                 exit()
 
-        file_name = db_name + "-" + str(read_size) + "-" + str(coverage) + "-" + str(l)
+        file_name = db_name + "-" + SvCallerRunTable(db_conn).getName(run_id)
         sam_file_name = sam_folder + file_name
+        sam_file_name_paired = sam_folder + file_name + "-paired"
         if False: # write alignments myself
             alignment_to_file(alignments_list[:1], sam_folder + "us", reference)
         if False: # use ngmlr
@@ -268,25 +285,34 @@ if __name__ == "__main__":
             #mm2(read_set, sam_file_name + ".sam", json_dict)
             #sam_to_bam(sam_file_name)
         alignment_to_file(alignments_list, sam_file_name, reference)
+        alignment_to_file(alignments_list_paired, sam_file_name_paired, reference, paired=True)
 
-        caller_ids = [run_msv(reference, alignments_list)]
-        read_types = ["single"]
+        caller_ids = [run_msv(reference, alignments_list), run_msv(reference, alignments_list_paired, paired=True)]
+        read_types = ["single", "paired"]
         # other callers
         with open(global_prefix + "/vcf_errors.log", "w") as error_file:
             for caller, name, interpreter, read_type in callers:
                 vcf_file_path = vcf_folder + file_name + "-" + name + ".vcf"
-                caller(sam_file_name + ".sorted.bam", vcf_file_path, genome)
+                caller( (sam_file_name if read_type=="single" else sam_file_name_paired) + ".sorted.bam",
+                        vcf_file_path, genome)
                 if not os.path.exists( vcf_file_path ):
                     print("caller did not create calls: ", name)
-                    continue
-                call_id = vcf_to_db(name, "desc", db_name, vcf_file_path, reference, interpreter, error_file)
+                    pooled_connection = PoolContainer(1, db_name)
+                    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, name, "desc", -1)
+                    call_inserter = get_inserter.execute(pooled_connection)
+                    call_inserter.close(pooled_connection)
+                    call_id = get_inserter.cpp_module.id
+                else:
+                    call_id = vcf_to_db(name, "desc", db_name, vcf_file_path, reference, interpreter, error_file)
                 caller_ids.append(call_id)
                 read_types.append(read_type)
-                caller_seeds, inserts = call_table.calls_to_seeds(reference, call_id)
                 if False:
+                    caller_seeds, inserts = call_table.calls_to_seeds(reference, call_id)
                     seed_printer = SeedPrinter(ParameterSetManager(), "caller seed",
                                             x_range=(offset, offset+section_size),
                                             y_range=(offset, offset+section_size), do_print=False)
                     seed_printer.execute(caller_seeds, seeds)
         sets.append( (caller_ids, read_types, run_id) )
-    render(db_conn, sets)
+    # why do i need another connection here?
+    db_conn2 = DbConn({"SCHEMA": {"NAME": db_name}})
+    render(db_conn2, sets)
