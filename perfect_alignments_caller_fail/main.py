@@ -237,6 +237,23 @@ def duplication_of_inversion(db_conn, dataset_name, l, offset):
 
     return get_inserter.cpp_module.id, None
 
+def overlapping_inversions_in_duplication(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "overlapping_inversions_in_duplication",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 2*l - 1, 0, 0, True, False, 1000)) # a
+    sv_inserter.insert(SvCall(offset + l, offset + 2*l, 0, 0, False, True, 1000)) # b
+    sv_inserter.insert(SvCall(offset + 3*l - 1, offset + 3*l - 1, 0, 0, True, False, 1000)) # c
+    sv_inserter.insert(SvCall(offset + l, offset + 3*l, 0, 0, False, True, 1000)) # d
+
+    sv_inserter.close(pool)
+
+    return get_inserter.cpp_module.id, None
+
 db_name = "perfect_alignment_caller_fail"
 l = 1000
 coverage = 100
@@ -324,6 +341,7 @@ if __name__ == "__main__":
         (l*4, inversion_overlapping_duplication),
         (l*6, duplication_in_duplication),
         (l*6, duplication_of_inversion),
+        (l*6, overlapping_inversions_in_duplication),
     ]
 
     sets = []

@@ -56,5 +56,5 @@ def main():
 
 #main()
 if True:
-    #binary_search_plot(duplication, "duplication_overlap")
+    binary_search_plot(duplication, "duplication_overlap")
     print_binary_search_plot_box_plot(file_name_in="duplication_overlap", title="Overlap - Duplication")
