@@ -140,8 +140,5 @@ def main():
 #main()
 #plot_scatter(num_reads=100, sv_size_range=[2**x for x in range(14)])
 if True:
-    test_set = [MATestSet(), MM2TestSet(), MM2TestSet("-z 400,1 --splice -P", "extra_sensitive"), 
-                    SeedsTestSet(False), NgmlrTestSet()]
-    #binary_search_plot(None, "scattered_overlap", overlap_percentages=[0.05, 0.25, 0.5, 0.75, 0.95],
-    #                   sv_size_max=2000, read_size=1000, gap_size_range=[1,2,3,4], test_sets=test_set)
-    print_binary_search_plot_box_plot(test_sets=test_set, y_label="Num Scatters")
+    binary_search_plot(None, "scattered_overlap", gap_size_range=[1,2,3,4])
+    print_binary_search_plot_box_plot(file_name_in="scattered_overlap", y_label="Num Scatters")

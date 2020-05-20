@@ -1,8 +1,6 @@
-from binary_search_plot import *
+from aligner_analysis.binary_search_plot import *
 import random
 
-only_sv = True
-no_sv = False
 
 def invert(seq):
     ret = ""
@@ -23,27 +21,26 @@ def invert(seq):
     return ret
 
 def inversion(sv_size, gap_size, genome_section, ref_start, min_dist=50):
-    seeds = Seeds()
+    points = []
     total_size = sv_size + gap_size
     offset = random.randint(min_dist, (len(genome_section) - total_size)-min_dist)
     total_size += offset
     g = str(genome_section)
+
     # before inversion
-    if not only_sv:
-        seeds.append(Seed(0, offset, ref_start, True))
     read = g[:offset] 
+    points.append((offset, ref_start+offset, True))
 
     # inverted secion
-    if not no_sv:
-        seeds.append(Seed(offset, sv_size, ref_start + total_size - 1, False))
     read += invert( g[offset + gap_size:total_size] )
+    points.append((offset+sv_size, ref_start+offset+gap_size-1, False))
+    points.append((offset, ref_start+total_size-1, False))
 
     # after inversion
-    if not only_sv:
-        seeds.append(Seed(sv_size + offset, len(genome_section) - total_size, ref_start + total_size, True))
     read += g[total_size:len(genome_section)]
+    points.append((offset+sv_size, ref_start+total_size, True))
 
-    return seeds, NucSeq(read)
+    return points, NucSeq(read)
 
 def print_sam_file():
     params = ParameterSetManager()
@@ -106,6 +103,10 @@ def main():
 #main()
 #plot_quads(inversion)
 #print_sam_file()
-if True:
-    #binary_search_plot(inversion, "inversion_overlap")
+if False:
+    binary_search_plot(inversion, "inversion_overlap")
     print_binary_search_plot_box_plot(file_name_in="inversion_overlap", title="Overlap - Inversion")
+
+if True:
+    accuracy_plot(inversion, filename_out="inversion_overlap")
+    print_accuracy_plot(file_name_in="inversion_overlap", title="Overlap - Inversion")

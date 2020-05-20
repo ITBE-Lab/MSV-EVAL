@@ -22,7 +22,7 @@ def choice_adj_size(l, total_len):
 def create_reads(pack, size, amount, func_get_seeds_and_read):
     lumper = SeedLumping(ParameterSetManager())
     read_by_name = ReadByName()
-    seeds_by_name = SeedsByName()
+    points_by_name = {}
     contigs = [(x, y) for x, y in zip(pack.contigLengths(), pack.contigStarts()) if x > size]
     total_len = sum(x for x, _ in contigs)
     def read_and_seeds():
@@ -33,75 +33,64 @@ def create_reads(pack, size, amount, func_get_seeds_and_read):
     for idx in range(amount):
         read = NucSeq("N")
         while 'n' in str(read) or 'N' in str(read):
-            seeds, read = read_and_seeds()
+            points, read = read_and_seeds()
         read.name = "read" + str(idx)
         read_by_name.append(read)
-        lumped_seeds = lumper.execute(seeds, read, pack)
-        seeds_by_name.append(lumped_seeds, read.name)
-    return seeds_by_name, read_by_name
+        points_by_name[read.name] = points
+    return points_by_name, read_by_name
 
 
-only_scattered_sv = True
-no_scattered_sv = False
-def create_scattered_read(pack, size, amount, num_pieces, size_pieces):
+def create_scattered_read(pack, amount, num_pieces, size_pieces):
     lumper = SeedLumping(ParameterSetManager())
     read_by_name = ReadByName()
-    seeds_by_name = SeedsByName()
-    main_contigs = [(x, y) for x, y in zip(pack.contigLengths(), pack.contigStarts()) if x > size]
-    main_total_len = sum(x for x, _ in main_contigs)
+    points_by_name = {}
     contigs = [(x, y) for x, y in zip(pack.contigLengths(), pack.contigStarts()) if x > size_pieces]
     total_len = sum(x for x, _ in contigs)
-    def read_and_seeds():
-        seeds = Seeds()
+    def read_and_points():
+        points = []
         read = ""
-        main_contig_len, main_cont_start = choice_adj_size(main_contigs, main_total_len)
-        main_start = random.randrange(main_contig_len - size)
-        size_one = size//(num_pieces+1)
-        for idx in range(0, num_pieces+1):
-            if not only_scattered_sv:
-                seeds.append(Seed(len(read), size_one,
-                                  main_cont_start + main_start+idx*size_one, True))
-            read += str(pack.extract_from_to(main_cont_start+main_start+idx*size_one,
-                                             main_cont_start+main_start+(idx+1)*size_one))
-            if idx < num_pieces:
-                contig_size, contig_start = choice_adj_size(contigs, total_len)
-                start = random.randrange(contig_size - size_pieces)
-                if not no_scattered_sv:
-                    seeds.append(Seed(len(read), size_pieces, contig_start + start, True))
-                read += str(pack.extract_from_to(contig_start+start,contig_start+start+size_pieces))
-        return seeds, NucSeq(read)
+        for idx in range(0, num_pieces):
+            contig_size, contig_start = choice_adj_size(contigs, total_len)
+            start = random.randrange(contig_size - size_pieces)
+            points.append((len(read), contig_start + start, True))
+            points.append((len(read)+size_pieces, contig_start + start + size_pieces, True))
+            read += str(pack.extract_from_to(contig_start+start,contig_start+start+size_pieces))
+        return points, NucSeq(read)
 
     for idx in range(amount):
         read = NucSeq("N")
         while 'n' in str(read) or 'N' in str(read):
-            seeds, read = read_and_seeds()
+            points, read = read_and_points()
         read.name = "read" + str(idx)
         read_by_name.append(read)
         lumped_seeds = lumper.execute(seeds, read, pack)
-        seeds_by_name.append(lumped_seeds, read.name)
-    return seeds_by_name, read_by_name
+        points_by_name[read.name] = points
+    return points_by_name, read_by_name
 
 
-def compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge, fm_index_pledge,
-            unlock_targets=None, render_one=False, original_seeds_list=None):
+def compare(params, data, points_by_name, reads, pack_pledge, fm_index_pledge,
+            unlock_targets=None, render_one=True, original_seeds_list=None):
     compare_module = CompareSeedSets(params)
     lumper = SeedLumping(params)
-    get_seed_set_comp = GetSeedSetCompByName(params)
     get_rectangles = SvJumpsFromSeeds(params, pack_pledge.get())
+    collector = NucSeqSeedCollector(params)
 
     if render_one:
         for idx in range(params.get_num_threads()):
             read = reads[idx].get()
             while not read is None:
                 #lumped_g_t = lumper.execute( ground_truth[0].get(), read, pack_pledge.get())
-                lumped_data = lumper.execute( data[idx].get(), read, pack_pledge.get())
-                printer = SeedPrinter(params)
-                if not original_seeds_list is None:
-                    rectangles = get_rectangles.cpp_module.execute_helper(original_seeds_list[idx].get(),
-                                                                          pack_pledge.get(), read)
-                    printer.execute( lumped_data, ground_truth[idx].get(), rectangles )
-                else:
-                    printer.execute( lumped_data, ground_truth[idx].get() )
+                lumped_data = lumper.execute( data[idx].get(), read, pack_pledge.get() )
+                #if not original_seeds_list is None:
+                #    printer = SeedPrinter(params)
+                #    rectangles = get_rectangles.cpp_module.execute_helper(original_seeds_list[idx].get(),
+                #                                                          pack_pledge.get(), read)
+                #    printer.execute( lumped_data, rectangles )
+                #else:
+                if True:
+                    printer = SeedPointPrinter(params)
+                    printer.execute( lumped_data, points_by_name[read.name] )
+                    exit()
                 UnLock(params, unlock_targets[idx]).execute( Container() )
                 read = reads[idx].get()
     else:
@@ -109,20 +98,50 @@ def compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge
         for idx in range(params.get_num_threads()):
             #lumped_g_t = promise_me(lumper, ground_truth[idx], reads[idx], pack_pledge)
             lumped_data = promise_me(lumper, data[idx], reads[idx], pack_pledge)
-            seed_set_comp = promise_me(get_seed_set_comp, reads[idx], seeds_by_name_pledge)
-            comp = promise_me(compare_module, ground_truth[idx], lumped_data, seed_set_comp)
+            empty = promise_me(collector, reads[idx], lumped_data)
             if unlock_targets is None:
                 unlock = comp
             else:
-                unlock = promise_me(UnLock(params, unlock_targets[idx]), comp)
+                unlock = promise_me(UnLock(params, unlock_targets[idx]), empty)
             res.append(unlock)
 
         res.simultaneous_get(params.get_num_threads())
 
-    return seeds_by_name_pledge.get().mergeAll()
+    def matches(seed, point):
+        q,r,f = point
+        def nearby_start(max_diff=5):
+            return abs(q-seed.start) <= max_diff and abs(r-seed.start_ref) <= max_diff
+        def nearby_end(max_diff=5):
+            if seed.on_forward_strand:
+                return abs(q-(seed.start+seed.size)) <= max_diff and abs(r-(seed.start_ref+seed.size)) <= max_diff
+            else:
+                return abs(q-(seed.start+seed.size)) <= max_diff and abs(r-(seed.start_ref-seed.size)) <= max_diff
+        return seed.on_forward_strand == f and (nearby_start() or nearby_end())
+
+    all_found = {}
+    for name, point_values in points_by_name.items():
+        all_found[name] = [False]*len(point_values)
+    for read, seeds in collector.cpp_module.collection:
+        for seed in seeds:
+            for idx, point in enumerate(points_by_name[read.name]):
+                if matches(seed, point):
+                    all_found[read.name][idx] = True
+
+    s = 0
+    for point_values in all_found.values():
+        all_true = True
+        for found in point_values:
+            if not found:
+                all_true = False
+        if all_true:
+            s += 1
+
+    #print("hits:", s)
+
+    return s / len(points_by_name)
 
 
-def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, mems=True, reseeding=True,
+def compare_seeds(params, reads_by_name, points_by_name, fm_index, pack, mems=True, reseeding=True,
                  render_one=False):
     #params.by_name("Number of Threads").set(1)
     #params.by_name("Use all Processor Cores").set(False)
@@ -135,8 +154,6 @@ def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, mems=Tru
     pack_pledge.set(pack)
     fm_index_pledge = Pledge()
     fm_index_pledge.set(fm_index)
-    seeds_by_name_pledge = Pledge()
-    seeds_by_name_pledge.set(seeds_by_name)
     min_len = MinLength(params, params.by_name("Minimal Seed Size SV").get() + 1)
 
     if mems:
@@ -145,7 +162,6 @@ def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, mems=Tru
     else:
         seeding_module = BinarySeeding(params)
         extract_seeds = ExtractSeeds(params)
-    get_seeds_by_name = GetSeedsByReadName(params)
 
     reads_vec = ContainerVectorNucSeq()
     for name, read in reads_by_name:
@@ -153,7 +169,6 @@ def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, mems=Tru
     reads_vec_pledge = Pledge()
     reads_vec_pledge.set(reads_vec)
 
-    ground_truth = []
     data = []
     reads = []
     unlock_targets = []
@@ -181,36 +196,28 @@ def compare_seeds(params, reads_by_name, seeds_by_name, fm_index, pack, mems=Tru
                 recursive_reseeding = RecursiveReseedingSegments(params, pack)
                 seeds = promise_me(recursive_reseeding, segments, pack_pledge, fm_index_pledge, locked_read)
         data.append(seeds)
-        ground_truth_seeds = promise_me(get_seeds_by_name, locked_read, seeds_by_name_pledge)
-        ground_truth.append(ground_truth_seeds)
 
-    return compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge, fm_index_pledge,
+    return compare(params, data, points_by_name, reads, pack_pledge, fm_index_pledge,
                    unlock_targets, render_one, original_seeds_list=original_seeds_list)
 
-def compare_alignment(params, reads_by_name_pledge, seeds_by_name, alignments, pack_pledge, fm_index_pledge,
+def compare_alignment(params, reads_by_name_pledge, points_by_name, alignments, pack_pledge, fm_index_pledge,
                       unlock_targets=None, render_one=False):
     align_to_seeds = AlignmentToSeeds(params)
-    get_seeds_by_name = GetSeedsByName(params)
     get_read_by_name = GetReadByName(params)
-    seeds_by_name_pledge = Pledge()
-    seeds_by_name_pledge.set(seeds_by_name)
-    ground_truth = []
     data = []
     reads = []
     for idx in range(params.get_num_threads()):
         alignment_seeds = promise_me(align_to_seeds, alignments[idx], pack_pledge)
         data.append(alignment_seeds)
-        ground_truth_seeds = promise_me(get_seeds_by_name, alignments[idx], seeds_by_name_pledge)
-        ground_truth.append(ground_truth_seeds)
         read = promise_me(get_read_by_name, alignments[idx], reads_by_name_pledge)
         reads.append(read)
 
-    return compare(params, ground_truth, data, seeds_by_name_pledge, reads, pack_pledge, fm_index_pledge,
+    return compare(params, data, points_by_name, reads, pack_pledge, fm_index_pledge,
                    unlock_targets, render_one)
 
 
 
-def compare_alignment_from_file_queue(params, reads_by_name, seeds_by_name, pack, fm_index, queue_pledge,
+def compare_alignment_from_file_queue(params, reads_by_name, points_by_name, pack, fm_index, queue_pledge,
                                       render_one=False):
     file_reader = SamFileReader(params)
     queue_picker = FilePicker(params)
@@ -233,11 +240,11 @@ def compare_alignment_from_file_queue(params, reads_by_name, seeds_by_name, pack
         locked_files.append(locked_file)
         alignments.append(alignment)
 
-    return compare_alignment(params, reads_by_name_pledge, seeds_by_name, alignments, pack_pledge, fm_index_pledge,
+    return compare_alignment(params, reads_by_name_pledge, points_by_name, alignments, pack_pledge, fm_index_pledge,
                              locked_files, render_one)
 
 
-def compare_alignment_from_file_paths(params, reads_by_name, seeds_by_name, pack, fm_index, file_paths,
+def compare_alignment_from_file_paths(params, reads_by_name, points_by_name, pack, fm_index, file_paths,
                                       render_one=False):
     if file_paths is None:
         return None
@@ -246,7 +253,7 @@ def compare_alignment_from_file_paths(params, reads_by_name, seeds_by_name, pack
         file_queue.add(FileStreamFromPath(string))
     queue_pledge = Pledge()
     queue_pledge.set(file_queue)
-    return compare_alignment_from_file_queue(params, reads_by_name, seeds_by_name, pack, fm_index, queue_pledge,
+    return compare_alignment_from_file_queue(params, reads_by_name, points_by_name, pack, fm_index, queue_pledge,
                                              render_one)
 
 def create_alignment(read_by_name, aligner, sam_name):

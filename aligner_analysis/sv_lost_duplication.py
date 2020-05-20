@@ -1,39 +1,35 @@
 from aligner_analysis.binary_search_plot import *
 
-only_sv = True
-no_sv = False
 def duplication(sv_size, gap_size, genome_section, ref_start, min_dist=50):
-    seeds = Seeds()
+    points = []
     total_size = sv_size*2 + gap_size
     offset = random.randint(min_dist, (len(genome_section) - total_size)-min_dist)
     total_size += offset
     g = str(genome_section)
     # before duplication
-    if not only_sv:
-        seeds.append(Seed(0, offset, ref_start, True))
     read = g[:offset] 
 
-    # section a
-    if not only_sv:
-        seeds.append(Seed(offset, sv_size, ref_start + offset, True))
+    # section a (section to be duplicated)
     read += g[offset:offset + sv_size] 
 
     # between duplication
-    if not only_sv:
-        seeds.append(Seed(offset + sv_size, gap_size, ref_start + offset + sv_size, True))
     read += g[offset + sv_size:offset + sv_size + gap_size]
+    points.append((offset+sv_size+gap_size, ref_start+offset+sv_size+gap_size, True))
 
-    # section b
-    if not no_sv:
-        seeds.append(Seed(offset + sv_size + gap_size, sv_size, ref_start + offset, True))
+    # section b (section that was duplicated)
     read += g[offset:offset + sv_size]
+    points.append((offset+sv_size+gap_size, ref_start+offset, True))
+    points.append((offset+sv_size*2+gap_size, ref_start+offset+sv_size, True))
 
     # after duplication
-    if not only_sv:
-        seeds.append(Seed(total_size, len(genome_section) - total_size, ref_start + offset + sv_size + gap_size, True))
     read += g[offset + sv_size + gap_size:len(genome_section)-sv_size]
+    points.append((offset+sv_size*2+gap_size, ref_start+offset+sv_size+gap_size, True))
 
-    return seeds, NucSeq(read)
+    return points, NucSeq(read)
+
+def dup_size(read_size, sv_size, gap_size):
+    assert sv_size < read_size
+    return read_size - sv_size
 
 def main():
     params = ParameterSetManager()
@@ -55,6 +51,10 @@ def main():
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
 
 #main()
-if True:
+if False:
     binary_search_plot(duplication, "duplication_overlap")
     print_binary_search_plot_box_plot(file_name_in="duplication_overlap", title="Overlap - Duplication")
+
+if True:
+    accuracy_plot(duplication, dup_size, "duplication_overlap")
+    print_accuracy_plot(file_name_in="duplication_overlap", title="Overlap - Duplication")
