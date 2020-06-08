@@ -139,6 +139,11 @@ def main():
 
 #main()
 #plot_scatter(num_reads=100, sv_size_range=[2**x for x in range(14)])
-if True:
+if False:
     binary_search_plot(None, "scattered_overlap", gap_size_range=[1,2,3,4])
     print_binary_search_plot_box_plot(file_name_in="scattered_overlap", y_label="Num Scatters")
+
+
+if True:
+    accuracy_plot(None, None, "scattered_overlap", gap_size_range=[4])
+    print_accuracy_plot(file_name_in="scattered_overlap", title="Accuracy - Scattered Read")

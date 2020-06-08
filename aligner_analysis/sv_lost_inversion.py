@@ -109,4 +109,4 @@ if False:
 
 if True:
     accuracy_plot(inversion, filename_out="inversion_overlap")
-    print_accuracy_plot(file_name_in="inversion_overlap", title="Overlap - Inversion")
+    print_accuracy_plot(file_name_in="inversion_overlap", title="Accuracy - Inversion")

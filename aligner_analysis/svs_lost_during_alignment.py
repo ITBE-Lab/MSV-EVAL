@@ -63,7 +63,6 @@ def create_scattered_read(pack, amount, num_pieces, size_pieces):
             points, read = read_and_points()
         read.name = "read" + str(idx)
         read_by_name.append(read)
-        lumped_seeds = lumper.execute(seeds, read, pack)
         points_by_name[read.name] = points
     return points_by_name, read_by_name
 

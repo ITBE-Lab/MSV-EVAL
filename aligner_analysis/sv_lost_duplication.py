@@ -57,4 +57,4 @@ if False:
 
 if True:
     accuracy_plot(duplication, dup_size, "duplication_overlap")
-    print_accuracy_plot(file_name_in="duplication_overlap", title="Overlap - Duplication")
+    print_accuracy_plot(file_name_in="duplication_overlap", title="Accuracy - Duplication")

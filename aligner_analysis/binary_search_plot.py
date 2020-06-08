@@ -4,6 +4,7 @@ from bokeh.models import FactorRange
 from bokeh.models import PrintfTickFormatter
 from bokeh.transform import dodge
 from bokeh.layouts import column
+from bokeh.io import output_file
 
 class MATestSet:
     def __init__(self, params=ParameterSetManager(), name="ma", render_one=False):
@@ -198,7 +199,7 @@ def binary_search_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translo
                 print_n_write("\n", file_out)
 
 def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocation_overlap", gap_size_range=[50],
-                    test_sets=default_test_set, sv_sizes=range(10, 500, 10), read_size=2000, num_reads=1000):
+                    test_sets=default_test_set, sv_sizes=range(25, 501, 25), read_size=2000, num_reads=1000):
     params = ParameterSetManager()
 
     pack = Pack()
@@ -266,8 +267,7 @@ def print_binary_search_plot_box_plot(file_name_in="scattered_overlap", title="O
             return int(s)
 
         plot = figure(title=title, x_range=(sv_size_max*2, sv_size_min/2), y_range=FactorRange(*y_range),
-                      x_axis_type="log", 
-                      plot_width=800)
+                      x_axis_type="log", plot_width=800)
         plot.xaxis.axis_label = "SV Size"
         plot.xaxis[0].formatter = PrintfTickFormatter(format="%5f")
         plot.yaxis.axis_label = y_label
@@ -312,8 +312,9 @@ def print_binary_search_plot_box_plot(file_name_in="scattered_overlap", title="O
         show(plot)
 
 def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scattered read", 
-                            test_sets=default_test_set, x_label="SV Size", bar_width=10):
+                            test_sets=default_test_set, x_label="SV Size"):
     with open(data_dir + "/" + file_name_in + ".tsv", "r") as file_in:
+        output_file(data_dir + "/bokeh_out_" + file_name_in + ".html")
         lines = file_in.readlines()
         header = lines[0]
 
@@ -323,17 +324,16 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
 
         xs = [int(x) for x in lines[0].split("\t")[2:]]
 
-
-        plots = []
+        plot = figure(title=title, plot_width=800, y_range=(-0.05, 1.05))
+        plot.xaxis.axis_label = x_label
+        plot.yaxis.axis_label = "Accuracy"
         for line in lines[1:]:
             cells = line.split("\t")
             y_idx = str(int(cells[0]))
             test_set = test_set_dict[cells[1]]
-            plot = figure(title=title + " " + test_set.display_name() + " gap_size="+y_idx, plot_width=800,
-                          y_range=(0,1))
-            plot.xaxis.axis_label = x_label
-            plot.yaxis.axis_label = "Accuracy"
-            plot.vbar(x=xs, top=[float(x) for x in cells[2:]], bottom=[0]*(len(xs)), width=bar_width,
-                      fill_color=test_set.color())
-            plots.append(plot)
-        show(column(plots))
+            plot.line(x=xs, y=[float(x) for x in cells[2:]], line_color=test_set.color(), line_width=point_to_px(2),
+                      legend_label=test_set.display_name() + " gap_size="+y_idx)
+            plot.x(x=xs, y=[float(x) for x in cells[2:]], line_color=test_set.color(), line_width=point_to_px(2),
+                   size=point_to_px(5), legend_label=test_set.display_name() + " gap_size="+y_idx)
+        plot.legend.location = "bottom_right"
+        show(plot)

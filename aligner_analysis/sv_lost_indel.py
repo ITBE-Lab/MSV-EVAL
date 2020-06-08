@@ -74,7 +74,7 @@ def main():
 
 if True:
     accuracy_plot(deletion, del_size, "deletion_overlap")
-    print_accuracy_plot(file_name_in="deletion_overlap", title="Overlap - Deletion")
+    print_accuracy_plot(file_name_in="deletion_overlap", title="Accuracy - Deletion")
 
     accuracy_plot(insertion, ins_size, "insertion_overlap")
-    print_accuracy_plot(file_name_in="insertion_overlap", title="Overlap - Insertion")
+    print_accuracy_plot(file_name_in="insertion_overlap", title="Accuracy - Insertion")

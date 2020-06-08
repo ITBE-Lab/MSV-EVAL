@@ -63,4 +63,4 @@ if False:
 
 if True:
     accuracy_plot(translocation, filename_out="translocation_overlap")
-    print_accuracy_plot(file_name_in="translocation_overlap", title="Overlap - Translocation")
+    print_accuracy_plot(file_name_in="translocation_overlap", title="Accuracy - Translocation")
