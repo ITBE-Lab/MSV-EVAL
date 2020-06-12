@@ -223,6 +223,8 @@ def sniffles_interpreter(call, call_inserter, pack, error_file, call_desc):
 
         if to_recognize != 0:
             raise Exception("could not classify call")
+
+        return from_pos, to_pos, int(call["ID"]), call["ALT"]
     except Exception as e:
         log_error(call, error_file, "sniffles", e)
 
@@ -325,19 +327,25 @@ def delly_interpreter(call, call_inserter, pack, error_file, call_desc):
 
         to_insert = []
         if call["ALT"] == "<DEL>":
+            call_name = "<DEL>"
             to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, True, find_confidence(call), 1))
         elif call["ALT"] == "<INV>":
             # delly calls inversion twice once 3t3 once 5t5 (or head to head and tail to tail) of reads
             if call["INFO"]["CT"] == "3to3":
+                call_name = "<INV-3to3>"
                 to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, False, find_confidence(call), 1))
             else:
+                call_name = "<INV-5to5>"
                 assert call["INFO"]["CT"] == "5to5"
                 to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, False, True, find_confidence(call), 1))
         elif call["ALT"] == "<DUP>":
+            call_name = "<DUP>"
             to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, False, False, find_confidence(call), 1))
         elif call["ALT"] == "<INS>":
+            call_name = "<INS>"
             to_insert.append(SvCall(from_pos, from_pos + 1, std_from, std_to, True, True, find_confidence(call), 1))
         elif call["INFO"]["SVTYPE"] == "BND":
+            call_name = "BND"
             to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, False, find_confidence(call), 1))
             to_insert.append(SvCall(from_pos, to_pos, std_to, std_from, False, True, find_confidence(call), 1))
         else:
@@ -346,6 +354,7 @@ def delly_interpreter(call, call_inserter, pack, error_file, call_desc):
             call_inserter.insert(call_to_insert)
             call_desc.insert(call_to_insert.id, call["ALT"][1:-1] + str(int(call["ID"][4:])))
 
+        return from_pos, to_pos, int(call["ID"][4:]), call_name
     except Exception as e:
         log_error(call, error_file, "delly", e)
 
@@ -549,11 +558,13 @@ def vcf_to_db(name, desc, dataset_name, file_name, pack, vcf_interpreter, error_
     call_inserter = get_inserter.execute(pooled_connection)
     call_desc = CallDescTable( DbConn(dataset_name))
 
+    from_to_calls_list = []
+
     num_calls = 0
     for call in vcf_parser(file_name):
         num_calls += 1
-        vcf_interpreter(call, call_inserter, pack, error_file, call_desc)
+        from_to_calls_list.append(vcf_interpreter(call, call_inserter, pack, error_file, call_desc))
     #print("number of calls:", num_calls)
     call_inserter.close(pooled_connection)
 
-    return get_inserter.cpp_module.id
+    return get_inserter.cpp_module.id, from_to_calls_list

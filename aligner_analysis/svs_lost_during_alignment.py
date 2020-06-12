@@ -9,7 +9,7 @@ from bokeh.layouts import column, row, grid
 from bokeh.models.tools import HoverTool
 
 genome_dir = "/MAdata/genome/human/GRCh38.p12"
-data_dir = "/MAdata/sv_lost_during_alignment"
+data_dir = "/MAdata/sv_caller_analysis/sv_lost_during_alignment"
 
 def choice_adj_size(l, total_len):
     x = random.randrange(total_len)

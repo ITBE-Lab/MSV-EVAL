@@ -2,14 +2,14 @@ from MSV import *
 from MA import *
 import random
 from perfect_alignments_caller_fail.alignments_from_db import *
-from bokeh.io.output import reset_output
+from bokeh.io import output_file
 from caller_analysis.os_sv_callers import *
 from caller_analysis.vcf_interpreters import *
 import os
 from sv_util.os_aligners import *
 from perfect_alignments_caller_fail.compute_errors import *
 
-global_prefix = "/MAdata/sv_lost_during_calling/"
+global_prefix = "/MAdata/sv_caller_analysis/sv_lost_during_calling/"
 sam_folder = global_prefix + "sam/"
 fasta_folder = global_prefix + "fasta/"
 vcf_folder = global_prefix + "vcf/"
@@ -254,6 +254,52 @@ def overlapping_inversions_in_duplication(db_conn, dataset_name, l, offset):
 
     return get_inserter.cpp_module.id, None
 
+def inverted_duplication(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "inverted_duplication",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + l - 1, 0, 0, True, False, 1000)) # a
+    sv_inserter.insert(SvCall(offset, offset + l, 0, 0, False, True, 1000)) # b
+
+    sv_inserter.close(pool)
+
+    return get_inserter.cpp_module.id, None
+
+def duplicated_inversion(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "duplicated_inversion",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 2*l - 1, 0, 0, True, False, 1000)) # a
+    sv_inserter.insert(SvCall(offset + l, offset + 2*l - 1, 0, 0, False, False, 1000)) # b
+    sv_inserter.insert(SvCall(offset + l, offset + 2*l, 0, 0, False, True, 1000)) # c
+
+    sv_inserter.close(pool)
+
+    return get_inserter.cpp_module.id, None
+
+def inversion_after_duplication(db_conn, dataset_name, l, offset):
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "inversion_after_duplication",
+                                   "the sv's that were simulated", -1)
+    pool = PoolContainer(1, dataset_name)
+    sv_inserter = get_inserter.execute(pool)
+
+    sv_inserter.insert(SvCall(offset + l - 1, offset + 2*l - 1, 0, 0, True, False, 1000)) # a
+    sv_inserter.insert(SvCall(offset + l, offset + l, 0, 0, False, True, 1000)) # b
+
+    sv_inserter.close(pool)
+
+    return get_inserter.cpp_module.id, None
+
 db_name = "perfect_alignment_caller_fail"
 l = 1000
 coverage = 100
@@ -331,17 +377,20 @@ if __name__ == "__main__":
     svs = [
         (l*10, four_nested_svs_calls),
         (l*5, inversion_in_inversion),
-        (l*4, inversion_in_inversion_2),
+        (l*4, inversion_in_inversion_2), # selected @todo
         (l*5, insertion_in_inversion),
         (l*3, inversion),
         (l*5, inversion_in_translocation),
         (l*7, proper_inversion_in_translocation),
         (l*6, inversions_in_duplication),
-        (l*5, duplication_in_inversion),
-        (l*4, inversion_overlapping_duplication),
+        (l*5, duplication_in_inversion), # @todo remove from pic
+        (l*4, inversion_overlapping_duplication), # selected
         (l*6, duplication_in_duplication),
         (l*6, duplication_of_inversion),
-        (l*6, overlapping_inversions_in_duplication),
+        (l*6, overlapping_inversions_in_duplication), # selected @todo
+        (l*3, inverted_duplication), # selected
+        (l*4, duplicated_inversion), # selected
+        (l*4, inversion_after_duplication), # selected
     ]
 
     sets = []
@@ -414,6 +463,7 @@ if __name__ == "__main__":
         caller_ids = [run_msv(reference, alignments_list), run_msv(reference, alignments_list_paired, paired=True)]
         read_types = ["single", "paired"]
         # other callers
+        from_to_calls_lists = []
         with open(global_prefix + "/vcf_errors.log", "w") as error_file:
             for caller, name, interpreter, read_type in callers:
                 vcf_file_path = vcf_folder + file_name + "-" + name + ".vcf"
@@ -427,7 +477,8 @@ if __name__ == "__main__":
                     call_inserter.close(pooled_connection)
                     call_id = get_inserter.cpp_module.id
                 else:
-                    call_id = vcf_to_db(name, "desc", db_name, vcf_file_path, reference, interpreter, error_file)
+                    call_id, from_to_calls_list = vcf_to_db(name, "desc", db_name, vcf_file_path, reference,
+                                                            interpreter, error_file)
                 caller_ids.append(call_id)
                 read_types.append(read_type)
                 if False:
@@ -436,7 +487,10 @@ if __name__ == "__main__":
                                             x_range=(offset, offset+section_size),
                                             y_range=(offset, offset+section_size), do_print=False)
                     seed_printer.execute(caller_seeds, seeds)
-        sets.append( (caller_ids, read_types, run_id) )
+                from_to_calls_lists.append((name, from_to_calls_list))
+        sets.append( (caller_ids, read_types, run_id, seeds, from_to_calls_lists, offset, offset+section_size,
+                      l) )
     # why do i need another connection here?
     db_conn2 = DbConn({"SCHEMA": {"NAME": db_name}})
+    output_file(global_prefix + "/bokeh_out_" + db_name + ".html")
     render(db_conn2, sets)
