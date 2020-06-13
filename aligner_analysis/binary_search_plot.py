@@ -4,8 +4,8 @@ from bokeh.models import FactorRange
 from bokeh.models import PrintfTickFormatter
 from bokeh.transform import dodge
 from bokeh.layouts import column
-from bokeh.io import output_file
-
+from bokeh.io import output_file, export_svgs
+from sv_util.bokeh_style_helper import *
 class MATestSet:
     def __init__(self, params=ParameterSetManager(), name="ma", render_one=False):
         params.by_name("Detect Small Inversions").set(True)
@@ -312,7 +312,7 @@ def print_binary_search_plot_box_plot(file_name_in="scattered_overlap", title="O
         show(plot)
 
 def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scattered read", 
-                            test_sets=default_test_set, x_label="SV Size"):
+                            test_sets=default_test_set, x_label="SV Size", save_svg=True):
     with open(data_dir + "/" + file_name_in + ".tsv", "r") as file_in:
         output_file(data_dir + "/bokeh_out_" + file_name_in + ".html")
         lines = file_in.readlines()
@@ -324,16 +324,32 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
 
         xs = [int(x) for x in lines[0].split("\t")[2:]]
 
-        plot = figure(title=title, plot_width=800, y_range=(-0.05, 1.05))
+        plot = figure(title=title, plot_width=800, y_range=(-0.05, 1.05), x_range=(-10,510))
         plot.xaxis.axis_label = x_label
         plot.yaxis.axis_label = "Accuracy"
-        for line in lines[1:]:
+        funcs = [
+            plot.x,
+            plot.circle,
+            plot.cross,
+            plot.square,
+            plot.triangle,
+            plot.diamond,
+            plot.circle_x,
+            plot.circle_cross,
+        ]
+        for line, func in zip(lines[1:],funcs):
             cells = line.split("\t")
             y_idx = str(int(cells[0]))
             test_set = test_set_dict[cells[1]]
-            plot.line(x=xs, y=[float(x) for x in cells[2:]], line_color=test_set.color(), line_width=point_to_px(2),
+            plot.line(x=xs, y=[float(x) for x in cells[2:]], line_color=color_scheme(test_set.color()),
+                      line_width=point_to_px(4),
                       legend_label=test_set.display_name() + " gap_size="+y_idx)
-            plot.x(x=xs, y=[float(x) for x in cells[2:]], line_color=test_set.color(), line_width=point_to_px(2),
-                   size=point_to_px(5), legend_label=test_set.display_name() + " gap_size="+y_idx)
+            func(x=xs, y=[float(x) for x in cells[2:]], line_color=color_scheme(test_set.color()),
+                 line_width=point_to_px(2), fill_color=None,
+                 size=point_to_px(8), legend_label=test_set.display_name() + " gap_size="+y_idx)
         plot.legend.location = "bottom_right"
+        style_plot(plot)
         show(plot)
+        if save_svg:
+            plot.output_backend = "svg"
+            export_svgs(plot, filename=data_dir + "/bokeh_out_" + file_name_in + ".svg")

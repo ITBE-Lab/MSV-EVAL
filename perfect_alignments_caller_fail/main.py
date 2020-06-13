@@ -377,13 +377,13 @@ if __name__ == "__main__":
     svs = [
         (l*10, four_nested_svs_calls),
         (l*5, inversion_in_inversion),
-        (l*4, inversion_in_inversion_2), # selected @todo
+        (l*4, inversion_in_inversion_2), # selected
         (l*5, insertion_in_inversion),
         (l*3, inversion),
         (l*5, inversion_in_translocation),
         (l*7, proper_inversion_in_translocation),
         (l*6, inversions_in_duplication),
-        (l*5, duplication_in_inversion), # @todo remove from pic
+        (l*5, duplication_in_inversion),
         (l*4, inversion_overlapping_duplication), # selected
         (l*6, duplication_in_duplication),
         (l*6, duplication_of_inversion),
