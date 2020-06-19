@@ -3,6 +3,7 @@ from MA import *
 from MSV import *
 import math
 import traceback
+import os
 
 logged_errors = set()
 def log_error(call, error_file, interpreter_name, e=None):
@@ -563,6 +564,8 @@ def vcf_to_db(name, desc, dataset_name, file_name, pack, vcf_interpreter, error_
     num_calls = 0
     for call in vcf_parser(file_name):
         num_calls += 1
+        if num_calls % 100000 == 0:
+            print("num_calls:", num_calls)
         from_to_calls_list.append(vcf_interpreter(call, call_inserter, pack, error_file, call_desc))
     #print("number of calls:", num_calls)
     call_inserter.close(pooled_connection)
