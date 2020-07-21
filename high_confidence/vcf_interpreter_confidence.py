@@ -1,6 +1,6 @@
 from caller_analysis.vcf_interpreters import *
 
-min_sv_size = 10
+min_sv_size = 5
 
 def confidence_call_interpreter(call, call_inserter, pack, error_file, call_desc):
     def find_confidence(call):
