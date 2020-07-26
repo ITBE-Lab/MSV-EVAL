@@ -21,12 +21,14 @@ def load_genomes(query_genome, reference_genome):
 
     return pack, fm_index, mm_index, query_genome
 
-def compute_seeds(seeder, query_genome, reference_genome, ambiguity=10000):
+def compute_seeds(seeder, query_genome, reference_genome, ambiguity=10000, seed_filter=None):
     pack, fm_index, mm_index, query_genome = load_genomes(query_genome, reference_genome)
     mm_index.set_max_occ(ambiguity)
 
     print("a")
     seeds = seeder.execute(mm_index, query_genome, pack)
+    if not seed_filter is None:
+        seeds = seed_filter(seeds, str(query_genome))
     print("b")
     mems = SeedLumping(ParameterSetManager()).execute(seeds, query_genome, pack)
     print("c")
@@ -65,35 +67,27 @@ def str_to_k_mer(s, k=16):
     for idx in enumerate(len(s) - k):
         yield s[idx:idx+k]
 
-def filter_k_mer_set(genome, k=16, max_cnt=5):
+def filter_k_mer_set(genome, k=16, max_cnt=1):
     k_mers = {}
-    pack = Pack()
-    pack.load(genome_dir + genome + "/ma/genome")
-    gen_str = pack.extract_forward_strand()
-    for k_mer in str_to_k_mer(gen_str):
+    for k_mer in str_to_k_mer(genome):
         if not k_mer in k_mers:
             k_mers[k_mer] = 0
         k_mers[k_mer] += 1
 
     return set([k_mer for k_mer, cnt in k_mers.items() if cnt < max_cnt])
 
-def filter_by_k_mer_set(seeds, query, ref, k_mers):
+def filter_by_k_mer_set(seeds, query):
+    k_mers = filter_k_mer_set(query)
     ret = []
     for seed in seeds:
         q_str = query[seed.start:seed.start + seed.size]
-        if seed.on_forward_strand:
-            r_str = ref[seed.start_ref:seed.start_ref + seed.size]
-        else:
-            r_str = ref[seed.start_ref - seed.size :seed.start_ref]
         f = False
         for k_mer in str_to_k_mer(q_str):
             if k_mer in k_mers:
                 f = True
-        for k_mer in str_to_k_mer(r_str):
-            if k_mer in k_mers:
-                f = True
         if not f:
             ret.append(seed)
+    return ret
 
 def run_aligner(query_genome_str, reference_genome):
     pack, fm_index, mm_index, query_genome = load_genomes(query_genome_str, reference_genome)
@@ -180,7 +174,7 @@ class SoCFilter:
         del self.socs[-1]
         return ret
 
-    def pop_all_larger_than(self, num_nt=200):
+    def pop_all_larger_than(self, num_nt=150):
         ret = []
         while len(self.socs) > 0:
             p = self.pop()
@@ -277,9 +271,10 @@ if __name__ == "__main__":
     #seeds = compute_seeds(MinimizerSeeding(param), reference_genome, reference_genome)
     #intervals = seeds_to_filter_sections(seeds)
     #print("#intervals:", len(intervals))
+
     seeds_y = compute_seeds(MinimizerSeeding(param), query_genome, query_genome)
     intervals_y = seeds_to_filter_sections(seeds_y)
-    seeds_2 = compute_seeds(MinimizerSeeding(param), query_genome, reference_genome, 2)
+    seeds_2 = compute_seeds(MinimizerSeeding(param), query_genome, reference_genome, 2, filter_by_k_mer_set)
     seed_filter = SeedsFilter(intervals_2=intervals_y)
     print("e")
     filtered_1 = [s for s in seeds_2 if not seed_filter.seed_filtered(s)]
