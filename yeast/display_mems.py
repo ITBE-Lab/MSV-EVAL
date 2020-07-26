@@ -35,32 +35,65 @@ def compute_seeds(seeder, query_genome, reference_genome, ambiguity=10000):
     #seeds = segments.extract_seeds(fm_index, 10000, 18, len(query_genome), True)
     return filtered_mems
 
-def seeds_to_filter_sections(seeds, add_size=50, min_seeds=2):
+def seeds_to_filter_sections(seeds, add_size=50, min_nt=25):
     intervals = []
     for seed in seeds:
         if seed.on_forward_strand:
-            intervals.append((seed.start_ref, seed.start_ref + seed.size))
+            intervals.append((seed.start_ref, seed.start_ref + seed.size, seed.size))
         else:
-            intervals.append((seed.start_ref - seed.size, seed.start_ref))
+            intervals.append((seed.start_ref - seed.size, seed.start_ref, seed.size))
     intervals.sort()
     max_len_idx = 0
     for idx, interval in enumerate(intervals):
-        if interval[1] - interval[0] > intervals[max_len_idx][1] - intervals[max_len_idx][0]:
+        if interval[2] > intervals[max_len_idx][2]:
             max_len_idx = idx
     del intervals[max_len_idx]
 
-    merged_intervals = [[*intervals[0], 1]]
-    for start, end in intervals[1:]:
+    merged_intervals = [[*intervals[0]]]
+    for start, end, nt in intervals[1:]:
         if start <= merged_intervals[-1][1] + add_size:
             merged_intervals[-1][1] = end
-            merged_intervals[-1][2] += 1
+            merged_intervals[-1][2] += nt
         else:
-            merged_intervals.append([start, end, 1])
+            merged_intervals.append([start, end, nt])
 
-    ret_intervals = [(start, end) for start,end,num in merged_intervals if num > min_seeds]
+    ret_intervals = [(start, end) for start,end,num in merged_intervals if num > min_nt]
 
     return ret_intervals
 
+def str_to_k_mer(s, k=16):
+    for idx in enumerate(len(s) - k):
+        yield s[idx:idx+k]
+
+def filter_k_mer_set(genome, k=16, max_cnt=5):
+    k_mers = {}
+    pack = Pack()
+    pack.load(genome_dir + genome + "/ma/genome")
+    gen_str = pack.extract_forward_strand()
+    for k_mer in str_to_k_mer(gen_str):
+        if not k_mer in k_mers:
+            k_mers[k_mer] = 0
+        k_mers[k_mer] += 1
+
+    return set([k_mer for k_mer, cnt in k_mers.items() if cnt < max_cnt])
+
+def filter_by_k_mer_set(seeds, query, ref, k_mers):
+    ret = []
+    for seed in seeds:
+        q_str = query[seed.start:seed.start + seed.size]
+        if seed.on_forward_strand:
+            r_str = ref[seed.start_ref:seed.start_ref + seed.size]
+        else:
+            r_str = ref[seed.start_ref - seed.size :seed.start_ref]
+        f = False
+        for k_mer in str_to_k_mer(q_str):
+            if k_mer in k_mers:
+                f = True
+        for k_mer in str_to_k_mer(r_str):
+            if k_mer in k_mers:
+                f = True
+        if not f:
+            ret.append(seed)
 
 def run_aligner(query_genome_str, reference_genome):
     pack, fm_index, mm_index, query_genome = load_genomes(query_genome_str, reference_genome)
@@ -99,7 +132,9 @@ class SoCFilter:
         self.__seperate_socs()
 
     def delta(self, seed):
-        return seed.start_ref - seed.start
+        if seed.on_forward_strand:
+            return seed.start_ref - seed.start
+        return seed.start_ref + seed.start + seed.size
 
     def delta_dist(self, seed_a, seed_b):
         if seed_a.on_forward_strand != seed_b.on_forward_strand:
@@ -109,15 +144,13 @@ class SoCFilter:
     def __soc_sweep(self):
         self.seeds.sort(key=lambda x:(x.on_forward_strand, x.start_ref-x.start))
         start_idx = 0
-        end_idx = -1
+        end_idx = 0
         num_nt = 0
-        end_delta_last = -10000
         while start_idx < len(self.seeds):
             while end_idx < len(self.seeds) and self.delta_dist(self.seeds[start_idx], self.seeds[end_idx]):
                 num_nt += self.seeds[end_idx].size
                 end_idx += 1
-            start_delta = self.delta(self.seeds[start_idx])
-            if start_delta < end_delta_last + self.max_delta_dist:
+            if len(self.socs) > 0 and self.delta_dist(self.seeds[start_idx], self.seeds[self.socs[-1][1]-1]):
                 if len(self.socs) > 0 and num_nt > self.socs[-1][2]:
                     del self.socs[-1]
                 else:
@@ -125,7 +158,6 @@ class SoCFilter:
                     start_idx += 1
                     continue
             self.socs.append((start_idx, end_idx, num_nt))
-            end_delta_last = self.delta(self.seeds[end_idx])
             num_nt -= self.seeds[start_idx].size
             start_idx += 1
 
@@ -148,7 +180,7 @@ class SoCFilter:
         del self.socs[-1]
         return ret
 
-    def pop_all_larger_than(self, num_nt=100):
+    def pop_all_larger_than(self, num_nt=200):
         ret = []
         while len(self.socs) > 0:
             p = self.pop()
@@ -160,9 +192,10 @@ class SoCFilter:
 
 
 class SeedsFilter:
-    def __init__(self, intervals, intervals_2=None):
+    def __init__(self, intervals=None, intervals_2=None):
         self.intervals = intervals
-        self.keys = [start for start, end in intervals]
+        if not self.intervals is None:
+            self.keys = [start for start, end in intervals]
         self.intervals_2 = intervals_2
         if not self.intervals_2 is None:
             self.keys_2 = [start for start, end in intervals_2]
@@ -190,10 +223,11 @@ class SeedsFilter:
         else:
             s_start = seed.start_ref - seed.size
             s_end = seed.start_ref
-        ret = self.__filter(s_start, s_end, self.keys, self.intervals)
+        ret = False
+        if not self.intervals is None:
+            ret = ret or self.__filter(s_start, s_end, self.keys, self.intervals)
         if not self.intervals_2 is None:
-            b = self.__filter(seed.start, seed.start + seed.size, self.keys_2, self.intervals_2)
-            ret = ret or b
+            ret = ret or self.__filter(seed.start, seed.start + seed.size, self.keys_2, self.intervals_2)
         return ret
 
 def render_seeds(seeds, merged_intervals=None, merged_intervals_2=None):
@@ -240,11 +274,19 @@ reference_genome = "YPS138"
 #reference_genome = "vivax"
 if __name__ == "__main__":
     param = ParameterSetManager()
-    seeds = compute_seeds(MinimizerSeeding(param), reference_genome, reference_genome)
-    intervals = seeds_to_filter_sections(seeds)
+    #seeds = compute_seeds(MinimizerSeeding(param), reference_genome, reference_genome)
+    #intervals = seeds_to_filter_sections(seeds)
+    #print("#intervals:", len(intervals))
     seeds_y = compute_seeds(MinimizerSeeding(param), query_genome, query_genome)
     intervals_y = seeds_to_filter_sections(seeds_y)
     seeds_2 = compute_seeds(MinimizerSeeding(param), query_genome, reference_genome, 2)
-    print("#intervals:", len(intervals))
-    render_seeds(seeds_2, intervals, intervals_y)
+    seed_filter = SeedsFilter(intervals_2=intervals_y)
+    print("e")
+    filtered_1 = [s for s in seeds_2 if not seed_filter.seed_filtered(s)]
+    print("f")
+    soc_filter = SoCFilter(filtered_1)
+    print("g")
+    filtered_2 = soc_filter.pop_all_larger_than()
+    print("h")
+    render_seeds(filtered_2)
     #render_seeds(run_aligner(query_genome, reference_genome))
