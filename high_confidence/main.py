@@ -4,20 +4,9 @@ import os
 from MSV import *
 
 global_prefix = "/MAdata/"
-genome_dir = global_prefix + "genome/human/GRCh38.p12/"
-data_dir = global_prefix + "sv_caller_analysis/high_confidence_calls/"
-#
-# Zeus
-#
-if True:
-    #read_data_dir = "/mnt/hdd0/giab/HG002/"
-    read_data_dir = "/mnt/hdd0/ena/PRJEB19900/SAMEA2757769/"
-
-#
-# Hera
-#
-if False:
-    read_data_dir = "/MAdata/giab/HG002/"
+#genome_dir = global_prefix + "genome/human/GRCh38.p12/"
+genome_dir = global_prefix + "genome/yeasts/YPS138-chrVII-section/"
+read_data_dir = global_prefix + "ena/" #"giab/"
 
 def load_high_confidence_calls(pack, file_name="HG002_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC-SOLIDgatkHC_CHROM1-22_v.3.3.2_highconf_triophased.vcf", individual="HG002"):
 
@@ -53,8 +42,12 @@ def regex_match(folder, regex):
 #]
 
 read_datasets = [
-    ("Illumina_2x250bps", regex_match(read_data_dir, "*.fastq.gz"), None),
+    ("Illumina", regex_match(read_data_dir + "PRJEB7245/UFRJ50816/illumina_hiseq_2500/", "*.trimmed.fastq"), None),
 ]
+
+def uFRJ50816_filter(pack):
+    chr_pos = pack.start_of_sequence("chrVII")
+    return (chr_pos + 659132, chr_pos + 862941)
 
 def load_reads(individual, param):
     seq_ids = []
@@ -64,15 +57,15 @@ def load_reads(individual, param):
     return seq_ids
 
 def compute_jumps_n_calls(individual, param, seq_ids, pack, fm_index):
-    jump_id = 1 #compute_sv_jumps(param, fm_index, pack, individual, seq_ids)
+    jump_id = 1#compute_sv_jumps(param, fm_index, pack, individual, seq_ids)
     sv_caller_run_id = sweep_sv_jumps(param, individual, jump_id, "MA", "", [0], pack)
     return sv_caller_run_id
 
 def run_ma(pack, fm_index, individual="HG002"):
     param = ParameterSetManager()
     param.by_name("Min Size Edge").set(min_sv_size)
-    param.by_name("Maximal Ambiguity SV").set(1)
-    seq_ids = [1] #load_reads(individual, param)
+    param.by_name("Maximal Ambiguity SV").set(100)
+    seq_ids = [1]# load_reads(individual, param)
     sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, fm_index)
     print("caller_id", sv_caller_run_id)
 
@@ -84,6 +77,9 @@ if __name__ == "__main__":
     fm_index = FMIndex()
     fm_index.load(genome_dir + "ma/genome")
 
-    run_ma(pack, fm_index, individual="SAMEA2757769")
+    run_ma(pack, fm_index, individual="UFRJ50816_chrVII_section")
 
-    load_high_confidence_calls(pack, individual="SAMEA2757769")
+    #load_high_confidence_calls(pack, individual="UFRJ50816")
+
+
+# java -jar ~/workspace/trimmomatic/Trimmomatic-0.39/trimmomatic-0.39.jar PE -threads 32 SRR4074411.1_1.fastq SRR4074411.1_2.fastq SRR4074411.1_1.paired.trimmed.fastq SRR4074411.1_1.unpaired.trimmed.fastq SRR4074411.1_2.paired.trimmed.fastq SRR4074411.1_2.unpaired.trimmed.fastq ILLUMINACLIP:adapters.fa:2:30:10 SLIDINGWINDOW:5:20 MINLEN:36
