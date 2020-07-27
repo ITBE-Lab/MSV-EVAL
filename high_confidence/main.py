@@ -5,7 +5,7 @@ from MSV import *
 
 global_prefix = "/MAdata/"
 #genome_dir = global_prefix + "genome/human/GRCh38.p12/"
-genome_dir = global_prefix + "genome/yeasts/YPS138-chrVII-section/"
+genome_dir = global_prefix + "genome/yeasts/YPS138/"
 read_data_dir = global_prefix + "ena/" #"giab/"
 
 def load_high_confidence_calls(pack, file_name="HG002_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC-SOLIDgatkHC_CHROM1-22_v.3.3.2_highconf_triophased.vcf", individual="HG002"):
@@ -65,7 +65,8 @@ def run_ma(pack, fm_index, individual="HG002"):
     param = ParameterSetManager()
     param.by_name("Min Size Edge").set(min_sv_size)
     param.by_name("Maximal Ambiguity SV").set(100)
-    seq_ids = [1]# load_reads(individual, param)
+    seq_ids = load_reads(individual, param)
+    return
     sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, fm_index)
     print("caller_id", sv_caller_run_id)
 
@@ -77,7 +78,7 @@ if __name__ == "__main__":
     fm_index = FMIndex()
     fm_index.load(genome_dir + "ma/genome")
 
-    run_ma(pack, fm_index, individual="UFRJ50816_chrVII_section")
+    run_ma(pack, fm_index, individual="UFRJ50816")
 
     #load_high_confidence_calls(pack, individual="UFRJ50816")
 
