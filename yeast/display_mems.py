@@ -1,5 +1,7 @@
 from bokeh.plotting import figure, show, reset_output, ColumnDataSource
+from bokeh.layouts import column, row
 from MA import *
+from MSV import *
 from sv_util.os_aligners import *
 from bisect import bisect_right
 
@@ -26,22 +28,38 @@ def load_genomes(query_genome, reference_genome):
     return pack, fm_index, mm_index, query_genome
 
 def compute_seeds(seeder, query_genome, reference_genome, ambiguity=10000, seed_filter=None):
+    param = ParameterSetManager()
+    param.by_name("Max Size Reseed").set(2000)
+
     pack, fm_index, mm_index, query_genome = load_genomes(query_genome, reference_genome)
     mm_index.set_max_occ(ambiguity)
 
     print("a")
     seeds = seeder.execute(mm_index, query_genome, pack)
     print("b")
-    mems = SeedLumping(ParameterSetManager()).execute(seeds, query_genome, pack)
+    mems = SeedLumping(param).execute(seeds, query_genome, pack)
     if not seed_filter is None:
         mems_2 = seed_filter(mems, str(query_genome))
         print("filtered from", len(mems), "down to",len(mems_2))
         mems = mems_2
-    print("c")
-    filtered_mems = MinLength(ParameterSetManager(), 20).execute(mems)
+    print("f")
+    soc_filter = SoCFilter(mems)
+    print("g")
+    filtered_2 = Seeds(soc_filter.pop_all_larger_than())
     print("d")
-    #seeds = segments.extract_seeds(fm_index, 10000, 18, len(query_genome), True)
-    return filtered_mems
+
+
+    jumps_from_seeds = SvJumpsFromSeeds(param, pack)
+    reseeding = RecursiveReseeding(param, pack)
+    helper_ret = jumps_from_seeds.cpp_module.execute_helper(filtered_2, pack, query_genome)
+    #reseeded_mems = helper_ret.seeds
+    #layer_of_seeds = helper_ret.layer_of_seeds
+    rectangles = helper_ret.rectangles
+    parlindromes = helper_ret.parlindrome
+    #fill_of_rectangles = helper_ret.rectangles_fill
+    #seed_sample_sizes = helper_ret.rectangle_ambiguity
+    #rectangle_used_dp = helper_ret.rectangle_used_dp
+    return reseeding.execute(filtered_2, pack, query_genome), rectangles
 
 def seeds_to_filter_sections(seeds, add_size=50, min_nt=25):
     intervals = []
@@ -126,7 +144,7 @@ def filter_by_k_mer_set(seeds, query):
             ret.append(seed)
     return libMA.containers.Seeds(ret)
 
-def run_aligner(query_genome_str, reference_genome):
+def run_aligner(query_genome_str, reference_genome, seed_filter=None):
     pack, fm_index, mm_index, query_genome = load_genomes(query_genome_str, reference_genome)
 
     with open("sequenced.fasta", "w") as out_file:
@@ -152,6 +170,12 @@ def run_aligner(query_genome_str, reference_genome):
         seeds = alignment.to_seeds(pack)
         for seed in seeds:
             seeds_list.append(seed)
+
+    if not seed_filter is None:
+        seeds_list_2 = seed_filter(seeds_list, str(query_genome))
+        print("filtered from", len(seeds_list), "down to", len(seeds_list_2))
+        seeds_list = seeds_list_2
+
     return seeds_list
 
 class SoCFilter:
@@ -294,7 +318,53 @@ def render_seeds(seeds, merged_intervals=None, merged_intervals_2=None):
             plot.line(x="xs", y="ys", color=cs[filtered][forw], line_width=4, line_cap="round", source=ColumnDataSource(data={
                     "xs":xs[filtered][forw], "ys":ys[filtered][forw]
                 }))
-    show(plot)
+    return plot
+
+def render_seeds_2(seeds_1, seeds_2, rects_1):
+    plot = figure(title="seeds", plot_width=1000, plot_height=1000)
+
+    xs = []
+    xe = []
+    ys = []
+    ye = []
+    for rect in rects:
+        xs.append(rect.x_axis.start)
+        ys.append(rect.y_axis.start)
+        xe.append(rect.x_axis.start + rect.x_axis.size)
+        ye.append(rect.y_axis.start + rect.y_axis.size)
+    plot.quad(left="xs", bottom="ys", right="xe", top="ye", fill_color="black",
+                    fill_alpha=0.2, line_width=0,
+                    source=ColumnDataSource({"xs":xs, "xe":xe, "ys":ys, "ye":ye}))
+
+    xs = {True:{True:[], False:[]}, False:{True:[], False:[]}}
+    ys = {True:{True:[], False:[]}, False:{True:[], False:[]}}
+    cs = {True:{True:"purple", False:"green"}, False:{True:"blue", False:"orange"}}
+    lw = {True:8, False: 4}
+    for seed in seeds_1:
+        filtered = False
+        xs[filtered][seed.on_forward_strand].append(seed.start_ref)
+        xs[filtered][seed.on_forward_strand].append(seed.start_ref + seed.size * (1 if seed.on_forward_strand else -1))
+        ys[filtered][seed.on_forward_strand].append(seed.start)
+        ys[filtered][seed.on_forward_strand].append(seed.start + seed.size)
+        xs[filtered][seed.on_forward_strand].append(float("NaN"))
+        ys[filtered][seed.on_forward_strand].append(float("NaN"))
+    for seed in seeds_2:
+        filtered = True
+        xs[filtered][seed.on_forward_strand].append(seed.start_ref)
+        xs[filtered][seed.on_forward_strand].append(seed.start_ref + seed.size * (1 if seed.on_forward_strand else -1))
+        ys[filtered][seed.on_forward_strand].append(seed.start)
+        ys[filtered][seed.on_forward_strand].append(seed.start + seed.size)
+        xs[filtered][seed.on_forward_strand].append(float("NaN"))
+        ys[filtered][seed.on_forward_strand].append(float("NaN"))
+    for filtered in [True, False]:
+        for forw in [True, False]:
+            plot.line(x="xs", y="ys", color=cs[filtered][forw], line_width=lw[filtered], line_cap="round", source=ColumnDataSource(data={
+                    "xs":xs[filtered][forw], "ys":ys[filtered][forw]
+                }))
+
+    plot.left[0].formatter.use_scientific = False
+    plot.below[0].formatter.use_scientific = False
+    return plot
 
 #query_genome = "knowlesiStrain"
 #query_genome = "UFRJ50816-chrVII-section"
@@ -312,14 +382,16 @@ if __name__ == "__main__":
 
     #seeds_y = compute_seeds(MinimizerSeeding(param), query_genome, query_genome)
     #intervals_y = seeds_to_filter_sections(seeds_y)
-    seeds_2 = compute_seeds(MinimizerSeeding(param), query_genome, reference_genome, 2, filter_by_k_mer_set)
+    seeds, rects = compute_seeds(MinimizerSeeding(param), query_genome, reference_genome, 2, filter_by_k_mer_set)
     #seed_filter = SeedsFilter(intervals_2=intervals_y)
     #print("e")
     #filtered_1 = [s for s in seeds_2 if not seed_filter.seed_filtered(s)]
-    print("f")
-    soc_filter = SoCFilter(seeds_2)
-    print("g")
-    filtered_2 = soc_filter.pop_all_larger_than()
+
     print("h")
-    render_seeds(filtered_2)
-    #render_seeds(run_aligner(query_genome, reference_genome))
+    aligner_seeds = run_aligner(query_genome, reference_genome)
+    print("i")
+    out = []
+    #out.append(render_seeds(filtered_2))
+    #out.append(render_seeds(aligner_seeds))
+    out.append(render_seeds_2(seeds, aligner_seeds, rects))
+    show(row(out))
