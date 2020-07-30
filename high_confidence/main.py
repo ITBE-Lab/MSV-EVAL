@@ -42,7 +42,8 @@ def regex_match(folder, regex):
 #]
 
 read_datasets = [
-    ("Illumina", regex_match(read_data_dir + "PRJEB7245/UFRJ50816/illumina_hiseq_2500/", "*.trimmed.fastq"), None),
+    #("Illumina", regex_match(read_data_dir + "PRJEB7245/UFRJ50816/illumina_hiseq_2500/", "*.trimmed.fastq"), None),
+    ("PacBio", regex_match(read_data_dir + "PRJEB7245/UFRJ50816/pacBioSMRT/", "*.fasta"), None),
 ]
 
 def uFRJ50816_filter(pack):
@@ -57,16 +58,15 @@ def load_reads(individual, param):
     return seq_ids
 
 def compute_jumps_n_calls(individual, param, seq_ids, pack, fm_index):
-    jump_id = 1#compute_sv_jumps(param, fm_index, pack, individual, seq_ids)
+    jump_id = 10 #compute_sv_jumps(param, fm_index, pack, individual, seq_ids)
     sv_caller_run_id = sweep_sv_jumps(param, individual, jump_id, "MA", "", [0], pack)
     return sv_caller_run_id
 
 def run_ma(pack, fm_index, individual="HG002"):
     param = ParameterSetManager()
     param.by_name("Min Size Edge").set(min_sv_size)
-    param.by_name("Maximal Ambiguity SV").set(100)
-    seq_ids = load_reads(individual, param)
-    return
+    param.by_name("Maximal Ambiguity SV").set(1)
+    seq_ids = [2] #load_reads(individual, param)
     sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, fm_index)
     print("caller_id", sv_caller_run_id)
 

@@ -320,8 +320,35 @@ def render_seeds(seeds, merged_intervals=None, merged_intervals_2=None):
                 }))
     return plot
 
-def render_seeds_2(seeds_1, seeds_2, rects_1):
+def render_seeds_2(seeds_1, seeds_2, rects_1, query_genome, reference_genome):
     plot = figure(title="seeds", plot_width=1000, plot_height=1000)
+
+
+    pack_1 = Pack()
+    pack_1.load(genome_dir + query_genome + "/ma/genome")
+    pack_2 = Pack()
+    pack_2.load(genome_dir + reference_genome + "/ma/genome")
+
+    xs = []
+    ys = []
+    for idx in pack_2.contigStarts():
+        xs.append(idx)
+        ys.append(0)
+        xs.append(idx)
+        ys.append(pack_1.unpacked_size_single_strand)
+        xs.append(float("NaN"))
+        ys.append(float("NaN"))
+    plot.line(x=xs, y=ys, color="black", line_width=2)
+    ys = []
+    xs = []
+    for idx in pack_1.contigStarts():
+        xs.append(0)
+        ys.append(idx)
+        xs.append(pack_2.unpacked_size_single_strand)
+        ys.append(idx)
+        xs.append(float("NaN"))
+        ys.append(float("NaN"))
+    plot.line(x=xs, y=ys, color="black", line_width=2)
 
     xs = []
     xe = []
@@ -393,5 +420,5 @@ if __name__ == "__main__":
     out = []
     #out.append(render_seeds(filtered_2))
     #out.append(render_seeds(aligner_seeds))
-    out.append(render_seeds_2(seeds, aligner_seeds, rects))
+    out.append(render_seeds_2(seeds, aligner_seeds, rects, query_genome, reference_genome))
     show(row(out))
