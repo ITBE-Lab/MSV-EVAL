@@ -1,5 +1,6 @@
 from bokeh.plotting import figure, show, reset_output, ColumnDataSource
 from bokeh.layouts import column, row
+from bokeh.models import FuncTickFormatter
 from MA import *
 from MSV import *
 from sv_util.os_aligners import *
@@ -320,6 +321,12 @@ def render_seeds(seeds, merged_intervals=None, merged_intervals_2=None):
                 }))
     return plot
 
+def seeds_to_jumps(seeds, query_genome, reference_genome):
+    
+    param = ParameterSetManager()
+    pack, fm_index, mm_index, query_genome = load_genomes(query_genome, reference_genome)
+    jumps_from_seeds = SvJumpsFromExtractedSeeds(parameter_set_manager, pack)
+
 def render_seeds_2(seeds_1, seeds_2, rects_1, query_genome, reference_genome):
     plot = figure(title="seeds", plot_width=1000, plot_height=1000)
 
@@ -389,8 +396,26 @@ def render_seeds_2(seeds_1, seeds_2, rects_1, query_genome, reference_genome):
                     "xs":xs[filtered][forw], "ys":ys[filtered][forw]
                 }))
 
-    plot.left[0].formatter.use_scientific = False
-    plot.below[0].formatter.use_scientific = False
+    ticker_code = """
+            if(tick < 0 || tick >= genome_end)
+                return "n/a";
+            idx = 0;
+            while(contig_starts[idx + 1] < tick)
+                idx += 1;
+            return contig_names[idx] + ": " + (tick - contig_starts[idx]);
+        """
+    plot.xaxis[0].formatter = FuncTickFormatter(
+                    args={"contig_starts": [*pack_2.contigStarts(), pack_2.unpacked_size_single_strand],
+                            "genome_end":pack_2.unpacked_size_single_strand,
+                            "contig_names": [*pack_2.contigNames()]},
+                    code=ticker_code)
+                    
+    plot.xaxis.major_label_orientation = math.pi/4
+    plot.yaxis[0].formatter = FuncTickFormatter(
+                    args={"contig_starts": [*pack_1.contigStarts(), pack_1.unpacked_size_single_strand],
+                            "genome_end":pack_1.unpacked_size_single_strand,
+                            "contig_names": [*pack_1.contigNames()]},
+                    code=ticker_code)
     return plot
 
 #query_genome = "knowlesiStrain"
