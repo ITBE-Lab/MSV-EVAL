@@ -66,7 +66,7 @@ def run_ma(pack, fm_index, individual="HG002"):
     param = ParameterSetManager()
     param.by_name("Min Size Edge").set(min_sv_size)
     param.by_name("Maximal Ambiguity SV").set(1)
-    seq_ids = [1]# load_reads(individual, param)
+    seq_ids = load_reads(individual, param)
     sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, fm_index)
     print("caller_id", sv_caller_run_id)
 

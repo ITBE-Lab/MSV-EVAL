@@ -7,60 +7,65 @@ from sv_util.os_aligners import *
 from bisect import bisect_right
 
 global_prefix = "/MAdata/"
-genome_dir = global_prefix + "genome/yeasts/"
 
 def load_genomes(query_genome, reference_genome):
     pack = Pack()
-    pack.load(genome_dir + reference_genome + "/ma/genome")
+    pack.load(reference_genome + "/ma/genome")
     fm_index = FMIndex()
-    fm_index.load(genome_dir + reference_genome + "/ma/genome")
+    #fm_index.load(reference_genome + "/ma/genome") # not used at the moment
     mm_index = MinimizerIndex(ParameterSetManager(), libMA.util.StringVector([str(pack.extract_forward_strand())]), libMA.util.StringVector(["chrVII"]))
     file_reader = FileReader(ParameterSetManager())
-    f_stream = FileStreamFromPath(genome_dir + query_genome + "/fasta/genome.fna")
-    query_genome = NucSeq()
-    while not f_stream.eof():
-        query_genome.append(str(file_reader.execute(f_stream)))
-    query_genome.name = "sequence0"
+    ret_query_genome = []
+    if False: # load query genome from fasta
+        f_stream = FileStreamFromPath(query_genome + "/fasta/genome.fna")
+        idx = 0
+        y_start = 0
+        while not f_stream.eof():
+            ret_query_genome.append((y_start, file_reader.execute(f_stream)))
+            y_start += len(ret_query_genome[-1][1])
+            ret_query_genome[-1][1].name = "sequence" + str(idx)
+            idx += 1
+    else: # load query genome from pack
+        query_pack = Pack()
+        query_pack.load(query_genome + "/ma/genome")
+        ret_query_genome = list(zip(query_pack.contigStarts(), query_pack.contigNucSeqs()))
 
 
     #print("seq", pack.extract_from_to(185526, 187197))
     #exit()
 
-    return pack, fm_index, mm_index, query_genome
+    return pack, fm_index, mm_index, ret_query_genome
 
 def compute_seeds(seeder, query_genome, reference_genome, ambiguity=10000, seed_filter=None):
     param = ParameterSetManager()
     param.by_name("Max Size Reseed").set(2000)
 
-    pack, fm_index, mm_index, query_genome = load_genomes(query_genome, reference_genome)
+    pack, fm_index, mm_index, query_genomes = load_genomes(query_genome, reference_genome)
     mm_index.set_max_occ(ambiguity)
 
-    print("a")
-    seeds = seeder.execute(mm_index, query_genome, pack)
-    print("b")
-    mems = SeedLumping(param).execute(seeds, query_genome, pack)
-    if not seed_filter is None:
-        mems_2 = seed_filter(mems, str(query_genome))
-        print("filtered from", len(mems), "down to",len(mems_2))
-        mems = mems_2
-    print("f")
-    soc_filter = SoCFilter(mems)
-    print("g")
-    filtered_2 = Seeds(soc_filter.pop_all_larger_than())
-    print("d")
+    ret = []
+    for y_start, query_genome in query_genomes:
+        seeds = seeder.execute(mm_index, query_genome, pack)
+        mems = SeedLumping(param).execute(seeds, query_genome, pack)
+        if not seed_filter is None:
+            mems_2 = seed_filter(mems, str(query_genome))
+            print("filtered from", len(mems), "down to",len(mems_2))
+            mems = mems_2
+        soc_filter = SoCFilter(mems)
+        filtered_2 = Seeds(soc_filter.pop_all_larger_than())
 
-
-    jumps_from_seeds = SvJumpsFromSeeds(param, pack)
-    reseeding = RecursiveReseeding(param, pack)
-    helper_ret = jumps_from_seeds.cpp_module.execute_helper(filtered_2, pack, query_genome)
-    #reseeded_mems = helper_ret.seeds
-    #layer_of_seeds = helper_ret.layer_of_seeds
-    rectangles = helper_ret.rectangles
-    parlindromes = helper_ret.parlindrome
-    #fill_of_rectangles = helper_ret.rectangles_fill
-    #seed_sample_sizes = helper_ret.rectangle_ambiguity
-    #rectangle_used_dp = helper_ret.rectangle_used_dp
-    return reseeding.execute(filtered_2, pack, query_genome), rectangles
+        jumps_from_seeds = SvJumpsFromSeeds(param, pack)
+        reseeding = RecursiveReseeding(param, pack)
+        helper_ret = jumps_from_seeds.cpp_module.execute_helper(filtered_2, pack, query_genome)
+        #reseeded_mems = helper_ret.seeds
+        #layer_of_seeds = helper_ret.layer_of_seeds
+        rectangles = helper_ret.rectangles
+        parlindromes = helper_ret.parlindrome
+        #fill_of_rectangles = helper_ret.rectangles_fill
+        #seed_sample_sizes = helper_ret.rectangle_ambiguity
+        #rectangle_used_dp = helper_ret.rectangle_used_dp
+        ret.append((y_start, reseeding.execute(filtered_2, pack, query_genome), rectangles))
+    return ret
 
 def seeds_to_filter_sections(seeds, add_size=50, min_nt=25):
     intervals = []
@@ -123,12 +128,12 @@ def load_filter_set(file_name="tmp_k_mers.txt", t=300):
             seq, cnt = line.split("\t")
             if int(cnt) > t:
                 s.add(seq)
+    print("query filter k-mers:", len(s))
     return s
 
+k_mers_filter = load_filter_set()
 def filter_by_k_mer_set(seeds, query):
     #k_mers = filter_k_mer_set(query)
-    k_mers = load_filter_set()
-    print("query filter k-mers:", len(k_mers))
     ret = []
     for seed in seeds:
         q_str = query[seed.start:seed.start + seed.size]
@@ -138,46 +143,44 @@ def filter_by_k_mer_set(seeds, query):
         #print("q", q_str)
         for k_mer in str_to_k_mer(q_str):
             #print(k_mer)
-            if k_mer in k_mers:
+            if k_mer in k_mers_filter:
                 f = True
                 break
         if not f:
             ret.append(seed)
-    return libMA.containers.Seeds(ret)
+    return Seeds(ret)
 
-def run_aligner(query_genome_str, reference_genome, seed_filter=None):
-    pack, fm_index, mm_index, query_genome = load_genomes(query_genome_str, reference_genome)
-
-    with open("sequenced.fasta", "w") as out_file:
-        out_file.write(">sequence0\n")
-        out_file.write(str(query_genome))
-        out_file.write("\n")
-
+def run_aligner(query_genome_str, reference_genome):
+    pack, fm_index, mm_index, query_genomes = load_genomes(query_genome_str, reference_genome)
 
     read_set = {"technology":"pb", "name":"test", "fasta_file":"sequenced.fasta"}
-    json_dict = {"reference_path":genome_dir + reference_genome}
+    json_dict = {"reference_path":reference_genome}
     sam_file_path = "mm2.sam"
-    mm2(read_set, sam_file_path, json_dict)
-    #ngmlr(read_set, sam_file_path, json_dict)
-    read = ReadByName()
-    query_genome.name = "sequence0"
-    read.append(query_genome)
+    ret = []
+    for y_start, query_genome in query_genomes:
+        with open("sequenced.fasta", "w") as out_file:
+            out_file.write(">sequence0\n")
+            out_file.write(str(query_genome))
+            out_file.write("\n")
 
-    f_stream = FileStreamFromPath("mm2.sam")
-    file_reader = SamFileReader(ParameterSetManager())
-    seeds_list = []
-    while not f_stream.eof():
-        alignment = file_reader.execute(f_stream, pack, read)
-        seeds = alignment.to_seeds(pack)
-        for seed in seeds:
-            seeds_list.append(seed)
+        mm2(read_set, sam_file_path, json_dict)
+        #ngmlr(read_set, sam_file_path, json_dict)
+        read = ReadByName()
+        query_genome.name = "sequence0"
+        read.append(query_genome)
 
-    if not seed_filter is None:
-        seeds_list_2 = seed_filter(seeds_list, str(query_genome))
-        print("filtered from", len(seeds_list), "down to", len(seeds_list_2))
-        seeds_list = seeds_list_2
+        f_stream = FileStreamFromPath("mm2.sam")
+        file_reader = SamFileReader(ParameterSetManager())
+        seeds_list = []
+        while not f_stream.eof():
+            alignment = file_reader.execute(f_stream, pack, read)
+            seeds = alignment.to_seeds(pack)
+            for seed in seeds:
+                seeds_list.append(seed)
 
-    return seeds_list
+        ret.append((y_start, seeds_list))
+
+    return ret
 
 class SoCFilter:
     def __init__(self, seeds):
@@ -321,80 +324,49 @@ def render_seeds(seeds, merged_intervals=None, merged_intervals_2=None):
                 }))
     return plot
 
-def seeds_to_jumps(seeds, query_genome, reference_genome):
-    
+def seeds_to_jumps(seeds_n_rects, query_genome, reference_genome):
     param = ParameterSetManager()
-    pack, fm_index, mm_index, query_genome = load_genomes(query_genome, reference_genome)
-    jumps_from_seeds = SvJumpsFromExtractedSeeds(parameter_set_manager, pack)
+    pack, fm_index, mm_index, query_genomes = load_genomes(query_genome, reference_genome)
+    jumps_from_seeds = SvJumpsFromExtractedSeeds(param, pack)
+    filter_by_ambiguity = FilterJumpsByRefAmbiguity(param)
 
-def render_seeds_2(seeds_1, seeds_2, rects_1, query_genome, reference_genome):
-    plot = figure(title="seeds", plot_width=1000, plot_height=1000)
+    ret = []
+    for (_, seeds, _), (_, query_genome) in zip(seeds_n_rects, query_genomes):
+        jumps = jumps_from_seeds.execute(libMA.containers.Seeds(seeds), pack, query_genome)
+        filtered_jumps = filter_by_ambiguity.execute(jumps, pack)
+        ret.append(filtered_jumps)
+    return ret
 
-
+def decorate_plot(plot, query_genome, reference_genome, diagonal=False):
     pack_1 = Pack()
-    pack_1.load(genome_dir + query_genome + "/ma/genome")
+    pack_1.load(query_genome + "/ma/genome")
     pack_2 = Pack()
-    pack_2.load(genome_dir + reference_genome + "/ma/genome")
+    pack_2.load(reference_genome + "/ma/genome")
 
     xs = []
     ys = []
-    for idx in pack_2.contigStarts():
+    for idx in [*pack_2.contigStarts(), pack_2.unpacked_size_single_strand]:
         xs.append(idx)
         ys.append(0)
         xs.append(idx)
         ys.append(pack_1.unpacked_size_single_strand)
         xs.append(float("NaN"))
         ys.append(float("NaN"))
-    plot.line(x=xs, y=ys, color="black", line_width=2)
+    plot.line(x=xs, y=ys, color="black", line_width=1)
     ys = []
     xs = []
-    for idx in pack_1.contigStarts():
+    for idx in [*pack_1.contigStarts(), pack_1.unpacked_size_single_strand]:
         xs.append(0)
         ys.append(idx)
         xs.append(pack_2.unpacked_size_single_strand)
         ys.append(idx)
         xs.append(float("NaN"))
         ys.append(float("NaN"))
-    plot.line(x=xs, y=ys, color="black", line_width=2)
+    plot.line(x=xs, y=ys, color="black", line_width=1)
 
-    xs = []
-    xe = []
-    ys = []
-    ye = []
-    for rect in rects:
-        xs.append(rect.x_axis.start)
-        ys.append(rect.y_axis.start)
-        xe.append(rect.x_axis.start + rect.x_axis.size)
-        ye.append(rect.y_axis.start + rect.y_axis.size)
-    plot.quad(left="xs", bottom="ys", right="xe", top="ye", fill_color="black",
-                    fill_alpha=0.2, line_width=0,
-                    source=ColumnDataSource({"xs":xs, "xe":xe, "ys":ys, "ye":ye}))
-
-    xs = {True:{True:[], False:[]}, False:{True:[], False:[]}}
-    ys = {True:{True:[], False:[]}, False:{True:[], False:[]}}
-    cs = {True:{True:"purple", False:"green"}, False:{True:"blue", False:"orange"}}
-    lw = {True:8, False: 4}
-    for seed in seeds_1:
-        filtered = False
-        xs[filtered][seed.on_forward_strand].append(seed.start_ref)
-        xs[filtered][seed.on_forward_strand].append(seed.start_ref + seed.size * (1 if seed.on_forward_strand else -1))
-        ys[filtered][seed.on_forward_strand].append(seed.start)
-        ys[filtered][seed.on_forward_strand].append(seed.start + seed.size)
-        xs[filtered][seed.on_forward_strand].append(float("NaN"))
-        ys[filtered][seed.on_forward_strand].append(float("NaN"))
-    for seed in seeds_2:
-        filtered = True
-        xs[filtered][seed.on_forward_strand].append(seed.start_ref)
-        xs[filtered][seed.on_forward_strand].append(seed.start_ref + seed.size * (1 if seed.on_forward_strand else -1))
-        ys[filtered][seed.on_forward_strand].append(seed.start)
-        ys[filtered][seed.on_forward_strand].append(seed.start + seed.size)
-        xs[filtered][seed.on_forward_strand].append(float("NaN"))
-        ys[filtered][seed.on_forward_strand].append(float("NaN"))
-    for filtered in [True, False]:
-        for forw in [True, False]:
-            plot.line(x="xs", y="ys", color=cs[filtered][forw], line_width=lw[filtered], line_cap="round", source=ColumnDataSource(data={
-                    "xs":xs[filtered][forw], "ys":ys[filtered][forw]
-                }))
+    if diagonal:
+        plot.line(x=[0, pack_2.unpacked_size_single_strand], y=[0, pack_1.unpacked_size_single_strand],
+                  color="black", line_width=1)
 
     ticker_code = """
             if(tick < 0 || tick >= genome_end)
@@ -416,34 +388,132 @@ def render_seeds_2(seeds_1, seeds_2, rects_1, query_genome, reference_genome):
                             "genome_end":pack_1.unpacked_size_single_strand,
                             "contig_names": [*pack_1.contigNames()]},
                     code=ticker_code)
+
+def render_jumps(jumps, query_genome, reference_genome):
+    xs = []
+    ys = []
+    cs = []
+    colors = {True:{True:"blue", False:"green"}, False:{True:"purple", False:"orange"}}
+    for jumps_ in jumps:
+        for jump in jumps_:
+            f = jump.from_pos
+            t = jump.to_pos
+            if not jump.from_known():
+                f = t
+                t += 1
+            if not jump.to_known():
+                t = f
+                f -= 1
+            xs.append(f)
+            ys.append(t)
+            cs.append(colors[jump.from_forward][jump.to_forward])
+    plot = figure(title="entries", plot_width=1000, plot_height=1000)
+    decorate_plot(plot, reference_genome, reference_genome, True)
+    plot.x(x=xs, y=ys, color=cs, line_width=4)
     return plot
+
+def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome):
+    db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
+
+    JumpRunTable(db_conn)
+    SvCallerRunTable(db_conn)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "Ground Truth",
+                                   "SV's form genome assembly", -1)
+    pool = PoolContainer(1, db_name)
+    sv_inserter = get_inserter.execute(pool)
+    
+    pack, fm_index, mm_index, query_genomes = load_genomes(query_genome_str, reference_genome)
+
+    for jumps_, (_, query_genome) in zip(jumps, query_genomes):
+        for jump in jumps_:
+            f = jump.from_pos
+            t = jump.to_pos
+            if not jump.from_known():
+                f = t
+                t += 1
+            if not jump.to_known():
+                t = f
+                f -= 1
+            call = SvCall(f, t, 0, 0, jump.from_forward, jump.to_forward, 1000)
+            if jump.query_from < jump.query_to:
+                call.inserted_sequence = NucSeq(query_genome, jump.query_from, jump.query_to)
+            sv_inserter.insert(call)
+
+    sv_inserter.close(pool)
+
+    return get_inserter.cpp_module.id, None
+
+def render_seeds_2(seeds_1, seeds_2, query_genome, reference_genome):
+    plot = figure(title="seeds", plot_width=1000, plot_height=1000)
+
+    decorate_plot(plot, query_genome, reference_genome)
+
+    xs = []
+    xe = []
+    ys = []
+    ye = []
+    for y_start, _, rects in seeds_1:
+        for rect in rects:
+            xs.append(rect.x_axis.start)
+            ys.append(rect.y_axis.start + y_start)
+            xe.append(rect.x_axis.start + rect.x_axis.size)
+            ye.append(rect.y_axis.start + rect.y_axis.size + y_start)
+    plot.quad(left="xs", bottom="ys", right="xe", top="ye", fill_color="black",
+                    fill_alpha=0.2, line_width=0,
+                    source=ColumnDataSource({"xs":xs, "xe":xe, "ys":ys, "ye":ye}))
+
+    xs = {True:{True:[], False:[]}, False:{True:[], False:[]}}
+    ys = {True:{True:[], False:[]}, False:{True:[], False:[]}}
+    cs = {True:{True:"purple", False:"green"}, False:{True:"blue", False:"orange"}}
+    lw = {True:8, False: 4}
+    for y_start, seeds, _ in seeds_1:
+        for seed in seeds:
+            filtered = False
+            xs[filtered][seed.on_forward_strand].append(seed.start_ref)
+            xs[filtered][seed.on_forward_strand].append(seed.start_ref + seed.size * (1 if seed.on_forward_strand else -1))
+            ys[filtered][seed.on_forward_strand].append(seed.start + y_start)
+            ys[filtered][seed.on_forward_strand].append(seed.start + seed.size + y_start)
+            xs[filtered][seed.on_forward_strand].append(float("NaN"))
+            ys[filtered][seed.on_forward_strand].append(float("NaN"))
+    if not seeds_2 is None:
+        for y_start, seeds, _ in seeds_2:
+            for seed in seeds:
+                filtered = True
+                xs[filtered][seed.on_forward_strand].append(seed.start_ref)
+                xs[filtered][seed.on_forward_strand].append(seed.start_ref + seed.size * (1 if seed.on_forward_strand else -1))
+                ys[filtered][seed.on_forward_strand].append(seed.start + y_start)
+                ys[filtered][seed.on_forward_strand].append(seed.start + seed.size + y_start)
+                xs[filtered][seed.on_forward_strand].append(float("NaN"))
+                ys[filtered][seed.on_forward_strand].append(float("NaN"))
+    for filtered in [True, False]:
+        for forw in [True, False]:
+            plot.line(x="xs", y="ys", color=cs[filtered][forw], line_width=lw[filtered], line_cap="round", source=ColumnDataSource(data={
+                    "xs":xs[filtered][forw], "ys":ys[filtered][forw]
+                }))
+
+    return plot
+
+genome_dir = global_prefix + "genome/yeasts/"
 
 #query_genome = "knowlesiStrain"
 #query_genome = "UFRJ50816-chrVII-section"
-query_genome = "UFRJ50816"
+query_genome = genome_dir + "UFRJ50816"
 #query_genome = "YPS138-chrVII-section"
 #reference_genome = "YPS138-chrVII-section"
-reference_genome = "YPS138"
+reference_genome = genome_dir + "YPS138"
 #reference_genome = "vivax"
+
 if __name__ == "__main__":
-
-    #search_in_filter()
-    #exit()
-
     param = ParameterSetManager()
 
-    #seeds_y = compute_seeds(MinimizerSeeding(param), query_genome, query_genome)
-    #intervals_y = seeds_to_filter_sections(seeds_y)
-    seeds, rects = compute_seeds(MinimizerSeeding(param), query_genome, reference_genome, 2, filter_by_k_mer_set)
-    #seed_filter = SeedsFilter(intervals_2=intervals_y)
-    #print("e")
-    #filtered_1 = [s for s in seeds_2 if not seed_filter.seed_filtered(s)]
+    seeds_n_rects = compute_seeds(MinimizerSeeding(param), query_genome, reference_genome, 2, filter_by_k_mer_set)
+    jumps = seeds_to_jumps(seeds_n_rects, query_genome, reference_genome)
+    #jumps_to_calls_to_db(jumps, "UFRJ50816_test_reconstruct", query_genome, reference_genome)
 
-    print("h")
     aligner_seeds = run_aligner(query_genome, reference_genome)
-    print("i")
+    aligner_seeds = [(x,y,[]) for x,y in aligner_seeds]
+
     out = []
-    #out.append(render_seeds(filtered_2))
-    #out.append(render_seeds(aligner_seeds))
-    out.append(render_seeds_2(seeds, aligner_seeds, rects, query_genome, reference_genome))
+    out.append(render_seeds_2(seeds_n_rects, aligner_seeds, query_genome, reference_genome))
+    out.append(render_jumps(jumps, query_genome, reference_genome))
     show(row(out))
