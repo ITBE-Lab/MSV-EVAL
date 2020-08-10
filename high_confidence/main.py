@@ -57,17 +57,19 @@ def load_reads(individual, param):
                                                     f_path_vec_2))
     return seq_ids
 
-def compute_jumps_n_calls(individual, param, seq_ids, pack, fm_index):
-    jump_id = compute_sv_jumps(param, fm_index, pack, individual, seq_ids)
+def compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index):
+    jump_id = compute_sv_jumps(param, mm_index, pack, individual, seq_ids)
     sv_caller_run_id = sweep_sv_jumps(param, individual, jump_id, "MA", "", [0], pack)
     return sv_caller_run_id
 
-def run_ma(pack, fm_index, individual="HG002"):
+def run_ma(pack, individual="HG002"):
     param = ParameterSetManager()
     param.by_name("Min Size Edge").set(min_sv_size)
     param.by_name("Maximal Ambiguity SV").set(1)
-    seq_ids = load_reads(individual, param)
-    sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, fm_index)
+    param.by_name("Max Size Reseed").set(2000)
+    mm_index = MinimizerIndex(param, pack.contigSeqs(), pack.contigNames())
+    seq_ids = 1#load_reads(individual, param)
+    sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index)
     print("caller_id", sv_caller_run_id)
 
 
@@ -75,10 +77,8 @@ if __name__ == "__main__":
     pack = Pack()
     pack.load(genome_dir + "ma/genome")
 
-    fm_index = FMIndex()
-    fm_index.load(genome_dir + "ma/genome")
 
-    run_ma(pack, fm_index, individual="UFRJ50816")
+    run_ma(pack, individual="UFRJ50816")
 
     #load_high_confidence_calls(pack, individual="UFRJ50816")
 
