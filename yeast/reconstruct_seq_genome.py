@@ -34,7 +34,7 @@ if __name__ == "__main__":
         ("chrIX", False),
         ("chrXVI", True),
     ]
-    seeds_list = call_table.calls_to_seeds(pack, run_id, True, 10000, extract_contigs_from)
+    seeds_list = call_table.calls_to_seeds_by_id(pack, run_id, True, 0, extract_contigs_from)
 
     reconstructed_query_genome = call_table.reconstruct_sequenced_genome_from_seeds(seeds_list, pack)
     reconstructed_query_genome.store(reconstructed_query_genome_path + "/ma/genome")

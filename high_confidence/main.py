@@ -68,7 +68,7 @@ def run_ma(pack, individual="HG002"):
     param.by_name("Maximal Ambiguity SV").set(1)
     param.by_name("Max Size Reseed").set(2000)
     mm_index = MinimizerIndex(param, pack.contigSeqs(), pack.contigNames())
-    seq_ids = 1#load_reads(individual, param)
+    seq_ids = load_reads(individual, param)
     sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index)
     print("caller_id", sv_caller_run_id)
 
