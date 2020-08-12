@@ -1,6 +1,7 @@
 from bokeh.plotting import figure, show, reset_output, ColumnDataSource
 from bokeh.layouts import column, row
 from bokeh.models import FuncTickFormatter
+from bokeh.models.tools import HoverTool
 from MA import *
 from MSV import *
 from sv_util.os_aligners import *
@@ -393,9 +394,15 @@ def render_jumps(jumps, query_genome, reference_genome):
     xs = []
     ys = []
     cs = []
+    ms = []
+    ids = []
+    idx = 0
     colors = {True:{True:"blue", False:"green"}, False:{True:"purple", False:"orange"}}
     for jumps_ in jumps:
         for jump in jumps_:
+            #if idx != 8281:
+            #    idx+=1
+            #    continue
             f = jump.from_pos
             t = jump.to_pos
             if not jump.from_known():
@@ -406,10 +413,16 @@ def render_jumps(jumps, query_genome, reference_genome):
                 f -= 1
             xs.append(f)
             ys.append(t)
+            ms.append(jump.was_mirrored)
             cs.append(colors[jump.from_forward][jump.to_forward])
+            ids.append(idx)
+            idx+=1
     plot = figure(title="entries", plot_width=1000, plot_height=1000)
     decorate_plot(plot, reference_genome, reference_genome, True)
-    plot.x(x=xs, y=ys, color=cs, line_width=4)
+    plot.x(x="xs", y="ys", color="cs", line_width=4, source=ColumnDataSource(data={
+                    "xs":xs, "ys":ys, "cs":cs, "ms":ms, "ids": ids
+                }))
+    plot.add_tools(HoverTool(tooltips=[("x, y", "@xs, @ys"),("id", "@ids"),("color, mirrored", "@cs, @ms")]))
     return plot
 
 def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome):
@@ -424,19 +437,23 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome):
     
     pack, fm_index, mm_index, query_genomes = load_genomes(query_genome_str, reference_genome)
 
+    idx = 0
     for jumps_, (_, query_genome) in zip(jumps, query_genomes):
+        query_genome.check()
         for jump in jumps_:
             f = jump.from_pos
             t = jump.to_pos
             if not jump.from_known():
-                f = t
-                t += 1
+                continue
             if not jump.to_known():
-                t = f
-                f -= 1
+                continue
             call = SvCall(f, t, 0, 0, jump.from_forward, jump.to_forward, 1000)
             if jump.query_from < jump.query_to:
                 call.inserted_sequence = NucSeq(query_genome, jump.query_from, jump.query_to)
+                call.inserted_sequence.check()
+            call.order_id = idx
+            idx += 1
+            call.mirrored = jump.was_mirrored
             sv_inserter.insert(call)
 
     sv_inserter.close(pool)
@@ -498,9 +515,11 @@ genome_dir = global_prefix + "genome/yeasts/"
 #query_genome = "knowlesiStrain"
 #query_genome = "UFRJ50816-chrVII-section"
 query_genome = genome_dir + "UFRJ50816"
+#query_genome = genome_dir + "UWOPS919171"
 #query_genome = "YPS138-chrVII-section"
 #reference_genome = "YPS138-chrVII-section"
 reference_genome = genome_dir + "YPS138"
+#reference_genome = genome_dir + "SK1"
 #reference_genome = "vivax"
 
 if __name__ == "__main__":
@@ -508,11 +527,12 @@ if __name__ == "__main__":
 
     seeds_n_rects = compute_seeds(MinimizerSeeding(param), query_genome, reference_genome, 2, filter_by_k_mer_set)
     jumps = seeds_to_jumps(seeds_n_rects, query_genome, reference_genome)
-    jumps_to_calls_to_db(jumps, "UFRJ50816_test_reconstruct", query_genome, reference_genome) #
-    exit()
+    jumps_to_calls_to_db(jumps, "UFRJ50816", query_genome, reference_genome) #
+    #exit()
 
-    aligner_seeds = run_aligner(query_genome, reference_genome)
-    aligner_seeds = [(x,y,[]) for x,y in aligner_seeds]
+    aligner_seeds = None
+    #aligner_seeds = run_aligner(query_genome, reference_genome)
+    #aligner_seeds = [(x,y,[]) for x,y in aligner_seeds]
 
     out = []
     out.append(render_seeds_2(seeds_n_rects, aligner_seeds, query_genome, reference_genome))
