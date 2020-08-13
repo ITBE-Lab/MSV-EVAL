@@ -58,7 +58,7 @@ def load_reads(individual, param):
     return seq_ids
 
 def compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index):
-    jump_id = 1#compute_sv_jumps(param, mm_index, pack, individual, seq_ids)
+    jump_id = compute_sv_jumps(param, mm_index, pack, individual, seq_ids)
     sv_caller_run_id = sweep_sv_jumps(param, individual, jump_id, "MA", "", [0], pack)
     return sv_caller_run_id
 

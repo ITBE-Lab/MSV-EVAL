@@ -528,7 +528,7 @@ if __name__ == "__main__":
     seeds_n_rects = compute_seeds(MinimizerSeeding(param), query_genome, reference_genome, 2, filter_by_k_mer_set)
     jumps = seeds_to_jumps(seeds_n_rects, query_genome, reference_genome)
     jumps_to_calls_to_db(jumps, "UFRJ50816", query_genome, reference_genome) #
-    #exit()
+    exit()
 
     aligner_seeds = None
     #aligner_seeds = run_aligner(query_genome, reference_genome)
