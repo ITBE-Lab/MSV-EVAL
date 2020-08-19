@@ -39,34 +39,32 @@ if __name__ == "__main__":
     extract_contigs_from = [
         ("chrI", True, "rec_chrI"),
         ("chrII", True, "rec_chrII"),
-        ("chrIII", True, "rec_chrIII"),
+        ("chrXI", False, "rec_chrIII"),
         ("chrXI", True, "rec_chrIV"),
-        ("chrVIII", True, "rec_chrV"),
+        ("chrV", True, "rec_chrV"),
         ("chrVI", True, "rec_chrVI"),
         ("chrVII", True, "rec_chrVII"),
         ("chrVIII", True, "rec_chrVIII"),
-        ("chrIII", False, "rec_chrIX"),
+        ("chrXV", True, "rec_chrIX"),
         ("chrX", True, "rec_chrX"),
         ("chrIV", True, "rec_chrXI"),
         ("chrXIV", True, "rec_chrXII"),
         ("chrXIV", False, "rec_chrXIII"),
         ("chrXII", True, "rec_chrXIV"),
-        ("chrXV", True, "rec_chrXV"),
-        ("chrXIII", False, "rec_chrXVI"),
+        ("chrIX", True, "rec_chrXV"),
+        ("chrXVI", True, "rec_chrXVI"),
     ]
     seeds_list = call_table.calls_to_seeds_by_id(pack, run_id, True, 10, extract_contigs_from)
 
     reconstructed_query_genome = call_table.reconstruct_sequenced_genome_from_seeds(seeds_list, pack)
     reconstructed_query_genome.store(reconstructed_query_genome_path + "/ma/genome")
     
-    seeds_n_rects_reconstr = compute_seeds(MinimizerSeeding(ParameterSetManager()), reconstructed_query_genome_path,
-                                           query_genome, 2, None)
+    seeds_n_rects_reconstr = compute_seeds(reconstructed_query_genome_path, query_genome, "UFRJ50816", 1)
 
 
     seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, []) for (_, seeds, _), (_, f, name) in zip(seeds_list, extract_contigs_from)]
 
-    seeds_n_rects = compute_seeds(MinimizerSeeding(ParameterSetManager()), query_genome,
-                                  reference_genome, 2, filter_by_k_mer_set)
+    seeds_n_rects = compute_seeds(query_genome, reference_genome, "UFRJ50816", 1)
 
     out = []
     out.append(render_seeds_2(seeds_list_display, None, reconstructed_query_genome_path, reference_genome, title="reconstructed on reference"))

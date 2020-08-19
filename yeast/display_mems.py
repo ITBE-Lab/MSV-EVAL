@@ -37,27 +37,34 @@ def load_genomes(query_genome, reference_genome):
 
     return pack, fm_index, mm_index, ret_query_genome
 
-def compute_seeds(seeder, query_genome, reference_genome, ambiguity=10000, seed_filter=None):
+def compute_seeds(query_genome, reference_genome, db_name, seq_id, ambiguity=2):
     param = ParameterSetManager()
     param.by_name("Max Size Reseed").set(2000)
+    param.by_name("Fixed SoC Width").set(50)
+    param.by_name("Min NT in SoC").set(50)
+    param.by_name("Rectangular SoC").set(False)
 
     pack, fm_index, mm_index, query_genomes = load_genomes(query_genome, reference_genome)
     mm_index.set_max_occ(ambiguity)
 
+    seeding_module = MMFilteredSeeding(param)
+    seed_lumper = SeedLumping(param)
+    contig_filter = FilterContigBorder(param)
+    soc_module = StripOfConsiderationSeeds(param)
+    soc_filter = GetAllFeasibleSoCs(param)
+    db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
+    mm_counter = HashFilterTable(db_conn).get_counter(seq_id)
+    jumps_from_seeds = SvJumpsFromSeeds(param, pack)
+    reseeding = RecursiveReseeding(param, pack)
+
     ret = []
     for y_start, query_genome in query_genomes:
-        seeds = seeder.execute(mm_index, query_genome, pack)
-        mems = SeedLumping(param).execute(seeds, query_genome, pack)
-        if not seed_filter is None:
-            mems_2 = seed_filter(mems, str(query_genome))
-            print("filtered from", len(mems), "down to",len(mems_2))
-            mems = mems_2
-        soc_filter = SoCFilter(mems)
-        filtered_2 = Seeds(soc_filter.pop_all_larger_than())
-
-        jumps_from_seeds = SvJumpsFromSeeds(param, pack)
-        reseeding = RecursiveReseeding(param, pack)
-        helper_ret = jumps_from_seeds.cpp_module.execute_helper(filtered_2, pack, query_genome)
+        seeds = seeding_module.execute(mm_index, query_genome, pack, mm_counter)
+        mems = seed_lumper.execute(seeds, query_genome, pack)
+        filtered_mems = contig_filter.execute(mems, pack)
+        socs = soc_module.execute(filtered_mems, query_genome, pack)
+        filtered_seeds = soc_filter.execute(socs)
+        helper_ret = jumps_from_seeds.cpp_module.execute_helper(filtered_seeds, pack, query_genome)
         #reseeded_mems = helper_ret.seeds
         #layer_of_seeds = helper_ret.layer_of_seeds
         rectangles = helper_ret.rectangles
@@ -65,7 +72,7 @@ def compute_seeds(seeder, query_genome, reference_genome, ambiguity=10000, seed_
         #fill_of_rectangles = helper_ret.rectangles_fill
         #seed_sample_sizes = helper_ret.rectangle_ambiguity
         #rectangle_used_dp = helper_ret.rectangle_used_dp
-        ret.append((y_start, reseeding.execute(filtered_2, pack, query_genome), rectangles))
+        ret.append((y_start, reseeding.execute(filtered_seeds, pack, query_genome), rectangles))
     return ret
 
 def seeds_to_filter_sections(seeds, add_size=50, min_nt=25):
@@ -437,6 +444,14 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome):
     
     pack, fm_index, mm_index, query_genomes = load_genomes(query_genome_str, reference_genome)
 
+    def at_contig_border(x, dist=3):
+        idx = pack.seq_id_for_pos(x)
+        if pack.start_of_sequence_id(idx) + dist >= x:
+            return True
+        if pack.end_of_sequence_id(idx) <= x + dist:
+            return True
+        return False
+
     idx = 0
     for jumps_, (_, query_genome) in zip(jumps, query_genomes):
         query_genome.check()
@@ -446,6 +461,8 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome):
             if not jump.from_known():
                 continue
             if not jump.to_known():
+                continue
+            if at_contig_border(f) or at_contig_border(t):
                 continue
             call = SvCall(f, t, 0, 0, jump.from_forward, jump.to_forward, 1000)
             if jump.query_from < jump.query_to:
@@ -525,7 +542,7 @@ reference_genome = genome_dir + "YPS138"
 if __name__ == "__main__":
     param = ParameterSetManager()
 
-    seeds_n_rects = compute_seeds(MinimizerSeeding(param), query_genome, reference_genome, 2, filter_by_k_mer_set)
+    seeds_n_rects = compute_seeds(query_genome, reference_genome, "UFRJ50816", 1)
     jumps = seeds_to_jumps(seeds_n_rects, query_genome, reference_genome)
     jumps_to_calls_to_db(jumps, "UFRJ50816", query_genome, reference_genome) #
     exit()
