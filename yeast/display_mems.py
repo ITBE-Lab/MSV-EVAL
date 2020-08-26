@@ -32,7 +32,7 @@ def load_genomes(query_genome, reference_genome):
         ret_query_genome = list(zip(query_pack.contigStarts(), query_pack.contigNucSeqs()))
 
 
-    #print("seq", pack.extract_from_to(185526, 187197))
+    #print("seq", pack.extract_from_to(185500, 190900))
     #exit()
 
     return pack, fm_index, mm_index, ret_query_genome
@@ -40,7 +40,7 @@ def load_genomes(query_genome, reference_genome):
 def compute_seeds(query_genome, reference_genome, db_name, seq_id, ambiguity=2):
     param = ParameterSetManager()
     param.by_name("Max Size Reseed").set(2000)
-    param.by_name("Fixed SoC Width").set(50)
+    param.by_name("Fixed SoC Width").set(100)
     param.by_name("Min NT in SoC").set(50)
     param.by_name("Rectangular SoC").set(False)
 
@@ -51,9 +51,11 @@ def compute_seeds(query_genome, reference_genome, db_name, seq_id, ambiguity=2):
     seed_lumper = SeedLumping(param)
     contig_filter = FilterContigBorder(param)
     soc_module = StripOfConsiderationSeeds(param)
-    soc_filter = GetAllFeasibleSoCs(param)
+    soc_filter = GetAllFeasibleSoCsAsSet(param)
+    reseeding_1 = RecursiveReseedingSoCs(param, pack, 100)
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     mm_counter = HashFilterTable(db_conn).get_counter(seq_id)
+    #mm_counter = HashCounter()
     jumps_from_seeds = SvJumpsFromSeeds(param, pack)
     reseeding = RecursiveReseeding(param, pack)
 
@@ -61,10 +63,13 @@ def compute_seeds(query_genome, reference_genome, db_name, seq_id, ambiguity=2):
     for y_start, query_genome in query_genomes:
         seeds = seeding_module.execute(mm_index, query_genome, pack, mm_counter)
         mems = seed_lumper.execute(seeds, query_genome, pack)
+        #ret.append((y_start, mems, []))
+        #continue
         filtered_mems = contig_filter.execute(mems, pack)
         socs = soc_module.execute(filtered_mems, query_genome, pack)
         filtered_seeds = soc_filter.execute(socs)
-        helper_ret = jumps_from_seeds.cpp_module.execute_helper(filtered_seeds, pack, query_genome)
+        filtered_seeds_2 = reseeding_1.execute(filtered_seeds, pack, query_genome)
+        helper_ret = jumps_from_seeds.cpp_module.execute_helper(filtered_seeds_2, pack, query_genome)
         #reseeded_mems = helper_ret.seeds
         #layer_of_seeds = helper_ret.layer_of_seeds
         rectangles = helper_ret.rectangles
@@ -72,91 +77,11 @@ def compute_seeds(query_genome, reference_genome, db_name, seq_id, ambiguity=2):
         #fill_of_rectangles = helper_ret.rectangles_fill
         #seed_sample_sizes = helper_ret.rectangle_ambiguity
         #rectangle_used_dp = helper_ret.rectangle_used_dp
-        ret.append((y_start, reseeding.execute(filtered_seeds, pack, query_genome), rectangles))
+
+        #ret.append((y_start, filtered_seeds_2, rectangles))
+        ret.append((y_start, reseeding.execute(filtered_seeds_2, pack, query_genome), rectangles))
     return ret
 
-def seeds_to_filter_sections(seeds, add_size=50, min_nt=25):
-    intervals = []
-    for seed in seeds:
-        if seed.on_forward_strand:
-            intervals.append((seed.start_ref, seed.start_ref + seed.size, seed.size))
-        else:
-            intervals.append((seed.start_ref - seed.size, seed.start_ref, seed.size))
-    intervals.sort()
-    max_len_idx = 0
-    for idx, interval in enumerate(intervals):
-        if interval[2] > intervals[max_len_idx][2]:
-            max_len_idx = idx
-    del intervals[max_len_idx]
-
-    merged_intervals = [[*intervals[0]]]
-    for start, end, nt in intervals[1:]:
-        if start <= merged_intervals[-1][1] + add_size:
-            merged_intervals[-1][1] = end
-            merged_intervals[-1][2] += nt
-        else:
-            merged_intervals.append([start, end, nt])
-
-    ret_intervals = [(start, end) for start,end,num in merged_intervals if num > min_nt]
-
-    return ret_intervals
-
-def str_to_k_mer(s, k=18):
-    for idx in range(1 + len(s) - k):
-        sec = s[idx:idx+k]
-        yield sec
-        nuc_seq = NucSeq(sec)
-        nuc_seq.reverse()
-        nuc_seq.complement()
-        yield str(nuc_seq)
-
-def filter_k_mer_set(genome, max_cnt=1):
-    k_mers = {}
-    for k_mer in str_to_k_mer(genome):
-        if not k_mer in k_mers:
-            k_mers[k_mer] = 0 
-        k_mers[k_mer] += 1
-
-    if False:
-        with open("tmp_k_mers_assembly.txt", "w") as out_file:
-            for k_mer, cnt in k_mers.items():
-                if cnt > 1:
-                    out_file.write(k_mer)
-                    out_file.write("\t")
-                    out_file.write(str(cnt))
-                    out_file.write("\n")
-        exit()
-
-    return set([k_mer for k_mer, cnt in k_mers.items() if cnt > max_cnt])
-
-def load_filter_set(file_name="tmp_k_mers.txt", t=300):
-    s = set()
-    with open(file_name, "r") as in_file:
-        for line in in_file.readlines():
-            seq, cnt = line.split("\t")
-            if int(cnt) > t:
-                s.add(seq)
-    print("query filter k-mers:", len(s))
-    return s
-
-k_mers_filter = load_filter_set()
-def filter_by_k_mer_set(seeds, query):
-    #k_mers = filter_k_mer_set(query)
-    ret = []
-    for seed in seeds:
-        q_str = query[seed.start:seed.start + seed.size]
-        if 'n' in q_str or 'N' in q_str:
-            continue
-        f = False
-        #print("q", q_str)
-        for k_mer in str_to_k_mer(q_str):
-            #print(k_mer)
-            if k_mer in k_mers_filter:
-                f = True
-                break
-        if not f:
-            ret.append(seed)
-    return Seeds(ret)
 
 def run_aligner(query_genome_str, reference_genome):
     pack, fm_index, mm_index, query_genomes = load_genomes(query_genome_str, reference_genome)
@@ -189,73 +114,6 @@ def run_aligner(query_genome_str, reference_genome):
         ret.append((y_start, seeds_list))
 
     return ret
-
-class SoCFilter:
-    def __init__(self, seeds):
-        self.seeds = [s for s in seeds]
-        self.max_delta_dist = 50
-        self.socs = [] # start_idx, end_idx, num_nt
-        self.__soc_sweep()
-        self.__seperate_socs()
-
-    def delta(self, seed):
-        if seed.on_forward_strand:
-            return seed.start_ref - seed.start
-        return seed.start_ref + seed.start + seed.size
-
-    def delta_dist(self, seed_a, seed_b):
-        if seed_a.on_forward_strand != seed_b.on_forward_strand:
-            return False
-        return abs(self.delta(seed_a) - self.delta(seed_b)) < self.max_delta_dist
-
-    def __soc_sweep(self):
-        self.seeds.sort(key=lambda x:(x.on_forward_strand, x.start_ref-x.start))
-        start_idx = 0
-        end_idx = 0
-        num_nt = 0
-        while start_idx < len(self.seeds):
-            while end_idx < len(self.seeds) and self.delta_dist(self.seeds[start_idx], self.seeds[end_idx]):
-                num_nt += self.seeds[end_idx].size
-                end_idx += 1
-            if len(self.socs) > 0 and self.delta_dist(self.seeds[start_idx], self.seeds[self.socs[-1][1]-1]):
-                if len(self.socs) > 0 and num_nt > self.socs[-1][2]:
-                    del self.socs[-1]
-                else:
-                    num_nt -= self.seeds[start_idx].size
-                    start_idx += 1
-                    continue
-            self.socs.append((start_idx, end_idx, num_nt))
-            num_nt -= self.seeds[start_idx].size
-            start_idx += 1
-
-    def __seperate_socs(self):
-        new_socs = []
-        for start_idx, end_idx, _ in self.socs:
-            seeds = self.seeds[start_idx:end_idx]
-            seeds.sort(key=lambda x:x.start)
-            max_q = -self.max_delta_dist - 10
-            for seed in seeds:
-                if seed.start >= max_q + self.max_delta_dist:
-                    new_socs.append([])
-                new_socs[-1].append(seed)
-                max_q = max(max_q, seed.start + seed.size)
-        new_socs.sort(key=lambda x: sum([s.size for s in x]))
-        self.socs = new_socs
-
-    def pop(self):
-        ret = self.socs[-1]
-        del self.socs[-1]
-        return ret
-
-    def pop_all_larger_than(self, num_nt=150):
-        ret = []
-        while len(self.socs) > 0:
-            p = self.pop()
-            if sum([s.size for s in p]) < num_nt:
-                return ret
-            for s in p:
-                ret.append(s)
-        return ret
 
 
 class SeedsFilter:
@@ -342,7 +200,7 @@ def seeds_to_jumps(seeds_n_rects, query_genome, reference_genome):
     for (_, seeds, _), (_, query_genome) in zip(seeds_n_rects, query_genomes):
         jumps = jumps_from_seeds.execute(libMA.containers.Seeds(seeds), pack, query_genome)
         filtered_jumps = filter_by_ambiguity.execute(jumps, pack)
-        ret.append(filtered_jumps)
+        ret.append(jumps)
     return ret
 
 def decorate_plot(plot, query_genome, reference_genome, diagonal=False):
@@ -403,6 +261,9 @@ def render_jumps(jumps, query_genome, reference_genome):
     cs = []
     ms = []
     ids = []
+    qlens = []
+    fs = []
+    ts = []
     idx = 0
     colors = {True:{True:"blue", False:"green"}, False:{True:"purple", False:"orange"}}
     for jumps_ in jumps:
@@ -418,26 +279,38 @@ def render_jumps(jumps, query_genome, reference_genome):
             if not jump.to_known():
                 t = f
                 f -= 1
+            if abs(f - t) < 200:
+                continue
             xs.append(f)
             ys.append(t)
             ms.append(jump.was_mirrored)
-            cs.append(colors[jump.from_forward][jump.to_forward])
+            if jump.query_to - jump.query_from >= 5000:
+                cs.append("red")
+            else:
+                cs.append(colors[jump.from_forward][jump.to_forward])
             ids.append(idx)
+            qlens.append(jump.query_to - jump.query_from )
+            fs.append("fow" if jump.from_forward else "rev")
+            ts.append("fow" if jump.to_forward else "rev")
             idx+=1
     plot = figure(title="entries", plot_width=1000, plot_height=1000)
     decorate_plot(plot, reference_genome, reference_genome, True)
     plot.x(x="xs", y="ys", color="cs", line_width=4, source=ColumnDataSource(data={
-                    "xs":xs, "ys":ys, "cs":cs, "ms":ms, "ids": ids
+                    "xs":xs, "ys":ys, "cs":cs, "ms":ms, "ids": ids, "qlens": qlens, "fs":fs, "ts":ts
                 }))
-    plot.add_tools(HoverTool(tooltips=[("x, y", "@xs, @ys"),("id", "@ids"),("color, mirrored", "@cs, @ms")]))
+    plot.add_tools(HoverTool(tooltips=[("x, y", "@xs, @ys"),("id", "@ids"),("color, mirrored", "@cs, @ms"),
+                                       ("query dist", "@qlens"), ("strandinfo", "from @fs to @ts")]))
     return plot
 
-def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome):
+def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, max_q_dist=None):
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
 
     JumpRunTable(db_conn)
     SvCallerRunTable(db_conn)
-    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, "Ground Truth",
+    name = "Ground Truth"
+    if not max_q_dist is None:
+        name = name + " Q-Dist-Filter:" + str(max_q_dist)
+    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, name,
                                    "SV's form genome assembly", -1)
     pool = PoolContainer(1, db_name)
     sv_inserter = get_inserter.execute(pool)
@@ -464,6 +337,9 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome):
                 continue
             if at_contig_border(f) or at_contig_border(t):
                 continue
+            if not max_q_dist is None:
+                if jump.query_to - jump.query_from > max_q_dist:
+                    continue 
             call = SvCall(f, t, 0, 0, jump.from_forward, jump.to_forward, 1000)
             if jump.query_from < jump.query_to:
                 call.inserted_sequence = NucSeq(query_genome, jump.query_from, jump.query_to)
@@ -502,6 +378,8 @@ def render_seeds_2(seeds_1, seeds_2, query_genome, reference_genome, title="seed
     lw = {True:8, False: 4}
     for y_start, seeds, _ in seeds_1:
         for seed in seeds:
+            if seed.size < 20:
+                continue
             filtered = False
             xs[filtered][seed.on_forward_strand].append(seed.start_ref)
             xs[filtered][seed.on_forward_strand].append(seed.start_ref + seed.size * (1 if seed.on_forward_strand else -1))
@@ -540,11 +418,11 @@ reference_genome = genome_dir + "YPS138"
 #reference_genome = "vivax"
 
 if __name__ == "__main__":
-    param = ParameterSetManager()
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, "UFRJ50816", 1)
     jumps = seeds_to_jumps(seeds_n_rects, query_genome, reference_genome)
-    jumps_to_calls_to_db(jumps, "UFRJ50816", query_genome, reference_genome) #
+    jumps_to_calls_to_db(jumps, "UFRJ50816", query_genome, reference_genome)
+    jumps_to_calls_to_db(jumps, "UFRJ50816", query_genome, reference_genome, 5000)
     exit()
 
     aligner_seeds = None
@@ -555,3 +433,28 @@ if __name__ == "__main__":
     out.append(render_seeds_2(seeds_n_rects, aligner_seeds, query_genome, reference_genome))
     out.append(render_jumps(jumps, query_genome, reference_genome))
     show(row(out))
+
+
+# ~/workspace/samtools/samtools view -h minimap2.sorted.bam "chrIX:251682-259682" > minimap2.filtered.bam
+
+
+# ~/workspace/samtools/samtools view minimap2.filtered.bam | awk '{print length($10), $1}' | sort -n
+
+
+# "chrVII:778311-788311"
+
+# m150417_101358_00127_c100782972550000001823173608251533_s1_p0/39217/0_22799
+
+#1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/44963/0_5594;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/109922/8352_13954;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/18037/0_5603;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/18037/5658_11267;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/20956/20700_26370;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/144875/5623_11295;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/71304/464_11950;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/13415/20843_26706;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/36188/5946_11812;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/36188/0_5903;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/36188/11858_17775;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/36188/17820_23740;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/141524/5704_11651;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/69336/6856_12806;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/53772/16676_22651;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/48812/0_6104;
+
+# 1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/69336/579_6809;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/142877/1520_8074;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/56174/0_6597;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/144999/4834_11460;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/96953/0_6679;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/119223/0_6698;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/89902/0_6727;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/84553/0_6764;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/96953/6725_13515;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/13415/6922_13772;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/13415/0_6878;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/13415/13818_20797;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/67617/0_14819;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/96953/20946_28172;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/131853/3711_10942;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/96953/13559_20900;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/52958/0_7342;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/114215/19087_26459;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/153159/23675_31070;
+
+# 1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/50652/0_7727;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/115600/2203_10049;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/144875/11342_19397;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/23917/0_8142;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/107598/0_8176;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/53772/0_8260;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/109922/0_8306;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/53772/8308_16631;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/97715/0_8460;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/142063/326_8861;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/2179/0_8554;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/2179/8599_17162;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/140135/911_9670;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/134366/0_8891;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/98776/9081_18050;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/18417/786_9783;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/98776/0_9035;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/126913/19910_29096;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/108148/0_9205;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/146893/11756_21019;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/52204/0_9265;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/114215/0_9279;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/109222/0_9291;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/145770/5355_14713;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/122350/0_9424;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/145964/0_9575;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/126913/10149_19866;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/114215/9322_19044;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/47660/3687_13459;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/61988/0_9778;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/161131/21667_31448;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/157114/5062_14887;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/119359/3182_13040;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/130318/0_9884;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/49524/0_10347;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/386/0_10669;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/59588/0_11162;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/55563/11668_23254;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/66728/13702_25321;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/55563/0_11621;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/95246/0_11806;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/129268/0_11829;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/139555/0_12158;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/150846/0_12405;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/9765/0_12518;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/105516/0_13072;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/129509/0_13118;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/105081/13820_27418;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/66728/0_13658;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/117015/0_13993;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/131549/0_14564;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/67617/0_14819;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/134928/0_15752;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/35421/2824_18781;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/113604/0_16179;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/155075/0_17159;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/127492/0_19215;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/146511/1919_21890;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/161991/0_20332;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/20956/0_20653;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/39217/0_22799;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/50073/0_23026
+
+
+# "chrXV:1065771-1077771"
+
+#1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/55885/0_8619;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/35295/0_8639;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/129742/17067_25729;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/152119/0_8842;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/114840/7346_16216;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/109522/13296_22292;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/105542/33101_42099;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/70172/11458_20725;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/102214/9526_18885;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/41024/0_9412;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/70172/1965_11411;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/102214/0_9481;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/135212/0_9492;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/30757/0_9629;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/154519/0_9866;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/10228/6379_16379;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/33531/10262_20295;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/17978/10250_20357;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/12964/2375_12542;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/17978/0_10208;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/33531/0_10215;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/74182/0_10309;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/100090/0_10419;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/135130/0_10422;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/56647/2530_12954;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/126768/0_10441;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/100421/0_10472;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/141610/15767_26292;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/126483/15105_25714;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/56864/0_10624;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/56864/10667_21319;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/100421/10515_21179;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/52520/14743_25415;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/89986/0_10952;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/105751/0_11049;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/39529/2192_13268;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/138754/0_11288;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/26078/0_11407;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/123022/0_11429;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/37548/17257_28842;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/83276/0_11654;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/41545/12928_24890;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/126440/0_12051;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/12986/0_12256;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/137188/0_12376;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/130987/8198_20577;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/121636/0_12585;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/41545/0_12885;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/3142/0_13165;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/26833/13390_26583;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/109522/0_13253;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/84441/1782_15048;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/141043/13399_26728;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/141043/0_13354;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/16006/7084_20531;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/56436/8436_22097;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/87463/0_14608;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/52520/0_14698;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/144355/1327_16770;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/156966/0_15531;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/141610/0_15722;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/15467/0_16528;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/116614/0_16703;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/49306/0_16755;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/129763/11015_27846;1:m150424_132538_00127_c100802542550000001823174910081577_s1_p0/95551/0_17024;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/37548/0_17210;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/95743/0_17357;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/20949/0_18104;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/135400/0_18733;1:m150423_092113_00127_c100802542550000001823174910081570_s1_p0/52061/11034_30036;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/32549/0_20061;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/50125/0_25490;1:m150416_014538_00127_c100782992550000001823173608251512_s1_p0/94848/0_26413;1:m150417_101358_00127_c100782972550000001823173608251533_s1_p0/105488/0_27221;
+
+
+# m150417_101358_00127_c100782972550000001823173608251533_s1_p0/36119/0_25862
