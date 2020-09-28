@@ -58,14 +58,15 @@ def load_reads(individual, param):
     return seq_ids
 
 def compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index):
-    jump_id = 1#compute_sv_jumps(param, mm_index, pack, individual, seq_ids)
+    jump_id = compute_sv_jumps(param, mm_index, pack, individual, seq_ids)
     sv_caller_run_id = sweep_sv_jumps(param, individual, jump_id, "MA", "", [0], pack)
     return sv_caller_run_id
 
 def run_ma(pack, individual="HG002"):
     param = ParameterSetManager()
     mm_index = MinimizerIndex(param, pack.contigSeqs(), pack.contigNames())
-    seq_ids = [1]#load_reads(individual, param)
+    seq_ids = load_reads(individual, param)
+    return
     sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index)
     print("caller_id", sv_caller_run_id)
 
@@ -74,7 +75,7 @@ if __name__ == "__main__":
     pack = Pack()
     pack.load(genome_dir + "ma/genome")
 
-    run_ma(pack, individual="UFRJ50816")
+    run_ma(pack, individual="UFRJ50816_test_reconstruct")
 
     #load_high_confidence_calls(pack, individual="UFRJ50816")
 

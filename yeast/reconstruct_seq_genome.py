@@ -59,12 +59,12 @@ if __name__ == "__main__":
     reconstructed_query_genome = call_table.reconstruct_sequenced_genome_from_seeds(seeds_list, pack)
     reconstructed_query_genome.store(reconstructed_query_genome_path + "/ma/genome")
     
-    seeds_n_rects_reconstr = compute_seeds(reconstructed_query_genome_path, query_genome, "UFRJ50816", 1)
+    seeds_n_rects_reconstr = compute_seeds(reconstructed_query_genome_path, query_genome, db_name, 1)
 
 
     seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, []) for (_, seeds, _), (_, f, name) in zip(seeds_list, extract_contigs_from)]
 
-    seeds_n_rects = compute_seeds(query_genome, reference_genome, "UFRJ50816", 1)
+    seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, 1)
 
     out = []
     out.append(render_seeds_2(seeds_list_display, None, reconstructed_query_genome_path, reference_genome, title="reconstructed on reference"))

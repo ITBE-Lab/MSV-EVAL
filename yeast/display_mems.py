@@ -302,7 +302,7 @@ def render_jumps(jumps, query_genome, reference_genome):
                                        ("query dist", "@qlens"), ("strandinfo", "from @fs to @ts")]))
     return plot
 
-def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, max_q_dist=None):
+def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, max_q_dist=None, min_dist=None):
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
 
     JumpRunTable(db_conn)
@@ -340,6 +340,9 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, max
             if not max_q_dist is None:
                 if jump.query_to - jump.query_from > max_q_dist:
                     continue 
+            if not min_dist is None:
+                if jump.query_to - jump.query_from < min_dist and abs(t - f) < min_dist:
+                    continue
             call = SvCall(f, t, 0, 0, jump.from_forward, jump.to_forward, 1000)
             if jump.query_from < jump.query_to:
                 call.inserted_sequence = NucSeq(query_genome, jump.query_from, jump.query_to)
@@ -419,10 +422,10 @@ reference_genome = genome_dir + "YPS138"
 
 if __name__ == "__main__":
 
-    seeds_n_rects = compute_seeds(query_genome, reference_genome, "UFRJ50816", 1)
+    seeds_n_rects = compute_seeds(query_genome, reference_genome, "UFRJ50816_test_reconstruct", 1)
     jumps = seeds_to_jumps(seeds_n_rects, query_genome, reference_genome)
-    jumps_to_calls_to_db(jumps, "UFRJ50816", query_genome, reference_genome)
-    jumps_to_calls_to_db(jumps, "UFRJ50816", query_genome, reference_genome, 5000)
+    #jumps_to_calls_to_db(jumps, "UFRJ50816_test_reconstruct", query_genome, reference_genome)
+    #jumps_to_calls_to_db(jumps, "UFRJ50816_test_reconstruct", query_genome, reference_genome, 5000)
     exit()
 
     aligner_seeds = None
