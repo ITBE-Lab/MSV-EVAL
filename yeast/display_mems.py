@@ -279,8 +279,8 @@ def render_jumps(jumps, query_genome, reference_genome):
             if not jump.to_known():
                 t = f
                 f -= 1
-            if abs(f - t) < 200:
-                continue
+            #if abs(f - t) < 200:
+            #    continue
             xs.append(f)
             ys.append(t)
             ms.append(jump.was_mirrored)
@@ -424,9 +424,9 @@ if __name__ == "__main__":
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, "UFRJ50816_test_reconstruct", 1)
     jumps = seeds_to_jumps(seeds_n_rects, query_genome, reference_genome)
-    #jumps_to_calls_to_db(jumps, "UFRJ50816_test_reconstruct", query_genome, reference_genome)
+    jumps_to_calls_to_db(jumps, "UFRJ50816_test_reconstruct", query_genome, reference_genome)
     #jumps_to_calls_to_db(jumps, "UFRJ50816_test_reconstruct", query_genome, reference_genome, 5000)
-    exit()
+    #exit()
 
     aligner_seeds = None
     #aligner_seeds = run_aligner(query_genome, reference_genome)

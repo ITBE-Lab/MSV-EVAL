@@ -16,53 +16,18 @@ if __name__ == "__main__":
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     call_table = SvCallTable(db_conn)
     jump_table = SvJumpTable(db_conn) # initialize jump table
-    pack, _, _, _ = load_genomes(query_genome, reference_genome)
+    pack, _, _, ret_query_genome = load_genomes(query_genome, reference_genome)
 
-    #extract_contigs_from = [ # without order
-    #    ("chrI", True),
-    #    ("chrII", True),
-    #    ("chrIII", True),
-    #    ("chrIV", True),
-    #    ("chrXI", True),
-    #    ("chrVI", True),
-    #    ("chrVII", True),
-    #    ("chrVIII", True),
-    #    ("chrXV", True),
-    #    ("chrX", True),
-    #    ("chrXIV", True),
-    #    ("chrXIV", False),
-    #    ("chrXII", True),
-    #    ("chrIX", False),
-    #    ("chrXVI", True),
-    #]
 
-    extract_contigs_from = [
-        ("chrI", True, "rec_chrI"),
-        ("chrII", True, "rec_chrII"),
-        ("chrXI", False, "rec_chrIII"),
-        ("chrXI", True, "rec_chrIV"),
-        ("chrV", True, "rec_chrV"),
-        ("chrVI", True, "rec_chrVI"),
-        ("chrVII", True, "rec_chrVII"),
-        ("chrVIII", True, "rec_chrVIII"),
-        ("chrXV", True, "rec_chrIX"),
-        ("chrX", True, "rec_chrX"),
-        ("chrIV", True, "rec_chrXI"),
-        ("chrXIV", True, "rec_chrXII"),
-        ("chrXIV", False, "rec_chrXIII"),
-        ("chrXII", True, "rec_chrXIV"),
-        ("chrIX", True, "rec_chrXV"),
-        ("chrXVI", True, "rec_chrXVI"),
-    ]
-    seeds_list = call_table.calls_to_seeds_by_id(pack, run_id, True, 10, extract_contigs_from)
+    seeds_list = call_table.calls_to_seeds_by_id_auto(pack, run_id, True, 0)
 
     reconstructed_query_genome = call_table.reconstruct_sequenced_genome_from_seeds(seeds_list, pack)
     reconstructed_query_genome.store(reconstructed_query_genome_path + "/ma/genome")
-    
+
     seeds_n_rects_reconstr = compute_seeds(reconstructed_query_genome_path, query_genome, db_name, 1)
 
 
-    seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, []) for (_, seeds, _), (_, f, name) in zip(seeds_list, extract_contigs_from)]
+    seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, []) for name, seeds, _ in seeds_list]
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, 1)
 
@@ -71,3 +36,25 @@ if __name__ == "__main__":
     out.append(render_seeds_2(seeds_n_rects, None, query_genome, reference_genome, title="assembly on reference"))
     out.append(render_seeds_2(seeds_n_rects_reconstr, None, reconstructed_query_genome_path, query_genome, title="reconstructed on assembly"))
     show(row(out))
+
+    print("name", "pieces", "score", "matches", "missmatches", "indels", "indel ops", sep="\t")
+    max_p_len = 1000
+    for name, reconstr, (_, assembly) in zip(reconstructed_query_genome.contigNames(),
+                                             reconstructed_query_genome.contigNucSeqs(),
+                                             ret_query_genome):
+        matches = 0
+        mismatches = 0
+        indels = 0
+        indelops = 0
+        num_pieces = 1+max(len(reconstr), len(assembly))/max_p_len
+        for idx in range(num_pieces):
+            nw_alignment = runKsw(reconstr[idx*max_p_len:(idx+1)*max_p_len], assembly[idx*max_p_len:(idx+1)*max_p_len])
+            for op, l in nw_alignment.data:
+                if op == MatchType.match or op == MatchType.seed:
+                    matches += l
+                if op == MatchType.missmatch:
+                    mismatches += l
+                if op == MatchType.insertion or op == MatchType.deletion:
+                    indels += l
+                    indelops += 1
+        print(name, num_pieces, nw_alignment.get_score(), matches, mismatches, indels, indelops, sep="\t")
