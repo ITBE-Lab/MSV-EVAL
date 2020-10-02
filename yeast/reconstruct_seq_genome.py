@@ -37,8 +37,9 @@ if __name__ == "__main__":
     out.append(render_seeds_2(seeds_n_rects_reconstr, None, reconstructed_query_genome_path, query_genome, title="reconstructed on assembly"))
     show(row(out))
 
-    print("name", "pieces", "score", "matches", "missmatches", "indels", "indel ops", sep="\t")
-    max_p_len = 1000
+    # @todo propper needleman wunsch here...
+    print("name", "pieces", "score", "matches", "missmatches", "indels", "indel ops", "% identity", sep="\t")
+    max_p_len = 10000
     for name, reconstr, (_, assembly) in zip(reconstructed_query_genome.contigNames(),
                                              reconstructed_query_genome.contigNucSeqs(),
                                              ret_query_genome):
@@ -46,9 +47,12 @@ if __name__ == "__main__":
         mismatches = 0
         indels = 0
         indelops = 0
-        num_pieces = 1+max(len(reconstr), len(assembly))/max_p_len
+        l_total = max(len(reconstr), len(assembly))
+        num_pieces = int(l_total/max_p_len + 1)
         for idx in range(num_pieces):
-            nw_alignment = runKsw(reconstr[idx*max_p_len:(idx+1)*max_p_len], assembly[idx*max_p_len:(idx+1)*max_p_len])
+            nw_alignment = runKsw(
+                NucSeq(reconstr, idx*max_p_len, (idx+1)*max_p_len),
+                NucSeq(assembly, idx*max_p_len, (idx+1)*max_p_len))
             for op, l in nw_alignment.data:
                 if op == MatchType.match or op == MatchType.seed:
                     matches += l
@@ -57,4 +61,5 @@ if __name__ == "__main__":
                 if op == MatchType.insertion or op == MatchType.deletion:
                     indels += l
                     indelops += 1
-        print(name, num_pieces, nw_alignment.get_score(), matches, mismatches, indels, indelops, sep="\t")
+        iden = 100 * matches / l_total
+        print(name, num_pieces, nw_alignment.get_score(), matches, mismatches, indels, indelops, iden, sep="\t")

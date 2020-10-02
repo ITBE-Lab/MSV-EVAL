@@ -104,16 +104,68 @@ def run_aligner(query_genome_str, reference_genome):
 
         f_stream = FileStreamFromPath("mm2.sam")
         file_reader = SamFileReader(ParameterSetManager())
-        seeds_list = []
         while not f_stream.eof():
             alignment = file_reader.execute(f_stream, pack, read)
-            seeds = alignment.to_seeds(pack)
-            for seed in seeds:
-                seeds_list.append(seed)
+            ret.append((y_start, alignment))
+
+    return ret
+
+def run_aligner_seeds(query_genome_str, reference_genome):
+    ret = []
+    for y_start, alignment in run_aligner(query_genome_str, reference_genome):
+        seeds_list = []
+        seeds = alignment.to_seeds(pack)
+        for seed in seeds:
+            seeds_list.append(seed)
 
         ret.append((y_start, seeds_list))
 
     return ret
+
+def make_read_extension_table(db_name, seq_id, assembled_genome):
+    read_set = {"technology":"pb", "name":"test", "fasta_file":"reads.fasta"}
+    json_dict = {"reference_path":reference_genome}
+    sam_file_path = "mm2.sam"
+    ret = []
+    with open("reads.fasta", "w") as out_file:
+        for read in iterate_reads(ParameterSetManager(), db_name, seq_id):
+            out_file.write(">")
+            out_file.write(str(read.id))
+            out_file.write("\n")
+            out_file.write(str(read))
+            out_file.write("\n")
+
+    mm2(read_set, sam_file_path, json_dict)
+    f_stream = FileStreamFromPath("mm2.sam")
+    read_by_name = ReadByName()
+    # just always return nullptr since we do not need the cigars
+    read_by_name.return_null_for_unknown = True
+    file_reader = SamFileReader(ParameterSetManager())
+    db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
+    ext_table = ReadExtensionTable(db_conn)
+    ext_table.dropIndices()
+    pack = Pack()
+    pack.load(assembled_genome + "/ma/genome")
+    while not f_stream.eof():
+        alignment = file_reader.execute(f_stream, pack, read_by_name)
+        read_id = int(alignment.stats.name)
+        ext_table.insert(read_id, alignment)
+    ext_table.gen_indices()
+
+
+def view_coverage(db_name, assembled_genome, steps=1000):
+    ext_table = ReadExtensionTable(db_conn)
+    pack = Pack()
+    pack.load(assembled_genome + "/ma/genome")
+    xs = []
+    ys = []
+    for x in pack.unpacked_size_single_strand // steps:
+        xs.append(x)
+        ys.append(ext_table.coverage(x, x+1))
+    
+    plot = figure(title="coverage " + assembled_genome, plot_width=1000, plot_height=1000)
+    plot.line(x=xs, y=ys)
+    show(plot)
 
 
 class SeedsFilter:
@@ -422,6 +474,10 @@ reference_genome = genome_dir + "YPS138"
 
 if __name__ == "__main__":
 
+    make_read_extension_table("UFRJ50816_test_reconstruct", 1, query_genome)
+    view_coverage("UFRJ50816_test_reconstruct", query_genome)
+    exit()
+
     seeds_n_rects = compute_seeds(query_genome, reference_genome, "UFRJ50816_test_reconstruct", 1)
     jumps = seeds_to_jumps(seeds_n_rects, query_genome, reference_genome)
     jumps_to_calls_to_db(jumps, "UFRJ50816_test_reconstruct", query_genome, reference_genome)
@@ -429,7 +485,7 @@ if __name__ == "__main__":
     #exit()
 
     aligner_seeds = None
-    #aligner_seeds = run_aligner(query_genome, reference_genome)
+    #aligner_seeds = run_aligner_seeds(query_genome, reference_genome)
     #aligner_seeds = [(x,y,[]) for x,y in aligner_seeds]
 
     out = []
