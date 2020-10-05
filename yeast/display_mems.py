@@ -142,8 +142,8 @@ def make_read_extension_table(db_name, seq_id, assembled_genome):
     read_by_name.return_null_for_unknown = True
     file_reader = SamFileReader(ParameterSetManager())
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
-    ext_table = ReadExtensionTable(db_conn)
-    ext_table.dropIndices()
+    ext_table = ReadRangeTable(db_conn)
+    ext_table.drop_indices()
     pack = Pack()
     pack.load(assembled_genome + "/ma/genome")
     while not f_stream.eof():
@@ -153,18 +153,26 @@ def make_read_extension_table(db_name, seq_id, assembled_genome):
     ext_table.gen_indices()
 
 
-def view_coverage(db_name, assembled_genome, steps=1000):
-    ext_table = ReadExtensionTable(db_conn)
+def view_coverage(db_name, seq_id, assembled_genome, steps=20000):
+    db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
+    ext_table = ReadRangeTable(db_conn)
     pack = Pack()
     pack.load(assembled_genome + "/ma/genome")
     xs = []
     ys = []
-    for x in pack.unpacked_size_single_strand // steps:
+    max_y = 0
+    for x in range(0, pack.unpacked_size_single_strand, max(1, pack.unpacked_size_single_strand // steps)):
         xs.append(x)
-        ys.append(ext_table.coverage(x, x+1))
+        y = ext_table.coverage(x, x+1, seq_id)
+        max_y = max(y, max_y)
+        ys.append(y)
     
     plot = figure(title="coverage " + assembled_genome, plot_width=1000, plot_height=1000)
+    for x in [*pack.contigStarts(), pack.unpacked_size_single_strand]:
+        plot.line(x=[x, x], y=[0, max_y/2], color="black")
+
     plot.line(x=xs, y=ys)
+
     show(plot)
 
 
@@ -474,8 +482,8 @@ reference_genome = genome_dir + "YPS138"
 
 if __name__ == "__main__":
 
-    make_read_extension_table("UFRJ50816_test_reconstruct", 1, query_genome)
-    view_coverage("UFRJ50816_test_reconstruct", query_genome)
+    #make_read_extension_table("UFRJ50816_test_reconstruct", 1, query_genome)
+    view_coverage("UFRJ50816_test_reconstruct", 1, query_genome)
     exit()
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, "UFRJ50816_test_reconstruct", 1)
