@@ -201,33 +201,64 @@ def reads_per_jump(db_name, jumps, seq_id, min_stick_out=50, primary=True, min_m
             ret[-1].append(cov)
     return ret
 
-def render_reads_per_jump(cov_lists, assembled_genome):
+def render_reads_per_jump(jumps, cov_lists, assembled_genome):
     plot = figure(title="#reads that cover a call " + assembled_genome, plot_width=1000, plot_height=1000)
-    for cov_list, name, color in cov_lists:
+    plot2 = figure(title="query distance of calls (cov < 10) of " + assembled_genome, plot_width=1000, plot_height=1000)
+    plot3 = figure(title="query distance of calls (cov >= 10) of " + assembled_genome, plot_width=1000,
+                    plot_height=1000)
+
+    def dist_list_to_bars(dist_list, plot, name, color, num_bars=100):
+        dist_list.sort()
+        buckets = [0]*(num_bars+1)
+        bucket_len = (dist_list[-1] - dist_list[0]) / num_bars
+        for dist in dist_list:
+            buckets[ int((dist - dist_list[0]) / bucket_len) ] += 1
+        xs = [x * bucket_len + bucket_len/2 for x in range(num_bars+1)]
+        plot.vbar(x=xs, bottom=0, top=buckets, width=bucket_len*0.75, legend_label=name, color=color, fill_alpha=.5)
+
+    for (cov_list, name, color) in cov_lists:
         cov_dict = {}
         idx = 0
-        for cov_list_ in cov_list:
-            for cov in cov_list_:
+        for cov_list_, jumps_ in zip(cov_list, jumps):
+            for cov, jump in zip(cov_list_, jumps_):
                 if not cov in cov_dict:
                     cov_dict[cov] = []
-                cov_dict[cov].append(idx)
+                cov_dict[cov].append( (idx, jump.query_to - jump.query_from) )
                 idx += 1
 
         xs = [0]
         ys = [0]
+        q_dist_list = []
+        q_dist_list2 = []
         #print("coverage_dict ( coverage -> (num,id) ):")
-        for cov, l in sorted(list(cov_dict.items())):
+        for (cov, l) in sorted(list(cov_dict.items())):
             #print(cov, len(l), l)
             xs.append(cov)
             ys.append(len(l))
+            for idx, dist in l:
+                if cov < 10:
+                    q_dist_list.append(dist)
+                else:
+                    q_dist_list2.append(dist)
+
         xs.append(cov)
         ys.append(0)
 
-        plot.patch(x=xs, y=ys, legend_label=name, color=color, alpha=.75)
+        plot.patch(x=xs, y=ys, legend_label=name, color=color, fill_alpha=.5)
+
+        dist_list_to_bars(q_dist_list, plot2, name, color)
+        dist_list_to_bars(q_dist_list2, plot3, name, color)
+
     plot.xaxis.axis_label = "coverage"
     plot.yaxis.axis_label = "#calls"
 
-    return plot
+    plot2.xaxis.axis_label = "q_dist"
+    plot2.yaxis.axis_label = "#calls"
+    plot3.xaxis.axis_label = "q_dist"
+    plot3.yaxis.axis_label = "#calls"
+
+
+    return [plot, plot2, plot3]
 
 class SeedsFilter:
     def __init__(self, intervals=None, intervals_2=None):
@@ -450,7 +481,7 @@ def filter_jumps(jumps, reference_genome, max_q_dist=None, min_dist=None):
             ret[-1].append(jump)
     return ret
 
-def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome):
+def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_genome, min_cov=10):
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
 
     JumpRunTable(db_conn)
@@ -467,17 +498,20 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome):
 
 
     idx = 0
-    for jumps_, (_, query_genome) in zip(jumps, query_genomes):
+    for jumps_, (_, query_genome), jump_cov_ in zip(jumps, query_genomes, cov_list):
         query_genome.check()
-        for jump in jumps_:
-            call = SvCall(jump.from_pos, jump.to_pos, 0, 0, jump.from_forward, jump.to_forward, 1000)
-            if jump.query_from < jump.query_to:
-                call.inserted_sequence = NucSeq(query_genome, jump.query_from, jump.query_to)
-                call.inserted_sequence.check()
-            call.order_id = idx
-            idx += 1
-            call.mirrored = jump.was_mirrored
-            sv_inserter.insert(call)
+        for jump, cov in zip(jumps_, jump_cov_):
+            if cov < min_cov:
+                pass
+            else:
+                call = SvCall(jump.from_pos, jump.to_pos, 0, 0, jump.from_forward, jump.to_forward, 1000)
+                if jump.query_from < jump.query_to:
+                    call.inserted_sequence = NucSeq(query_genome, jump.query_from, jump.query_to)
+                    call.inserted_sequence.check()
+                call.order_id = idx
+                idx += 1
+                call.mirrored = jump.was_mirrored
+                sv_inserter.insert(call)
 
     sv_inserter.close(pool)
 
@@ -559,15 +593,15 @@ if __name__ == "__main__":
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, dm_name, seq_id)
     jumps = filter_jumps(seeds_to_jumps(seeds_n_rects, query_genome, reference_genome), reference_genome)
-    jump_coverage = reads_per_jump(dm_name, jumps, seq_id)
     jump_coverage_lenient = reads_per_jump(dm_name, jumps, seq_id, False)
+    jump_coverage = reads_per_jump(dm_name, jumps, seq_id, True)
     jump_coverage_strict = reads_per_jump(dm_name, jumps, seq_id, True, 0.1)
     covs = [
         (jump_coverage_lenient, "map_q>=0", "red"),
         (jump_coverage, "primary & map_q>=0", "blue"),
         (jump_coverage_strict, "primary & map_q>=10", "green")
     ]
-    out.append(render_reads_per_jump(covs, query_genome))
+    out.extend(render_reads_per_jump(jumps, covs, query_genome))
 
     #jumps_to_calls_to_db(jumps, dm_name, query_genome, reference_genome)
     #jumps_to_calls_to_db(jumps, dm_name, query_genome, reference_genome, 5000)
