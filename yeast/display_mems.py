@@ -481,11 +481,15 @@ def filter_jumps(jumps, reference_genome, max_q_dist=None, min_dist=None):
             ret[-1].append(jump)
     return ret
 
-def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_genome, min_cov=10):
+def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_genome, min_cov=10,
+                        # calls with low coverage that are smaller than this will be ignored others will become one 
+                        # sided
+                         low_cov_min_dist=200):
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
 
     JumpRunTable(db_conn)
     SvCallerRunTable(db_conn)
+    one_sided_calls = OneSidedCallsTable(db_conn)
     name = "Ground Truth"
     if not max_q_dist is None:
         name = name + " Q-Dist-Filter:" + str(max_q_dist)
@@ -501,10 +505,22 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
     for jumps_, (_, query_genome), jump_cov_ in zip(jumps, query_genomes, cov_list):
         query_genome.check()
         for jump, cov in zip(jumps_, jump_cov_):
-            if cov < min_cov:
-                pass
+            if cov < min_cov and abs(jump.from_pos - jump.to_pos) >= low_cov_min_dist:
+                    from_call = SvCall(jump.from_pos, jump.from_pos, 0, 0, jump.from_forward, jump.from_forward, cov)
+                    if jump.query_from < jump.query_to:
+                        from_call.inserted_sequence = NucSeq(query_genome, jump.query_from, jump.query_to)
+                        from_call.inserted_sequence.check()
+                    from_call.order_id = idx
+                    idx += 1
+                    sv_inserter.insert(from_call) # updates id in from_call
+                    to_call = SvCall(jump.to_pos, jump.to_pos, 0, 0, jump.to_forward, jump.to_forward, cov)
+                    to_call.order_id = idx
+                    idx += 1
+                    sv_inserter.insert(to_call) # updates id in to_call
+                    # uses ids to make connection
+                    one_sided_calls.insert_calls(from_call, to_call)
             else:
-                call = SvCall(jump.from_pos, jump.to_pos, 0, 0, jump.from_forward, jump.to_forward, 1000)
+                call = SvCall(jump.from_pos, jump.to_pos, 0, 0, jump.from_forward, jump.to_forward, cov)
                 if jump.query_from < jump.query_to:
                     call.inserted_sequence = NucSeq(query_genome, jump.query_from, jump.query_to)
                     call.inserted_sequence.check()
@@ -603,8 +619,7 @@ if __name__ == "__main__":
     ]
     out.extend(render_reads_per_jump(jumps, covs, query_genome))
 
-    #jumps_to_calls_to_db(jumps, dm_name, query_genome, reference_genome)
-    #jumps_to_calls_to_db(jumps, dm_name, query_genome, reference_genome, 5000)
+    jumps_to_calls_to_db(jumps, dm_name, query_genome, reference_genome)
     #exit()
 
     aligner_seeds = None
