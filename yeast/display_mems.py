@@ -154,9 +154,10 @@ def make_read_extension_table(db_name, seq_id, assembled_genome):
     ext_table.gen_indices()
 
 
-def view_coverage(db_name, seq_id, assembled_genome, steps=20000):
+def view_coverage(db_name, seq_id, assembled_genome, steps=10000):
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     ext_table = ReadRangeTable(db_conn)
+    ext_table.gen_indices() # make sure indices exist (does nothing if they are present)
     pack = Pack()
     pack.load(assembled_genome + "/ma/genome")
     plot = figure(title="coverage of " + assembled_genome, plot_width=1000, plot_height=1000)
@@ -185,47 +186,45 @@ def view_coverage(db_name, seq_id, assembled_genome, steps=20000):
     return plot
 
 
-def reads_per_jump(db_name, jumps, seq_id, min_stick_out=50, primary=True, min_map_q=0):
+def reads_per_jump(db_name, jumps, seq_id, min_stick_out=50, primary=True, min_map_q=0, min_cov=10):
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     ext_table = ReadRangeTable(db_conn)
+    ext_table.gen_indices() # make sure indices exist (does nothing if they are present)
 
     ret = []
-    for jumps_ in jumps:
+    for idx, jumps_ in enumerate(jumps):
+        print("reads_per_jump:", idx, "/", len(jumps), "...")
         ret.append([])
         for jump in jumps_:
-            if jump.query_from <= jump.query_to:
-                cov = ext_table.coverage(jump.query_from - min_stick_out, jump.query_to + min_stick_out, seq_id,
-                                         primary, min_map_q)
+            cov = ext_table.coverage(jump.query_from - min_stick_out, jump.query_to + min_stick_out, seq_id,
+                                        primary, min_map_q)
+            if cov < min_cov:
+                cov_start = ext_table.coverage(jump.query_from - min_stick_out, jump.query_from + min_stick_out,
+                                                seq_id, primary, min_map_q)
+                cov_end = ext_table.coverage(jump.query_to - min_stick_out, jump.query_to + min_stick_out, seq_id,
+                                            primary, min_map_q)
             else:
-                cov = 0
-            ret[-1].append(cov)
+                cov_start = None
+                cov_end = None
+            ret[-1].append( (cov, cov_start, cov_end) )
     return ret
 
 def render_reads_per_jump(jumps, cov_lists, assembled_genome):
     plot = figure(title="#reads that cover a call " + assembled_genome, plot_width=1000, plot_height=1000)
-    plot2 = figure(title="query distance of calls (cov < 10) of " + assembled_genome, plot_width=1000, plot_height=1000)
-    plot3 = figure(title="query distance of calls (cov >= 10) of " + assembled_genome, plot_width=1000,
-                    plot_height=1000)
+    plot4 = figure(title="#reads that cover a breakpoint " + assembled_genome, plot_width=1000, plot_height=1000)
+    plot2 = figure(title="query distance of calls (positive: cov < 10; negative: cov >= 10) of " + assembled_genome, plot_width=1000, plot_height=1000)
 
-    def dist_list_to_bars(dist_list, plot, name, color, num_bars=100):
+    def dist_list_to_bars(dist_list, plot, name, color, positive=True, num_bars=100):
         dist_list.sort()
         buckets = [0]*(num_bars+1)
         bucket_len = (dist_list[-1] - dist_list[0]) / num_bars
         for dist in dist_list:
-            buckets[ int((dist - dist_list[0]) / bucket_len) ] += 1
+            buckets[ int((dist - dist_list[0]) / bucket_len) ] += 1 if positive else -1
         xs = [x * bucket_len + bucket_len/2 for x in range(num_bars+1)]
-        plot.vbar(x=xs, bottom=0, top=buckets, width=bucket_len*0.75, legend_label=name, color=color, fill_alpha=.5)
+        plot.vbar(x=xs, bottom=0 if positive else buckets, top=buckets if positive else 0,
+                  width=bucket_len*0.75, legend_label=name, color=color, fill_alpha=.5)
 
-    for (cov_list, name, color) in cov_lists:
-        cov_dict = {}
-        idx = 0
-        for cov_list_, jumps_ in zip(cov_list, jumps):
-            for cov, jump in zip(cov_list_, jumps_):
-                if not cov in cov_dict:
-                    cov_dict[cov] = []
-                cov_dict[cov].append( (idx, jump.query_to - jump.query_from) )
-                idx += 1
-
+    def cov_patch(cov_dict, plot, name, color):
         xs = [0]
         ys = [0]
         q_dist_list = []
@@ -246,19 +245,40 @@ def render_reads_per_jump(jumps, cov_lists, assembled_genome):
 
         plot.patch(x=xs, y=ys, legend_label=name, color=color, fill_alpha=.5)
 
+    for (cov_list, name, color) in cov_lists:
+        cov_dict = {}
+        cov_dict_bp = {}
+        idx = 0
+        for cov_list_, jumps_ in zip(cov_list, jumps):
+            for (cov, cov_start, cov_end), jump in zip(cov_list_, jumps_):
+                if not cov in cov_dict:
+                    cov_dict[cov] = []
+                cov_dict[cov].append( (idx, jump.query_to - jump.query_from) )
+
+                if not cov_start in cov_dict_bp:
+                    cov_dict_bp[cov_start] = []
+                cov_dict_bp[cov_start].append(idx)
+
+                if not cov_end in cov_dict_bp:
+                    cov_dict_bp[cov_end] = []
+                cov_dict_bp[cov_end].append(idx)
+
+                idx += 1
+
+        cov_patch(cov_dict, plot, name, color)
+        cov_patch(cov_dict_bp, plot4, name, color)
+
         dist_list_to_bars(q_dist_list, plot2, name, color)
-        dist_list_to_bars(q_dist_list2, plot3, name, color)
+        dist_list_to_bars(q_dist_list2, plot2, name, color, False)
 
     plot.xaxis.axis_label = "coverage"
     plot.yaxis.axis_label = "#calls"
 
     plot2.xaxis.axis_label = "q_dist"
     plot2.yaxis.axis_label = "#calls"
-    plot3.xaxis.axis_label = "q_dist"
-    plot3.yaxis.axis_label = "#calls"
 
 
-    return [plot, plot2, plot3]
+    return [plot, plot4, plot2]
 
 class SeedsFilter:
     def __init__(self, intervals=None, intervals_2=None):
@@ -338,12 +358,13 @@ def seeds_to_jumps(seeds_n_rects, query_genome, reference_genome):
     param = ParameterSetManager()
     pack, fm_index, mm_index, query_genomes = load_genomes(query_genome, reference_genome)
     jumps_from_seeds = SvJumpsFromExtractedSeeds(param, pack)
-    filter_by_ambiguity = FilterJumpsByRefAmbiguity(param)
 
     ret = []
-    for (_, seeds, _), (_, query_genome) in zip(seeds_n_rects, query_genomes):
+    for (y_start, seeds, _), (_, query_genome) in zip(seeds_n_rects, query_genomes):
         jumps = jumps_from_seeds.execute(libMA.containers.Seeds(seeds), pack, query_genome)
-        filtered_jumps = filter_by_ambiguity.execute(jumps, pack)
+        for jump in jumps:
+            jump.query_from += y_start
+            jump.query_to += y_start
         ret.append(jumps)
     return ret
 
@@ -406,13 +427,15 @@ def render_jumps(jumps, jump_cov, query_genome, reference_genome, min_cov=10):
     ms = []
     ids = []
     covs = []
+    cov_starts = []
+    cov_ends = []
     qlens = []
     fs = []
     ts = []
     idx = 0
     colors = {True:{True:"blue", False:"green"}, False:{True:"purple", False:"orange"}}
     for jumps_, jump_cov_ in zip(jumps, jump_cov):
-        for jump, cov in zip(jumps_, jump_cov_):
+        for jump, (cov, cov_start, cov_end) in zip(jumps_, jump_cov_):
             #if idx != 8281:
             #    idx+=1
             #    continue
@@ -430,8 +453,13 @@ def render_jumps(jumps, jump_cov, query_genome, reference_genome, min_cov=10):
             ys.append(t)
             ms.append(jump.was_mirrored)
             covs.append(cov)
+            cov_starts.append(cov_start)
+            cov_ends.append(cov_end)
             if cov < min_cov:
-                cs.append("red")
+                if cov_start >= min_cov and cov_end >= min_cov:
+                    cs.append("orange")
+                else:
+                    cs.append("red")
             else:
                 cs.append(colors[jump.from_forward][jump.to_forward])
             ids.append(idx)
@@ -442,11 +470,12 @@ def render_jumps(jumps, jump_cov, query_genome, reference_genome, min_cov=10):
     plot = figure(title="entries", plot_width=1000, plot_height=1000)
     decorate_plot(plot, reference_genome, reference_genome, True)
     plot.x(x="xs", y="ys", color="cs", line_width=4, source=ColumnDataSource(data={
-                    "xs":xs, "ys":ys, "cs":cs, "ms":ms, "ids": ids, "qlens": qlens, "fs":fs, "ts":ts, "cov": covs
+                    "xs":xs, "ys":ys, "cs":cs, "ms":ms, "ids": ids, "qlens": qlens, "fs":fs, "ts":ts, "cov": covs,
+                    "cov_start": cov_starts, "cov_end":cov_ends
                 }))
     plot.add_tools(HoverTool(tooltips=[("x, y", "@xs, @ys"),("id", "@ids"),("color, mirrored", "@cs, @ms"),
                                        ("query dist", "@qlens"), ("strandinfo", "from @fs to @ts"),
-                                       ("read coverage", "@cov")]))
+                                       ("read coverage", "enclose: @cov, start: @cov_start, end: @cov_end")]))
     return plot
 
 def filter_jumps(jumps, reference_genome, max_q_dist=None, min_dist=None):
@@ -481,22 +510,17 @@ def filter_jumps(jumps, reference_genome, max_q_dist=None, min_dist=None):
             ret[-1].append(jump)
     return ret
 
-def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_genome, min_cov=10,
-                        # calls with low coverage that are smaller than this will be ignored others will become one 
-                        # sided
-                         low_cov_min_dist=200):
+def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_genome, min_cov=10):
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
 
     JumpRunTable(db_conn)
     SvCallerRunTable(db_conn)
     one_sided_calls = OneSidedCallsTable(db_conn)
     name = "Ground Truth"
-    if not max_q_dist is None:
-        name = name + " Q-Dist-Filter:" + str(max_q_dist)
-    get_inserter = GetCallInserter(ParameterSetManager(), db_conn, name,
-                                   "SV's form genome assembly", -1)
-    pool = PoolContainer(1, db_name)
-    sv_inserter = get_inserter.execute(pool)
+    sv_call_table = SvCallTable(db_conn)
+    caller_run_id = GetCallInserter(ParameterSetManager(), db_conn, name,
+                                   "SV's form genome assembly", -1).cpp_module.id
+    one_sided_calls = OneSidedCallsTable(db_conn)
 
     pack, fm_index, mm_index, query_genomes = load_genomes(query_genome_str, reference_genome)
 
@@ -504,21 +528,25 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
     idx = 0
     for jumps_, (_, query_genome), jump_cov_ in zip(jumps, query_genomes, cov_list):
         query_genome.check()
-        for jump, cov in zip(jumps_, jump_cov_):
-            if cov < min_cov and abs(jump.from_pos - jump.to_pos) >= low_cov_min_dist:
+        for jump, (cov, cov_start, cov_end) in zip(jumps_, jump_cov_):
+            if cov < min_cov:
+                if cov_start >= min_cov and cov_end >= min_cov:
                     from_call = SvCall(jump.from_pos, jump.from_pos, 0, 0, jump.from_forward, jump.from_forward, cov)
                     if jump.query_from < jump.query_to:
                         from_call.inserted_sequence = NucSeq(query_genome, jump.query_from, jump.query_to)
                         from_call.inserted_sequence.check()
                     from_call.order_id = idx
                     idx += 1
-                    sv_inserter.insert(from_call) # updates id in from_call
+                    sv_call_table.insert_call(caller_run_id, from_call) # updates id in from_call
                     to_call = SvCall(jump.to_pos, jump.to_pos, 0, 0, jump.to_forward, jump.to_forward, cov)
                     to_call.order_id = idx
                     idx += 1
-                    sv_inserter.insert(to_call) # updates id in to_call
+                    sv_call_table.insert_call(caller_run_id, to_call) # updates id in to_call
                     # uses ids to make connection
                     one_sided_calls.insert_calls(from_call, to_call)
+                else:
+                    # ignore call (cause it is impossible to make)
+                    pass
             else:
                 call = SvCall(jump.from_pos, jump.to_pos, 0, 0, jump.from_forward, jump.to_forward, cov)
                 if jump.query_from < jump.query_to:
@@ -527,11 +555,9 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
                 call.order_id = idx
                 idx += 1
                 call.mirrored = jump.was_mirrored
-                sv_inserter.insert(call)
+                sv_call_table.insert_call(caller_run_id, call)
 
-    sv_inserter.close(pool)
-
-    return get_inserter.cpp_module.id, None
+    return caller_run_id, None
 
 def render_seeds_2(seeds_1, seeds_2, query_genome, reference_genome, title="seeds"):
     plot = figure(title=title, plot_width=1000, plot_height=1000)
@@ -597,21 +623,21 @@ reference_genome = genome_dir + "YPS138"
 #reference_genome = genome_dir + "SK1"
 #reference_genome = "vivax"
 
-dm_name = "UFRJ50816_test_reconstruct"
+db_name = "UFRJ50816_test_reconstruct"
 seq_id = 1
 
 if __name__ == "__main__":
     out = []
 
     #make_read_extension_table(dm_name, 1, query_genome)
-    out.append(view_coverage(dm_name, 1, query_genome))
+    out.append(view_coverage(db_name, 1, query_genome))
     #exit()
 
-    seeds_n_rects = compute_seeds(query_genome, reference_genome, dm_name, seq_id)
+    seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, seq_id)
     jumps = filter_jumps(seeds_to_jumps(seeds_n_rects, query_genome, reference_genome), reference_genome)
-    jump_coverage_lenient = reads_per_jump(dm_name, jumps, seq_id, False)
-    jump_coverage = reads_per_jump(dm_name, jumps, seq_id, True)
-    jump_coverage_strict = reads_per_jump(dm_name, jumps, seq_id, True, 0.1)
+    jump_coverage_lenient = reads_per_jump(db_name, jumps, seq_id, False)
+    jump_coverage = reads_per_jump(db_name, jumps, seq_id, True)
+    jump_coverage_strict = reads_per_jump(db_name, jumps, seq_id, True, 0.1)
     covs = [
         (jump_coverage_lenient, "map_q>=0", "red"),
         (jump_coverage, "primary & map_q>=0", "blue"),
@@ -619,7 +645,7 @@ if __name__ == "__main__":
     ]
     out.extend(render_reads_per_jump(jumps, covs, query_genome))
 
-    jumps_to_calls_to_db(jumps, dm_name, query_genome, reference_genome)
+    jumps_to_calls_to_db(jumps, jump_coverage_strict, db_name, query_genome, reference_genome)
     #exit()
 
     aligner_seeds = None
