@@ -198,7 +198,7 @@ def reads_per_jump(db_name, jumps, seq_id, min_stick_out=50, primary=True, min_m
         for jump in jumps_:
             cov = ext_table.coverage(jump.query_from - min_stick_out, jump.query_to + min_stick_out, seq_id,
                                         primary, min_map_q)
-            if cov < min_cov:
+            if cov < min_cov or True:
                 cov_start = ext_table.coverage(jump.query_from - min_stick_out, jump.query_from + min_stick_out,
                                                 seq_id, primary, min_map_q)
                 cov_end = ext_table.coverage(jump.query_to - min_stick_out, jump.query_to + min_stick_out, seq_id,
@@ -227,18 +227,11 @@ def render_reads_per_jump(jumps, cov_lists, assembled_genome):
     def cov_patch(cov_dict, plot, name, color):
         xs = [0]
         ys = [0]
-        q_dist_list = []
-        q_dist_list2 = []
         #print("coverage_dict ( coverage -> (num,id) ):")
         for (cov, l) in sorted(list(cov_dict.items())):
             #print(cov, len(l), l)
             xs.append(cov)
             ys.append(len(l))
-            for idx, dist in l:
-                if cov < 10:
-                    q_dist_list.append(dist)
-                else:
-                    q_dist_list2.append(dist)
 
         xs.append(cov)
         ys.append(0)
@@ -268,6 +261,14 @@ def render_reads_per_jump(jumps, cov_lists, assembled_genome):
         cov_patch(cov_dict, plot, name, color)
         cov_patch(cov_dict_bp, plot4, name, color)
 
+        q_dist_list = []
+        q_dist_list2 = []
+        for (cov, l) in sorted(list(cov_dict.items())):
+            for idx, dist in l:
+                if cov < 10:
+                    q_dist_list.append(dist)
+                else:
+                    q_dist_list2.append(dist)
         dist_list_to_bars(q_dist_list, plot2, name, color)
         dist_list_to_bars(q_dist_list2, plot2, name, color, False)
 
@@ -395,8 +396,7 @@ def decorate_plot(plot, query_genome, reference_genome, diagonal=False):
         ys.append(float("NaN"))
     plot.line(x=xs, y=ys, color="black", line_width=1)
 
-    if diagonal:
-        plot.line(x=[0, pack_2.unpacked_size_single_strand], y=[0, pack_1.unpacked_size_single_strand],
+    if diagonal:            plot.line(x=[0, pack_2.unpacked_size_single_strand], y=[0, pack_1.unpacked_size_single_strand],
                   color="black", line_width=1)
 
     ticker_code = """
@@ -432,7 +432,6 @@ def render_jumps(jumps, jump_cov, query_genome, reference_genome, min_cov=10):
     qlens = []
     fs = []
     ts = []
-    idx = 0
     colors = {True:{True:"blue", False:"green"}, False:{True:"purple", False:"orange"}}
     for jumps_, jump_cov_ in zip(jumps, jump_cov):
         for jump, (cov, cov_start, cov_end) in zip(jumps_, jump_cov_):
@@ -457,16 +456,15 @@ def render_jumps(jumps, jump_cov, query_genome, reference_genome, min_cov=10):
             cov_ends.append(cov_end)
             if cov < min_cov:
                 if cov_start >= min_cov and cov_end >= min_cov:
-                    cs.append("orange")
+                    cs.append("black")
                 else:
                     cs.append("red")
             else:
                 cs.append(colors[jump.from_forward][jump.to_forward])
-            ids.append(idx)
-            qlens.append(jump.query_to - jump.query_from )
+            ids.append(jump.id)
+            qlens.append( jump.query_to - jump.query_from )
             fs.append("fow" if jump.from_forward else "rev")
             ts.append("fow" if jump.to_forward else "rev")
-            idx+=1
     plot = figure(title="entries", plot_width=1000, plot_height=1000)
     decorate_plot(plot, reference_genome, reference_genome, True)
     plot.x(x="xs", y="ys", color="cs", line_width=4, source=ColumnDataSource(data={
@@ -515,9 +513,9 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
 
     JumpRunTable(db_conn)
     SvCallerRunTable(db_conn)
+    sv_call_table = SvCallTable(db_conn)
     one_sided_calls = OneSidedCallsTable(db_conn)
     name = "Ground Truth"
-    sv_call_table = SvCallTable(db_conn)
     caller_run_id = GetCallInserter(ParameterSetManager(), db_conn, name,
                                    "SV's form genome assembly", -1).cpp_module.id
     one_sided_calls = OneSidedCallsTable(db_conn)
@@ -525,37 +523,70 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
     pack, fm_index, mm_index, query_genomes = load_genomes(query_genome_str, reference_genome)
 
 
+    cnt_one_sided_jumps = 0
+    cnt_low_coverage_jumps = 0
+    cnt_remaining_jumps = 0
+
     idx = 0
-    for jumps_, (_, query_genome), jump_cov_ in zip(jumps, query_genomes, cov_list):
+    for jumps_, (y_start, query_genome), jump_cov_ in zip(jumps, query_genomes, cov_list):
         query_genome.check()
         for jump, (cov, cov_start, cov_end) in zip(jumps_, jump_cov_):
-            if cov < min_cov:
-                if cov_start >= min_cov and cov_end >= min_cov:
-                    from_call = SvCall(jump.from_pos, jump.from_pos, 0, 0, jump.from_forward, jump.from_forward, cov)
-                    if jump.query_from < jump.query_to:
-                        from_call.inserted_sequence = NucSeq(query_genome, jump.query_from, jump.query_to)
-                        from_call.inserted_sequence.check()
-                    from_call.order_id = idx
-                    idx += 1
-                    sv_call_table.insert_call(caller_run_id, from_call) # updates id in from_call
-                    to_call = SvCall(jump.to_pos, jump.to_pos, 0, 0, jump.to_forward, jump.to_forward, cov)
+            jump.id = idx
+            if cov < min_cov and cov_start >= min_cov and cov_end >= min_cov:
+                from_forward = jump.from_forward
+                to_forward = jump.to_forward
+                if jump.was_mirrored:
+                    from_forward = not from_forward
+                    to_forward = not to_forward
+
+                from_call = SvCall(jump.from_pos, jump.from_pos, 0, 0, from_forward, from_forward, cov)
+                to_call = SvCall(jump.to_pos, jump.to_pos, 0, 0, to_forward, to_forward, cov)
+
+                if jump.was_mirrored:
                     to_call.order_id = idx
                     idx += 1
-                    sv_call_table.insert_call(caller_run_id, to_call) # updates id in to_call
-                    # uses ids to make connection
-                    one_sided_calls.insert_calls(from_call, to_call)
+                    from_call.order_id = idx
+                    idx += 1
                 else:
-                    # ignore call (cause it is impossible to make)
-                    pass
+                    from_call.order_id = idx
+                    idx += 1
+                    to_call.order_id = idx
+                    idx += 1
+
+                if jump.query_from < jump.query_to:
+                    if jump.was_mirrored:
+                        to_call.inserted_sequence = NucSeq(query_genome, jump.query_from - y_start,
+                                                                jump.query_to - y_start)
+                        to_call.inserted_sequence.check()
+                    else:
+                        from_call.inserted_sequence = NucSeq(query_genome, jump.query_from - y_start,
+                                                                jump.query_to - y_start)
+                        from_call.inserted_sequence.check()
+
+                sv_call_table.insert_call(caller_run_id, from_call) # updates id in from_call
+                sv_call_table.insert_call(caller_run_id, to_call) # updates id in to_call
+
+                if jump.was_mirrored:
+                    one_sided_calls.insert_calls(to_call, from_call)
+                else:
+                    one_sided_calls.insert_calls(from_call, to_call)
+                cnt_one_sided_jumps += 1
             else:
+                if cov < min_cov:
+                    cnt_low_coverage_jumps += 1
+                else:
+                    cnt_remaining_jumps += 1
                 call = SvCall(jump.from_pos, jump.to_pos, 0, 0, jump.from_forward, jump.to_forward, cov)
                 if jump.query_from < jump.query_to:
-                    call.inserted_sequence = NucSeq(query_genome, jump.query_from, jump.query_to)
+                    call.inserted_sequence = NucSeq(query_genome, jump.query_from - y_start, jump.query_to - y_start)
                     call.inserted_sequence.check()
                 call.order_id = idx
                 idx += 1
                 call.mirrored = jump.was_mirrored
                 sv_call_table.insert_call(caller_run_id, call)
+
+    print("Inserted into DB. There were", cnt_one_sided_jumps, "one sided entries,", cnt_low_coverage_jumps,
+          "entries with coverage <=", min_cov, "and", cnt_remaining_jumps, "two sided entries with enough coverage" )
 
     return caller_run_id, None
 
@@ -635,12 +666,12 @@ if __name__ == "__main__":
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, seq_id)
     jumps = filter_jumps(seeds_to_jumps(seeds_n_rects, query_genome, reference_genome), reference_genome)
-    jump_coverage_lenient = reads_per_jump(db_name, jumps, seq_id, False)
-    jump_coverage = reads_per_jump(db_name, jumps, seq_id, True)
+    #jump_coverage_lenient = reads_per_jump(db_name, jumps, seq_id, False)
+    #jump_coverage = reads_per_jump(db_name, jumps, seq_id, True)
     jump_coverage_strict = reads_per_jump(db_name, jumps, seq_id, True, 0.1)
     covs = [
-        (jump_coverage_lenient, "map_q>=0", "red"),
-        (jump_coverage, "primary & map_q>=0", "blue"),
+        #(jump_coverage_lenient, "map_q>=0", "red"),
+        #(jump_coverage, "primary & map_q>=0", "blue"),
         (jump_coverage_strict, "primary & map_q>=10", "green")
     ]
     out.extend(render_reads_per_jump(jumps, covs, query_genome))
