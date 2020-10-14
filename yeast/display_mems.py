@@ -123,10 +123,10 @@ def run_aligner_seeds(query_genome_str, reference_genome):
 
     return ret
 
-def make_read_extension_table(db_name, seq_id, assembled_genome):
+def make_read_extension_table(db_name, seq_id, assembled_genome, use_mm2=True):
     read_set = {"technology":"pb", "name":"test", "fasta_file":"reads.fasta"}
     json_dict = {"reference_path":reference_genome}
-    sam_file_path = "mm2.sam"
+    sam_file_path = "read_ext_out.sam"
     ret = []
     with open("reads.fasta", "w") as out_file:
         for read in iterate_reads(ParameterSetManager(), db_name, seq_id):
@@ -136,8 +136,12 @@ def make_read_extension_table(db_name, seq_id, assembled_genome):
             out_file.write(str(read))
             out_file.write("\n")
 
-    mm2(read_set, sam_file_path, json_dict)
-    f_stream = FileStreamFromPath("mm2.sam")
+    if use_mm2:
+        mm2(read_set, sam_file_path, json_dict)
+    else:
+
+        bwa_single(read_set, sam_file_path, json_dict)
+    f_stream = FileStreamFromPath("read_ext_out.sam")
     read_by_name = ReadByName()
     # just always return nullptr since we do not need the cigars
     read_by_name.return_null_for_unknown = True
@@ -154,9 +158,9 @@ def make_read_extension_table(db_name, seq_id, assembled_genome):
     ext_table.gen_indices()
 
 
-def view_coverage(db_name, seq_id, assembled_genome, steps=10000):
+def view_coverage(db_name, seq_id, assembled_genome, steps=10000, with_selection=False):
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
-    ext_table = ReadRangeTable(db_conn)
+    ext_table = ReadRangeTable(db_conn, with_selection)
     ext_table.gen_indices() # make sure indices exist (does nothing if they are present)
     pack = Pack()
     pack.load(assembled_genome + "/ma/genome")
@@ -660,15 +664,16 @@ seq_id = 1
 if __name__ == "__main__":
     out = []
 
-    #make_read_extension_table(dm_name, 1, query_genome)
+    #make_read_extension_table(db_name, 3, query_genome, use_mm2=False)
     out.append(view_coverage(db_name, 1, query_genome))
-    #exit()
+    show(row(out))
+    exit()
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, seq_id)
     jumps = filter_jumps(seeds_to_jumps(seeds_n_rects, query_genome, reference_genome), reference_genome)
     #jump_coverage_lenient = reads_per_jump(db_name, jumps, seq_id, False)
     #jump_coverage = reads_per_jump(db_name, jumps, seq_id, True)
-    jump_coverage_strict = reads_per_jump(db_name, jumps, seq_id, True, 0.1)
+    jump_coverage_strict = reads_per_jump(db_name, jumps, 3, True, 0.1)
     covs = [
         #(jump_coverage_lenient, "map_q>=0", "red"),
         #(jump_coverage, "primary & map_q>=0", "blue"),

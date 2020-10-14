@@ -6,6 +6,12 @@ def bwa(read_set, sam_file_path, json_dict):
                 + read_set["fasta_file"] + " " + read_set["fasta_file_mate"] + " > " + sam_file_path
                 + " 2> /dev/null")
 
+def bwa_single(read_set, sam_file_path, json_dict):
+    index_str = json_dict["reference_path"] + "/bwa/genome"
+    os.system("~/workspace/bwa/bwa mem -R \"@RG\\tID:1\\tSM:" + read_set["name"] + "\" -t 32 " + index_str + " "
+                + read_set["fasta_file"] + " > " + sam_file_path
+                + " 2> /dev/null")
+
 def bowtie(read_set, sam_file_path, json_dict):
     index_str = json_dict["reference_path"] + "/bowtie/genome.fna"
     os.system("~/workspace/bowtie2/bowtie2-2.3.3.1/bowtie2 --rg-id 1 --rg SM:" + read_set["name"] + " -p 32 -x " +
