@@ -40,10 +40,7 @@ def load_genomes(query_genome, reference_genome):
 
 def compute_seeds(query_genome, reference_genome, db_name, seq_id, ambiguity=2):
     param = ParameterSetManager()
-    param.by_name("Max Size Reseed").set(2000)
-    param.by_name("Fixed SoC Width").set(100)
-    param.by_name("Min NT in SoC").set(50)
-    param.by_name("Rectangular SoC").set(False)
+    param.set_selected("SV-PacBio")
 
     pack, fm_index, mm_index, query_genomes = load_genomes(query_genome, reference_genome)
     mm_index.set_max_occ(ambiguity)
@@ -53,7 +50,7 @@ def compute_seeds(query_genome, reference_genome, db_name, seq_id, ambiguity=2):
     contig_filter = FilterContigBorder(param)
     soc_module = StripOfConsiderationSeeds(param)
     soc_filter = GetAllFeasibleSoCsAsSet(param)
-    reseeding_1 = RecursiveReseedingSoCs(param, pack, 100)
+    reseeding_1 = RecursiveReseedingSoCs(param, pack)
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     mm_counter = HashFilterTable(db_conn).get_counter(seq_id)
     #mm_counter = HashCounter()
@@ -513,15 +510,21 @@ def filter_jumps(jumps, reference_genome, max_q_dist=None, min_dist=None):
     return ret
 
 def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_genome, min_cov=10):
+    parameter_set_manager = ParameterSetManager()
+    parameter_set_manager.set_selected("SV-PacBio")
+    min_size = parameter_set_manager.by_name("Min Size Edge").get()
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
 
     JumpRunTable(db_conn)
     SvCallerRunTable(db_conn)
     sv_call_table = SvCallTable(db_conn)
     one_sided_calls = OneSidedCallsTable(db_conn)
-    name = "Ground Truth"
-    caller_run_id = GetCallInserter(ParameterSetManager(), db_conn, name,
+    caller_run_id = GetCallInserter(parameter_set_manager, db_conn, "Ground Truth",
                                    "SV's form genome assembly", -1).cpp_module.id
+    low_cov_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, "Ground Truth - Low coverage",
+                                   "SV's form genome assembly that are not covered by any alignments", -1).cpp_module.id
+    small_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, "Ground Truth - Small",
+                                   "SV's form genome assembly that are too small for pacBio reads", -1).cpp_module.id
     one_sided_calls = OneSidedCallsTable(db_conn)
 
     pack, fm_index, mm_index, query_genomes = load_genomes(query_genome_str, reference_genome)
@@ -587,7 +590,12 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
                 call.order_id = idx
                 idx += 1
                 call.mirrored = jump.was_mirrored
-                sv_call_table.insert_call(caller_run_id, call)
+                if cov < min_cov:
+                    sv_call_table.insert_call(low_cov_caller_run_id, call)
+                elif max(abs(jump.from_pos - jump.to_pos), abs(jump.query_from - jump.query_to)) < min_size:
+                    sv_call_table.insert_call(small_caller_run_id, call)
+                else:
+                    sv_call_table.insert_call(caller_run_id, call)
 
     print("Inserted into DB. There were", cnt_one_sided_jumps, "one sided entries,", cnt_low_coverage_jumps,
           "entries with coverage <=", min_cov, "and", cnt_remaining_jumps, "two sided entries with enough coverage" )
@@ -658,22 +666,20 @@ reference_genome = genome_dir + "YPS138"
 #reference_genome = genome_dir + "SK1"
 #reference_genome = "vivax"
 
-db_name = "UFRJ50816_test_reconstruct"
+db_name = "UFRJ50816"
 seq_id = 1
 
 if __name__ == "__main__":
     out = []
 
-    #make_read_extension_table(db_name, 3, query_genome, use_mm2=False)
-    out.append(view_coverage(db_name, 1, query_genome))
-    show(row(out))
-    exit()
+    make_read_extension_table(db_name, seq_id, query_genome)
+    out.append(view_coverage(db_name, seq_id, query_genome))
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, seq_id)
     jumps = filter_jumps(seeds_to_jumps(seeds_n_rects, query_genome, reference_genome), reference_genome)
     #jump_coverage_lenient = reads_per_jump(db_name, jumps, seq_id, False)
     #jump_coverage = reads_per_jump(db_name, jumps, seq_id, True)
-    jump_coverage_strict = reads_per_jump(db_name, jumps, 3, True, 0.1)
+    jump_coverage_strict = reads_per_jump(db_name, jumps, seq_id, True, 0.1)
     covs = [
         #(jump_coverage_lenient, "map_q>=0", "red"),
         #(jump_coverage, "primary & map_q>=0", "blue"),

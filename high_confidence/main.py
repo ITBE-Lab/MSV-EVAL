@@ -42,8 +42,9 @@ def regex_match(folder, regex):
 #]
 
 read_datasets = [
-    ("Illumina", regex_match(read_data_dir + "PRJEB7245/UFRJ50816/illumina_hiseq_2500/", "*.trimmed.fastq"), None),
+    #("Illumina", regex_match(read_data_dir + "PRJEB7245/UFRJ50816/illumina_hiseq_2500/", "*.trimmed.fastq"), None),
     #("PacBio", regex_match(read_data_dir + "PRJEB7245/UFRJ50816/pacBioSMRT/", "*.fasta"), None),
+    ("SimulatedPacBio", regex_match(read_data_dir + "simulated/UFRJ50816/pacbio_CCS/", "*.fasta"), None),
 ]
 
 def uFRJ50816_filter(pack):
@@ -65,8 +66,8 @@ def compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index):
 def run_ma(pack, individual="HG002"):
     param = ParameterSetManager()
     mm_index = MinimizerIndex(param, pack.contigSeqs(), pack.contigNames())
-    seq_ids = load_reads(individual, param)
-    return
+    seq_ids = [1]#load_reads(individual, param)
+    #return
     sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index)
     print("caller_id", sv_caller_run_id)
 
@@ -75,7 +76,7 @@ if __name__ == "__main__":
     pack = Pack()
     pack.load(genome_dir + "ma/genome")
 
-    run_ma(pack, individual="UFRJ50816_test_reconstruct")
+    run_ma(pack, individual="UFRJ50816")
 
     #load_high_confidence_calls(pack, individual="UFRJ50816")
 

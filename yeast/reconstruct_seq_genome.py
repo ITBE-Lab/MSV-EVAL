@@ -11,7 +11,7 @@ reference_genome = genome_dir + "YPS138"
 #reference_genome = "vivax"
 if __name__ == "__main__":
     db_name = "UFRJ50816_test_reconstruct"
-    run_id = 2
+    run_ids = [1,2,3]
 
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     call_table = SvCallTable(db_conn)
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     pack, _, _, ret_query_genome = load_genomes(query_genome, reference_genome)
 
 
-    seeds_list = call_table.calls_to_seeds_by_id_auto(pack, run_id, True, 0)
+    seeds_list = call_table.calls_to_seeds_by_id_auto(pack, run_ids, True, 0)
 
     reconstructed_query_genome = call_table.reconstruct_sequenced_genome_from_seeds(seeds_list, pack)
     reconstructed_query_genome.store(reconstructed_query_genome_path + "/ma/genome")
