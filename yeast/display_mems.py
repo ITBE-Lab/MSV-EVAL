@@ -55,7 +55,7 @@ def compute_seeds(query_genome, reference_genome, db_name, seq_id, ambiguity=2):
     mm_counter = HashFilterTable(db_conn).get_counter(seq_id)
     #mm_counter = HashCounter()
     jumps_from_seeds = SvJumpsFromSeeds(param, pack)
-    reseeding = RecursiveReseeding(param, pack)
+    #reseeding = RecursiveReseeding(param, pack)
 
     ret = []
     for y_start, query_genome in query_genomes:
@@ -77,7 +77,8 @@ def compute_seeds(query_genome, reference_genome, db_name, seq_id, ambiguity=2):
         #rectangle_used_dp = helper_ret.rectangle_used_dp
 
         #ret.append((y_start, filtered_seeds_2, rectangles))
-        ret.append((y_start, reseeding.execute(filtered_seeds_2, pack, query_genome), rectangles))
+        ret.append((y_start, filtered_seeds_2, rectangles))
+        #ret.append((y_start, reseeding.execute(filtered_seeds_2, pack, query_genome), rectangles))
     return ret
 
 
@@ -120,7 +121,7 @@ def run_aligner_seeds(query_genome_str, reference_genome):
 
     return ret
 
-def make_read_extension_table(db_name, seq_id, assembled_genome, use_mm2=True):
+def make_read_range_table(db_name, seq_id, assembled_genome, use_mm2=True):
     read_set = {"technology":"pb", "name":"test", "fasta_file":"reads.fasta"}
     json_dict = {"reference_path":reference_genome}
     sam_file_path = "read_ext_out.sam"
@@ -480,7 +481,7 @@ def render_jumps(jumps, jump_cov, query_genome, reference_genome, min_cov=10):
 def filter_jumps(jumps, reference_genome, max_q_dist=None, min_dist=None):
     pack = Pack()
     pack.load(reference_genome + "/ma/genome")
-    def at_contig_border(x, dist=3):
+    def at_contig_border(x, dist=3000):
         idx = pack.seq_id_for_pos(x)
         if pack.start_of_sequence_id(idx) + dist >= x:
             return True
@@ -539,6 +540,7 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
         query_genome.check()
         for jump, (cov, cov_start, cov_end) in zip(jumps_, jump_cov_):
             jump.id = idx
+            assert(jump.num_supp_nt() > 0)
             if cov < min_cov and cov_start >= min_cov and cov_end >= min_cov:
                 from_forward = jump.from_forward
                 to_forward = jump.to_forward
@@ -546,8 +548,11 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
                     from_forward = not from_forward
                     to_forward = not to_forward
 
-                from_call = SvCall(jump.from_pos, jump.from_pos, 0, 0, from_forward, from_forward, cov)
-                to_call = SvCall(jump.to_pos, jump.to_pos, 0, 0, to_forward, to_forward, cov)
+                from_call = SvCall(jump.from_pos, jump.from_pos, 0, 0, from_forward, from_forward, cov_start,
+                                   cov_start * jump.num_supp_nt())
+                to_call = SvCall(jump.to_pos, jump.to_pos, 0, 0, to_forward, to_forward, cov_end,
+                                 cov_end* jump.num_supp_nt())
+
 
                 if jump.was_mirrored:
                     to_call.order_id = idx
@@ -583,7 +588,8 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
                     cnt_low_coverage_jumps += 1
                 else:
                     cnt_remaining_jumps += 1
-                call = SvCall(jump.from_pos, jump.to_pos, 0, 0, jump.from_forward, jump.to_forward, cov)
+                call = SvCall(jump.from_pos, jump.to_pos, 0, 0, jump.from_forward, jump.to_forward, cov,
+                              cov * jump.num_supp_nt())
                 if jump.query_from < jump.query_to:
                     call.inserted_sequence = NucSeq(query_genome, jump.query_from - y_start, jump.query_to - y_start)
                     call.inserted_sequence.check()
@@ -627,8 +633,8 @@ def render_seeds_2(seeds_1, seeds_2, query_genome, reference_genome, title="seed
     lw = {True:8, False: 4}
     for y_start, seeds, _ in seeds_1:
         for seed in seeds:
-            if seed.size < 20:
-                continue
+            #if seed.size < 20:
+            #    continue
             filtered = False
             xs[filtered][seed.on_forward_strand].append(seed.start_ref)
             xs[filtered][seed.on_forward_strand].append(seed.start_ref + seed.size * (1 if seed.on_forward_strand else -1))
@@ -672,8 +678,8 @@ seq_id = 1
 if __name__ == "__main__":
     out = []
 
-    make_read_extension_table(db_name, seq_id, query_genome)
-    out.append(view_coverage(db_name, seq_id, query_genome))
+    #make_read_range_table(db_name, seq_id, query_genome)
+    #out.append(view_coverage(db_name, seq_id, query_genome))
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, seq_id)
     jumps = filter_jumps(seeds_to_jumps(seeds_n_rects, query_genome, reference_genome), reference_genome)
