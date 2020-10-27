@@ -66,7 +66,7 @@ def compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index):
 def run_ma(pack, individual="HG002"):
     param = ParameterSetManager()
     mm_index = MinimizerIndex(param, pack.contigSeqs(), pack.contigNames())
-    seq_ids = [1]#load_reads(individual, param)
+    seq_ids = [1] #load_reads(individual, param)
     #return
     sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index)
     print("caller_id", sv_caller_run_id)

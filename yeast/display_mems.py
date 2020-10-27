@@ -137,7 +137,6 @@ def make_read_range_table(db_name, seq_id, assembled_genome, use_mm2=True):
     if use_mm2:
         mm2(read_set, sam_file_path, json_dict)
     else:
-
         bwa_single(read_set, sam_file_path, json_dict)
     f_stream = FileStreamFromPath("read_ext_out.sam")
     read_by_name = ReadByName()
@@ -155,6 +154,56 @@ def make_read_range_table(db_name, seq_id, assembled_genome, use_mm2=True):
         ext_table.insert(read_id, alignment)
     ext_table.gen_indices()
 
+def make_read_range_table_from_simulated_n_seeds(db_name, seq_id, assembled_genome):
+    read_set = {"technology":"pb", "name":"test", "fasta_file":"reads.fasta"}
+    json_dict = {"reference_path":reference_genome}
+    sam_file_path = "read_ext_out.sam"
+    ret = []
+    db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
+    ext_table = ReadRangeTable(db_conn)
+    ext_table.drop_indices()
+    pack = Pack()
+    pack.load(assembled_genome + "/ma/genome")
+
+    parameter_set_manager = ParameterSetManager()
+    parameter_set_manager.set_selected("SV-PacBio")
+    mm_index = MinimizerIndex(parameter_set_manager, pack.contigSeqs(), pack.contigNames())
+    mm_index.set_max_occ(2)
+    mm_counter = HashFilterTable(db_conn).get_counter(seq_id)
+    seeding_module = MMFilteredSeeding(parameter_set_manager)
+    seed_lumper = SeedLumping(parameter_set_manager)
+    read_table = ReadTable(db_conn)
+
+    with open("reads.fasta", "w") as out_file:
+        for read in iterate_reads(ParameterSetManager(), db_name, seq_id):
+            split = read_table.read_name(read.id).split("_")
+            #print(split)
+            chrom = split[0]
+            start_pos = int(split[1]) + pack.start_of_sequence("chr" + chrom[3:])
+            strand = split[2]
+            end_pos = start_pos + len(read)
+            ext_table.insert_range(read, start_pos, end_pos, 1, False)
+
+            minimizers = seeding_module.execute(mm_index, read, pack, mm_counter)
+            mems = seed_lumper.execute(minimizers, read, pack)
+            start_pos_mem = end_pos
+            end_pos_mem = start_pos
+
+            for mem in mems:
+                mem_start = mem.start_ref
+                mem_end = mem.start_ref + mem.size
+                if not mem.on_forward_strand:
+                    mem_start = mem.start_ref - mem.size
+                    mem_end = mem.start_ref
+
+                if mem_start < end_pos and mem_end > start_pos:
+                    start_pos_mem = min(start_pos_mem, mem_start)
+                    end_pos_mem = max(end_pos_mem, mem_end)
+
+            if start_pos_mem < end_pos_mem:
+                ext_table.insert_range(read, start_pos_mem, end_pos_mem, 1, True)
+
+    ext_table.gen_indices()
 
 def view_coverage(db_name, seq_id, assembled_genome, steps=10000, with_selection=False):
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
@@ -164,10 +213,9 @@ def view_coverage(db_name, seq_id, assembled_genome, steps=10000, with_selection
     pack.load(assembled_genome + "/ma/genome")
     plot = figure(title="coverage of " + assembled_genome, plot_width=1000, plot_height=1000)
     l = [
-        
-        (False, 0, "map_q>=0", "red"),
-        (True, 0, "primary & map_q>=0", "blue"),
-        (True, 0.1, "primary & map_q>=0.1", "green")
+        (False, None, "simulated reads", "red"),
+        #(True, 0, "primary & map_q>=0", "blue"),
+        (True, None, "unambiguous simulated reads", "green")
     ]
     max_y = 0
     for primary, map_q_min, name, color in l:
@@ -175,7 +223,10 @@ def view_coverage(db_name, seq_id, assembled_genome, steps=10000, with_selection
         ys = [0]
         for x in range(0, pack.unpacked_size_single_strand, max(1, pack.unpacked_size_single_strand // steps)):
             xs.append(x)
-            y = ext_table.coverage(x, x+1, seq_id, primary, map_q_min)
+            if map_q_min is None:
+                y = ext_table.coverage(x, x+1, seq_id, primary)
+            else:
+                y = ext_table.coverage(x, x+1, seq_id, primary, map_q_min)
             max_y = max(y, max_y)
             ys.append(y)
         xs.append(pack.unpacked_size_single_strand)
@@ -187,7 +238,6 @@ def view_coverage(db_name, seq_id, assembled_genome, steps=10000, with_selection
 
     return plot
 
-
 def reads_per_jump(db_name, jumps, seq_id, min_stick_out=50, primary=True, min_map_q=0, min_cov=10):
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     ext_table = ReadRangeTable(db_conn)
@@ -198,13 +248,23 @@ def reads_per_jump(db_name, jumps, seq_id, min_stick_out=50, primary=True, min_m
         print("reads_per_jump:", idx, "/", len(jumps), "...")
         ret.append([])
         for jump in jumps_:
-            cov = ext_table.coverage(jump.query_from - min_stick_out, jump.query_to + min_stick_out, seq_id,
-                                        primary, min_map_q)
-            if cov < min_cov or True:
-                cov_start = ext_table.coverage(jump.query_from - min_stick_out, jump.query_from + min_stick_out,
-                                                seq_id, primary, min_map_q)
-                cov_end = ext_table.coverage(jump.query_to - min_stick_out, jump.query_to + min_stick_out, seq_id,
+            if min_map_q is None:
+                cov = ext_table.coverage(jump.query_from - min_stick_out, jump.query_to + min_stick_out, seq_id,
+                                            primary)
+            else:
+                cov = ext_table.coverage(jump.query_from - min_stick_out, jump.query_to + min_stick_out, seq_id,
                                             primary, min_map_q)
+            if cov < min_cov or True:
+                if min_map_q is None:
+                    cov_start = ext_table.coverage(jump.query_from - min_stick_out, jump.query_from + min_stick_out,
+                                                    seq_id, primary)
+                    cov_end = ext_table.coverage(jump.query_to - min_stick_out, jump.query_to + min_stick_out, seq_id,
+                                                primary)
+                else:
+                    cov_start = ext_table.coverage(jump.query_from - min_stick_out, jump.query_from + min_stick_out,
+                                                    seq_id, primary, min_map_q)
+                    cov_end = ext_table.coverage(jump.query_to - min_stick_out, jump.query_to + min_stick_out, seq_id,
+                                                primary, min_map_q)
             else:
                 cov_start = None
                 cov_end = None
@@ -678,22 +738,22 @@ seq_id = 1
 if __name__ == "__main__":
     out = []
 
-    #make_read_range_table(db_name, seq_id, query_genome)
-    #out.append(view_coverage(db_name, seq_id, query_genome))
+    #make_read_range_table_from_simulated_n_seeds(db_name, seq_id, query_genome)
+    out.append(view_coverage(db_name, seq_id, query_genome))
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, seq_id)
     jumps = filter_jumps(seeds_to_jumps(seeds_n_rects, query_genome, reference_genome), reference_genome)
-    #jump_coverage_lenient = reads_per_jump(db_name, jumps, seq_id, False)
+    jump_coverage_lenient = reads_per_jump(db_name, jumps, seq_id, False, None)
     #jump_coverage = reads_per_jump(db_name, jumps, seq_id, True)
-    jump_coverage_strict = reads_per_jump(db_name, jumps, seq_id, True, 0.1)
+    jump_coverage_strict = reads_per_jump(db_name, jumps, seq_id, True, None)
     covs = [
-        #(jump_coverage_lenient, "map_q>=0", "red"),
+        (jump_coverage_lenient, "map_q>=0", "red"),
         #(jump_coverage, "primary & map_q>=0", "blue"),
         (jump_coverage_strict, "primary & map_q>=10", "green")
     ]
     out.extend(render_reads_per_jump(jumps, covs, query_genome))
 
-    jumps_to_calls_to_db(jumps, jump_coverage_strict, db_name, query_genome, reference_genome)
+    #jumps_to_calls_to_db(jumps, jump_coverage_strict, db_name, query_genome, reference_genome)
     #exit()
 
     aligner_seeds = None
