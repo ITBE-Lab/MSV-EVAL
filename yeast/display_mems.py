@@ -172,6 +172,9 @@ def make_read_range_table_from_simulated_n_seeds(db_name, seq_id, assembled_geno
     mm_counter = HashFilterTable(db_conn).get_counter(seq_id)
     seeding_module = MMFilteredSeeding(parameter_set_manager)
     seed_lumper = SeedLumping(parameter_set_manager)
+    contig_filter = FilterContigBorder(parameter_set_manager)
+    soc_module = StripOfConsiderationSeeds(parameter_set_manager)
+    soc_filter = GetAllFeasibleSoCsAsSet(parameter_set_manager)
     read_table = ReadTable(db_conn)
 
     with open("reads.fasta", "w") as out_file:
@@ -185,20 +188,24 @@ def make_read_range_table_from_simulated_n_seeds(db_name, seq_id, assembled_geno
             ext_table.insert_range(read, start_pos, end_pos, 1, False)
 
             minimizers = seeding_module.execute(mm_index, read, pack, mm_counter)
-            mems = seed_lumper.execute(minimizers, read, pack)
+            lumped_seeds = seed_lumper.execute(minimizers, read, pack)
+            c_filter_seeds = contig_filter.execute(lumped_seeds, pack)
+            socs = soc_module.execute(c_filter_seeds, read, pack)
+            filtered_seeds_pledge_2 = soc_filter.execute(socs)
             start_pos_mem = end_pos
             end_pos_mem = start_pos
 
-            for mem in mems:
-                mem_start = mem.start_ref
-                mem_end = mem.start_ref + mem.size
-                if not mem.on_forward_strand:
-                    mem_start = mem.start_ref - mem.size
-                    mem_end = mem.start_ref
+            for mems in filtered_seeds_pledge_2.content:
+                for mem in mems:
+                    mem_start = mem.start_ref
+                    mem_end = mem.start_ref + mem.size
+                    if not mem.on_forward_strand:
+                        mem_start = mem.start_ref - mem.size
+                        mem_end = mem.start_ref
 
-                if mem_start < end_pos and mem_end > start_pos:
-                    start_pos_mem = min(start_pos_mem, mem_start)
-                    end_pos_mem = max(end_pos_mem, mem_end)
+                    if mem_start < end_pos and mem_end > start_pos:
+                        start_pos_mem = min(start_pos_mem, mem_start)
+                        end_pos_mem = max(end_pos_mem, mem_end)
 
             if start_pos_mem < end_pos_mem:
                 ext_table.insert_range(read, start_pos_mem, end_pos_mem, 1, True)
@@ -233,8 +240,12 @@ def view_coverage(db_name, seq_id, assembled_genome, steps=10000, with_selection
         ys.append(0)
         plot.patch(x=xs, y=ys, legend_label=name, color=color)
 
-    for x in [*pack.contigStarts(), pack.unpacked_size_single_strand]:
-        plot.line(x=[x, x], y=[0, max_y], color="black")
+    #for x in [*pack.contigStarts(), pack.unpacked_size_single_strand]:
+    #    plot.line(x=[x, x], y=[0, max_y], color="black")
+
+    decorate_plot(plot, None, assembled_genome, x_only=True, max_y=max_y*1.25)
+    plot.xaxis.axis_label = "Sequenced Genome"
+    plot.yaxis.axis_label = "Coverage"
 
     return plot
 
@@ -431,9 +442,10 @@ def seeds_to_jumps(seeds_n_rects, query_genome, reference_genome):
         ret.append(jumps)
     return ret
 
-def decorate_plot(plot, query_genome, reference_genome, diagonal=False):
-    pack_1 = Pack()
-    pack_1.load(query_genome + "/ma/genome")
+def decorate_plot(plot, query_genome, reference_genome, diagonal=False, x_only=False, max_y=None):
+    if not x_only:
+        pack_1 = Pack()
+        pack_1.load(query_genome + "/ma/genome")
     pack_2 = Pack()
     pack_2.load(reference_genome + "/ma/genome")
 
@@ -443,22 +455,27 @@ def decorate_plot(plot, query_genome, reference_genome, diagonal=False):
         xs.append(idx)
         ys.append(0)
         xs.append(idx)
-        ys.append(pack_1.unpacked_size_single_strand)
+        if not x_only:
+            ys.append(pack_1.unpacked_size_single_strand)
+        else:
+            ys.append(max_y)
         xs.append(float("NaN"))
         ys.append(float("NaN"))
     plot.line(x=xs, y=ys, color="black", line_width=1)
-    ys = []
-    xs = []
-    for idx in [*pack_1.contigStarts(), pack_1.unpacked_size_single_strand]:
-        xs.append(0)
-        ys.append(idx)
-        xs.append(pack_2.unpacked_size_single_strand)
-        ys.append(idx)
-        xs.append(float("NaN"))
-        ys.append(float("NaN"))
-    plot.line(x=xs, y=ys, color="black", line_width=1)
+    if not x_only:
+        ys = []
+        xs = []
+        for idx in [*pack_1.contigStarts(), pack_1.unpacked_size_single_strand]:
+            xs.append(0)
+            ys.append(idx)
+            xs.append(pack_2.unpacked_size_single_strand)
+            ys.append(idx)
+            xs.append(float("NaN"))
+            ys.append(float("NaN"))
+        plot.line(x=xs, y=ys, color="black", line_width=1)
 
-    if diagonal:            plot.line(x=[0, pack_2.unpacked_size_single_strand], y=[0, pack_1.unpacked_size_single_strand],
+    if diagonal:
+        plot.line(x=[0, pack_2.unpacked_size_single_strand], y=[0, pack_1.unpacked_size_single_strand],
                   color="black", line_width=1)
 
     ticker_code = """
@@ -476,11 +493,12 @@ def decorate_plot(plot, query_genome, reference_genome, diagonal=False):
                     code=ticker_code)
                     
     plot.xaxis.major_label_orientation = math.pi/4
-    plot.yaxis[0].formatter = FuncTickFormatter(
-                    args={"contig_starts": [*pack_1.contigStarts(), pack_1.unpacked_size_single_strand],
-                            "genome_end":pack_1.unpacked_size_single_strand,
-                            "contig_names": [*pack_1.contigNames()]},
-                    code=ticker_code)
+    if not x_only:
+        plot.yaxis[0].formatter = FuncTickFormatter(
+                        args={"contig_starts": [*pack_1.contigStarts(), pack_1.unpacked_size_single_strand],
+                                "genome_end":pack_1.unpacked_size_single_strand,
+                                "contig_names": [*pack_1.contigNames()]},
+                        code=ticker_code)
 
 def render_jumps(jumps, jump_cov, query_genome, reference_genome, min_cov=10):
     xs = []
@@ -536,6 +554,8 @@ def render_jumps(jumps, jump_cov, query_genome, reference_genome, min_cov=10):
     plot.add_tools(HoverTool(tooltips=[("x, y", "@xs, @ys"),("id", "@ids"),("color, mirrored", "@cs, @ms"),
                                        ("query dist", "@qlens"), ("strandinfo", "from @fs to @ts"),
                                        ("read coverage", "enclose: @cov, start: @cov_start, end: @cov_end")]))
+    plot.xaxis.axis_label = "Reference Genome"
+    plot.yaxis.axis_label = "Reference Genome"
     return plot
 
 def filter_jumps(jumps, reference_genome, max_q_dist=None, min_dist=None):
@@ -718,6 +738,8 @@ def render_seeds_2(seeds_1, seeds_2, query_genome, reference_genome, title="seed
                     "xs":xs[filtered][forw], "ys":ys[filtered][forw]
                 }))
 
+    plot.xaxis.axis_label = "Reference Genome"
+    plot.yaxis.axis_label = "Sequenced Genome"
     return plot
 
 genome_dir = global_prefix + "genome/yeasts/"
@@ -740,6 +762,8 @@ if __name__ == "__main__":
 
     #make_read_range_table_from_simulated_n_seeds(db_name, seq_id, query_genome)
     out.append(view_coverage(db_name, seq_id, query_genome))
+    show(row(out))
+    exit()
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, seq_id)
     jumps = filter_jumps(seeds_to_jumps(seeds_n_rects, query_genome, reference_genome), reference_genome)
@@ -753,7 +777,7 @@ if __name__ == "__main__":
     ]
     out.extend(render_reads_per_jump(jumps, covs, query_genome))
 
-    #jumps_to_calls_to_db(jumps, jump_coverage_strict, db_name, query_genome, reference_genome)
+    jumps_to_calls_to_db(jumps, jump_coverage_strict, db_name, query_genome, reference_genome)
     #exit()
 
     aligner_seeds = None
