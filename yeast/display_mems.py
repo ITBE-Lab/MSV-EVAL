@@ -65,8 +65,8 @@ def compute_seeds(query_genome, reference_genome, db_name, seq_id, ambiguity=2):
         #continue
         filtered_mems = contig_filter.execute(mems, pack)
         socs = soc_module.execute(filtered_mems, query_genome, pack)
-        filtered_seeds = soc_filter.execute(socs)
-        filtered_seeds_2, helper_ret_1 = reseeding_1.cpp_module.execute_helper(filtered_seeds, pack, query_genome)
+        soc_filtered_seeds = soc_filter.execute(socs)
+        filtered_seeds_2, helper_ret_1 = reseeding_1.cpp_module.execute_helper(soc_filtered_seeds, pack, query_genome)
         #helper_ret, seeds_2 = jumps_from_seeds.cpp_module.execute_helper(filtered_seeds_2, pack, query_genome)
         #reseeded_mems = helper_ret.seeds
         #layer_of_seeds = helper_ret.layer_of_seeds
@@ -742,9 +742,10 @@ def render_seeds_2(seeds_1, query_genome, reference_genome, title="seeds"):
                 rs[filtered][seed.on_forward_strand].append(reason)
     for filtered in [True, False]:
         for forw in [True, False]:
-            plot.multi_line(xs="xs", ys="ys", color=cs[filtered][forw], line_width=lw[filtered], line_cap="round", source=ColumnDataSource(data={
-                    "xs":xs[filtered][forw], "ys":ys[filtered][forw], "rs":rs[filtered][forw]
-                }))
+            plot.multi_line(xs="xs", ys="ys", color=cs[filtered][forw], line_width=lw[filtered], line_cap="round",
+                            source=ColumnDataSource(data={
+                                "xs":xs[filtered][forw], "ys":ys[filtered][forw], "rs":rs[filtered][forw]
+                            }))
 
     plot.xaxis.axis_label = "Reference Genome"
     plot.yaxis.axis_label = "Sequenced Genome"
