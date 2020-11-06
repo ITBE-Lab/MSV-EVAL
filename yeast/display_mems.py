@@ -10,13 +10,13 @@ from bisect import bisect_right
 
 global_prefix = "/MAdata/"
 
-def load_genomes(query_genome, reference_genome):
+def load_genomes(query_genome, reference_genome, params):
     pack = Pack()
     pack.load(reference_genome + "/ma/genome")
     fm_index = FMIndex()
     #fm_index.load(reference_genome + "/ma/genome") # not used at the moment
-    mm_index = MinimizerIndex(ParameterSetManager(), libMA.util.StringVector([str(pack.extract_forward_strand())]), libMA.util.StringVector(["chrVII"]))
-    file_reader = FileReader(ParameterSetManager())
+    mm_index = MinimizerIndex(params, libMA.util.StringVector([str(pack.extract_forward_strand())]), libMA.util.StringVector(["chrVII"]))
+    file_reader = FileReader(params)
     ret_query_genome = []
     if False: # load query genome from fasta
         f_stream = FileStreamFromPath(query_genome + "/fasta/genome.fna")
@@ -42,12 +42,12 @@ def compute_seeds(query_genome, reference_genome, db_name, seq_id, ambiguity=2):
     param = ParameterSetManager()
     param.set_selected("SV-PacBio")
 
-    pack, fm_index, mm_index, query_genomes = load_genomes(query_genome, reference_genome)
+    pack, fm_index, mm_index, query_genomes = load_genomes(query_genome, reference_genome, param)
     mm_index.set_max_occ(ambiguity)
 
     seeding_module = MMFilteredSeeding(param)
     seed_lumper = SeedLumping(param)
-    contig_filter = FilterContigBorder(param)
+    #contig_filter = FilterContigBorder(param)
     soc_module = StripOfConsiderationSeeds(param)
     soc_filter = GetAllFeasibleSoCsAsSet(param)
     reseeding_1 = RecursiveReseedingSoCs(param, pack)
@@ -63,10 +63,10 @@ def compute_seeds(query_genome, reference_genome, db_name, seq_id, ambiguity=2):
         mems = seed_lumper.execute(seeds, query_genome, pack)
         #ret.append((y_start, mems, []))
         #continue
-        filtered_mems = contig_filter.execute(mems, pack)
-        socs = soc_module.execute(filtered_mems, query_genome, pack)
+        socs = soc_module.execute(mems, query_genome, pack)
         soc_filtered_seeds = soc_filter.execute(socs)
         filtered_seeds_2, helper_ret_1 = reseeding_1.cpp_module.execute_helper(soc_filtered_seeds, pack, query_genome)
+        #filtered_mems = contig_filter.execute(filtered_seeds_2, pack)
         #helper_ret, seeds_2 = jumps_from_seeds.cpp_module.execute_helper(filtered_seeds_2, pack, query_genome)
         #reseeded_mems = helper_ret.seeds
         #layer_of_seeds = helper_ret.layer_of_seeds
@@ -78,22 +78,27 @@ def compute_seeds(query_genome, reference_genome, db_name, seq_id, ambiguity=2):
         #rectangle_used_dp = helper_ret.rectangle_used_dp
 
         filtered_seeds = []
-        while not socs.empty():
-            for seed in socs.pop():
-                filtered_seeds.append( (seed, "initial SoC") )
-        for seed in helper_ret_1.seed_removed:
-            filtered_seeds.append( (seed, "reseeding Soc / overlapping filter / enclosed SoC") )
-        for seed, parlindrome, overlapping in zip(helper_ret_1.seeds, helper_ret_1.parlindrome,
-                                                  helper_ret_1.overlapping):
-            if parlindrome:
-                filtered_seeds.append((seed, "palrindrome"))
-            if overlapping:
-                filtered_seeds.append((seed, "overlapping"))
+        #while not socs.empty():
+        #    for seed in socs.pop():
+        #        filtered_seeds.append( (seed, "initial SoC") )
+        #for seed in helper_ret_1.seed_removed:
+        #    filtered_seeds.append( (seed, "reseeding Soc / overlapping filter / enclosed SoC") )
+        #for seed, parlindrome, overlapping in zip(helper_ret_1.seeds, helper_ret_1.parlindrome,
+        #                                          helper_ret_1.overlapping):
+        #    if parlindrome:
+        #        filtered_seeds.append((seed, "palrindrome"))
+        #    if overlapping:
+        #        filtered_seeds.append((seed, "overlapping"))
 
 
-        #ret.append((y_start, filtered_seeds_2, rectangles))
+        #r = []
+        #for seeds in soc_filtered_seeds.content:
+        #    for seed in seeds:
+        #        r.append(seed)
+
         ret.append((y_start, filtered_seeds_2, helper_ret_1.rectangles, filtered_seeds))
-        #ret.append((y_start, reseeding.execute(filtered_seeds_2, pack, query_genome), rectangles))
+
+        #ret.append((y_start, r, helper_ret_1.rectangles, filtered_seeds))
     return ret
 
 
@@ -443,8 +448,9 @@ def render_seeds(seeds, merged_intervals=None, merged_intervals_2=None):
 
 def seeds_to_jumps(seeds_n_rects, query_genome, reference_genome):
     param = ParameterSetManager()
-    pack, fm_index, mm_index, query_genomes = load_genomes(query_genome, reference_genome)
+    pack, fm_index, mm_index, query_genomes = load_genomes(query_genome, reference_genome, param)
     jumps_from_seeds = SvJumpsFromExtractedSeeds(param, pack)
+    contig_filter = JumpsFilterContigBorder(param)
 
     ret = []
     for (y_start, seeds, _, _), (_, query_genome) in zip(seeds_n_rects, query_genomes):
@@ -452,7 +458,8 @@ def seeds_to_jumps(seeds_n_rects, query_genome, reference_genome):
         for jump in jumps:
             jump.query_from += y_start
             jump.query_to += y_start
-        ret.append(jumps)
+        filtered = contig_filter.execute(jumps, pack)
+        ret.append(filtered)
     return ret
 
 def decorate_plot(plot, query_genome, reference_genome, diagonal=False, x_only=False, max_y=None):
@@ -621,7 +628,7 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
                                    "SV's form genome assembly that are too small for pacBio reads", -1).cpp_module.id
     one_sided_calls = OneSidedCallsTable(db_conn)
 
-    pack, fm_index, mm_index, query_genomes = load_genomes(query_genome_str, reference_genome)
+    pack, fm_index, mm_index, query_genomes = load_genomes(query_genome_str, reference_genome, parameter_set_manager)
 
 
     cnt_one_sided_jumps = 0
@@ -706,19 +713,20 @@ def render_seeds_2(seeds_1, query_genome, reference_genome, title="seeds"):
 
     decorate_plot(plot, query_genome, reference_genome)
 
-    xs = []
-    xe = []
-    ys = []
-    ye = []
-    for y_start, _, rects, _ in seeds_1:
-        for rect in rects:
-            xs.append(rect.x_axis.start)
-            ys.append(rect.y_axis.start + y_start)
-            xe.append(rect.x_axis.start + rect.x_axis.size)
-            ye.append(rect.y_axis.start + rect.y_axis.size + y_start)
-    plot.quad(left="xs", bottom="ys", right="xe", top="ye", fill_color="black",
-                    fill_alpha=0.2, line_width=0,
-                    source=ColumnDataSource({"xs":xs, "xe":xe, "ys":ys, "ye":ye}))
+    if True:
+        xs = []
+        xe = []
+        ys = []
+        ye = []
+        for y_start, _, rects, _ in seeds_1:
+            for rect in rects:
+                xs.append(rect.x_axis.start)
+                ys.append(rect.y_axis.start + y_start)
+                xe.append(rect.x_axis.start + rect.x_axis.size)
+                ye.append(rect.y_axis.start + rect.y_axis.size + y_start)
+        plot.quad(left="xs", bottom="ys", right="xe", top="ye", fill_color="black",
+                        fill_alpha=0.2, line_width=0,
+                        source=ColumnDataSource({"xs":xs, "xe":xe, "ys":ys, "ye":ye}))
 
     xs = {True:{True:[], False:[]}, False:{True:[], False:[]}}
     ys = {True:{True:[], False:[]}, False:{True:[], False:[]}}
