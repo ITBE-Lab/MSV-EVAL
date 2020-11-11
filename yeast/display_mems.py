@@ -619,6 +619,7 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
     JumpRunTable(db_conn)
     SvCallerRunTable(db_conn)
     sv_call_table = SvCallTable(db_conn)
+    call_per_contig_table = FirstCallPerContigTable(db_conn)
     one_sided_calls = OneSidedCallsTable(db_conn)
     caller_run_id = GetCallInserter(parameter_set_manager, db_conn, "Ground Truth",
                                    "SV's form genome assembly", -1).cpp_module.id
@@ -638,6 +639,7 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
     idx = 0
     for jumps_, (y_start, query_genome), jump_cov_ in zip(jumps, query_genomes, cov_list):
         query_genome.check()
+        is_first = True
         for jump, (cov, cov_start, cov_end) in zip(jumps_, jump_cov_):
             jump.id = idx
             assert(jump.num_supp_nt() > 0)
@@ -676,6 +678,9 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
                         from_call.inserted_sequence.check()
 
                 sv_call_table.insert_call(caller_run_id, from_call) # updates id in from_call
+                if is_first:
+                    is_first = False
+                    call_per_contig_table.insert(from_call.id, query_genome.name, from_forward)
                 sv_call_table.insert_call(caller_run_id, to_call) # updates id in to_call
 
                 if jump.was_mirrored:
@@ -696,12 +701,18 @@ def jumps_to_calls_to_db(jumps, cov_list, db_name, query_genome_str, reference_g
                 call.order_id = idx
                 idx += 1
                 call.mirrored = jump.was_mirrored
+                from_forward = jump.from_forward
+                if jump.was_mirrored:
+                    from_forward = not jump.to_forward
                 if cov < min_cov:
                     sv_call_table.insert_call(low_cov_caller_run_id, call)
                 elif max(abs(jump.from_pos - jump.to_pos), abs(jump.query_from - jump.query_to)) < min_size:
                     sv_call_table.insert_call(small_caller_run_id, call)
                 else:
                     sv_call_table.insert_call(caller_run_id, call)
+                if is_first:
+                    is_first = False
+                    call_per_contig_table.insert(call.id, query_genome.name, from_forward)
 
     print("Inserted into DB. There were", cnt_one_sided_jumps, "one sided entries,", cnt_low_coverage_jumps,
           "entries with coverage <=", min_cov, "and", cnt_remaining_jumps, "two sided entries with enough coverage" )
