@@ -16,7 +16,6 @@ if __name__ == "__main__":
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     call_table = SvCallTable(db_conn)
     jump_table = SvJumpTable(db_conn) # initialize jump table
-    OneSidedCallsTable(db_conn) # initialize one sided calls table
     param = ParameterSetManager()
     param.set_selected("SV-PacBio")
     pack, _, _, ret_query_genome = load_genomes(query_genome, reference_genome, param)

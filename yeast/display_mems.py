@@ -130,6 +130,10 @@ def run_aligner_seeds(query_genome_str, reference_genome):
 
 def seeds_to_jumps(seeds_n_rects, query_genome, reference_genome):
     param = ParameterSetManager()
+    # make sure we record the entire genome
+    param.by_name("Maximal Dummy Distance").set(10000000)
+    param.by_name("Minimal Dummy Distance").set(0)
+
     pack, fm_index, mm_index, query_genomes = load_genomes(query_genome, reference_genome, param)
     jumps_from_seeds = SvJumpsFromExtractedSeeds(param, pack)
 
@@ -215,15 +219,15 @@ def render_jumps(jumps, query_genome, reference_genome):
     colors = {True:{True:"blue", False:"green"}, False:{True:"purple", False:"orange"}}
     for idx, jumps_ in enumerate(jumps):
         for jump in jumps_:
-            if not jump.from_known():
-                continue
-            if not jump.to_known():
-                continue
             #if idx != 8281:
             #    idx+=1
             #    continue
             f = jump.from_pos
             t = jump.to_pos
+            if not jump.from_known():
+                f = t - 1
+            if not jump.to_known():
+                t = f + 1
             #if abs(f - t) < 200:
             #    continue
             xs.append(f)
@@ -279,14 +283,16 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, min
         query_genome.check()
         is_first = True
         for jump in jumps_:
-            if not jump.from_known():
-                continue
-            if not jump.to_known():
-                continue
             jump.id = idx
             assert(jump.num_supp_nt() > 0)
+            f = jump.from_pos
+            t = jump.to_pos
+            if not jump.from_known():
+                f = t - 1
+            if not jump.to_known():
+                t = f + 1
 
-            call = SvCall(jump.from_pos, jump.to_pos, 0, 0, jump.from_forward, jump.to_forward, 1,
+            call = SvCall(f, t, 0, 0, jump.from_forward, jump.to_forward, 1,
                             jump.num_supp_nt())
             if jump.query_from < jump.query_to:
                 call.inserted_sequence = NucSeq(query_genome, jump.query_from - y_start, jump.query_to - y_start)
@@ -297,10 +303,10 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, min
             from_forward = jump.from_forward
             if jump.was_mirrored:
                 from_forward = not jump.to_forward
-            if contig_filter.cpp_module.by_contig_border(jump, pack):
+            if contig_filter.cpp_module.by_contig_border(jump, pack) or not jump.from_known() or not jump.to_known():
                 cnt_contig_border += 1
                 sv_call_table.insert_call(contig_border_caller_run_id, call)
-            elif max(abs(jump.from_pos - jump.to_pos), abs(jump.query_from - jump.query_to)) < min_size:
+            elif max(abs(f - t), abs(jump.query_from - jump.query_to)) < min_size:
                 cnt_small += 1
                 sv_call_table.insert_call(small_caller_run_id, call)
             else:
