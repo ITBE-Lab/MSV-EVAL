@@ -11,32 +11,35 @@ reference_genome = genome_dir + "YPS138"
 #reference_genome = "vivax"
 if __name__ == "__main__":
     db_name = "UFRJ50816"
-    run_ids = [14,15,16]
+    run_ids = [1,2,3]
 
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     call_table = SvCallTable(db_conn)
     jump_table = SvJumpTable(db_conn) # initialize jump table
-    pack, _, _, ret_query_genome = load_genomes(query_genome, reference_genome, ParameterSetManager())
+    OneSidedCallsTable(db_conn) # initialize one sided calls table
+    param = ParameterSetManager()
+    param.set_selected("SV-PacBio")
+    pack, _, _, ret_query_genome = load_genomes(query_genome, reference_genome, param)
 
 
-    seeds_list = call_table.calls_to_seeds_by_id_table(pack, run_ids, True, 0)
+    seeds_list = call_table.calls_to_seeds_by_id_auto(pack, run_ids, True, 0)
 
     reconstructed_query_genome = call_table.reconstruct_sequenced_genome_from_seeds(seeds_list, pack)
     reconstructed_query_genome.store(reconstructed_query_genome_path + "/ma/genome")
 
-    seeds_n_rects_reconstr = compute_seeds(reconstructed_query_genome_path, query_genome, db_name, 1)
+    #seeds_n_rects_reconstr = compute_seeds(reconstructed_query_genome_path, query_genome, db_name, 1)
 
 
-    seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, []) for name, seeds, _ in seeds_list]
+    seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, [], []) for name, seeds, _ in seeds_list]
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, 1)
 
     out = []
-    out.append(render_seeds_2(seeds_list_display, None, reconstructed_query_genome_path, reference_genome,
-                              title="reconstructed on reference"))
-    out.append(render_seeds_2(seeds_n_rects, None, query_genome, reference_genome, title="assembly on reference"))
-    out.append(render_seeds_2(seeds_n_rects_reconstr, None, reconstructed_query_genome_path, query_genome,
-                              title="reconstructed on assembly"))
+    out.append(render_seeds(seeds_list_display, reconstructed_query_genome_path, reference_genome,
+                              "reconstructed on reference"))
+    out.append(render_seeds(seeds_n_rects, query_genome, reference_genome, "assembly on reference"))
+    #out.append(render_seeds(seeds_n_rects_reconstr, reconstructed_query_genome_path, query_genome,
+    #                          "reconstructed on assembly"))
 
     if True:
         print("name", "score", "matches", "missmatches", "indels", "indel ops", "% identity", sep="\t")
@@ -86,13 +89,12 @@ if __name__ == "__main__":
             ys.append(float("NaN"))
             iden = 100 * matches / l_total
             print(name, nw_alignment.get_score(), matches, mismatches, indels, indelops, iden, sep="\t")
-            break
         plot = figure(title="alignments reconstructed on assembly", plot_width=1000, plot_height=1000)
         for x in cx:
             plot.line(x=[x, x], y=[0, cy[-1]], color="black")
         for y in cy:
             plot.line(x=[0, cx[-1]], y=[y, y], color="black")
-        plot.line(x=xs, y=ys)
+        plot.line(x=xs, y=ys, line_width=4)
         out.append(plot)
 
     show(row(out))
