@@ -225,9 +225,9 @@ def render_jumps(jumps, query_genome, reference_genome):
             f = jump.from_pos
             t = jump.to_pos
             if not jump.from_known():
-                f = t - 1
+                f = t
             if not jump.to_known():
-                t = f + 1
+                t = f
             #if abs(f - t) < 200:
             #    continue
             xs.append(f)
@@ -288,9 +288,9 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, min
             f = jump.from_pos
             t = jump.to_pos
             if not jump.from_known():
-                f = t - 1
+                f = t
             if not jump.to_known():
-                t = f + 1
+                t = f
 
             call = SvCall(f, t, 0, 0, jump.from_forward, jump.to_forward, 1,
                             jump.num_supp_nt())
@@ -321,7 +321,8 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, min
 
     return caller_run_id, None
 
-def render_seeds(seeds_1, query_genome, reference_genome, title="seeds"):
+def render_seeds(seeds_1, query_genome, reference_genome, title="seeds", y_axis="Sequenced Genome",
+                 x_axis="Reference Genome"):
     plot = figure(title=title, plot_width=1000, plot_height=1000)
 
     decorate_plot(plot, query_genome, reference_genome)
@@ -368,8 +369,8 @@ def render_seeds(seeds_1, query_genome, reference_genome, title="seeds"):
                                 "xs":xs[filtered][forw], "ys":ys[filtered][forw], "rs":rs[filtered][forw]
                             }))
 
-    plot.xaxis.axis_label = "Reference Genome"
-    plot.yaxis.axis_label = "Sequenced Genome"
+    plot.xaxis.axis_label = x_axis
+    plot.yaxis.axis_label = y_axis
     plot.add_tools(HoverTool(tooltips=[("filtered due to", "@rs")]))
     return plot
 

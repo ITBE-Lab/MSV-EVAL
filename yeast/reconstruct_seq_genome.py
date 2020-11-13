@@ -35,8 +35,9 @@ if __name__ == "__main__":
 
     out = []
     out.append(render_seeds(seeds_list_display, reconstructed_query_genome_path, reference_genome,
-                              "reconstructed on reference"))
-    out.append(render_seeds(seeds_n_rects, query_genome, reference_genome, "assembly on reference"))
+                              "reconstructed on reference", "Reconstructed Genome", "Reference Genome"))
+    out.append(render_seeds(seeds_n_rects, query_genome, reference_genome, "assembly on reference",
+                            "Sequenced Genome", "Reference Genome"))
     #out.append(render_seeds(seeds_n_rects_reconstr, reconstructed_query_genome_path, query_genome,
     #                          "reconstructed on assembly"))
 
@@ -79,21 +80,44 @@ if __name__ == "__main__":
                     indels += l
                     indelops += 1
                     if op == MatchType.insertion:
-                        x += l
-                    else:
                         y += l
+                    else:
+                        x += l
                 xs.append(x + x_start)
                 ys.append(y + y_start)
             xs.append(float("NaN"))
             ys.append(float("NaN"))
             iden = 100 * matches / l_total
             print(name, nw_alignment.get_score(), matches, mismatches, indels, indelops, iden, sep="\t")
+            break
         plot = figure(title="alignments reconstructed on assembly", plot_width=1000, plot_height=1000)
+        plot.xaxis.axis_label = "Sequenced Genome"
+        plot.yaxis.axis_label = "Reconstructed Genome"
         for x in cx:
-            plot.line(x=[x, x], y=[0, cy[-1]], color="black")
+            plot.line(y=[x, x], x=[0, cy[-1]], color="black")
         for y in cy:
-            plot.line(x=[0, cx[-1]], y=[y, y], color="black")
+            plot.line(y=[0, cx[-1]], x=[y, y], color="black")
         plot.line(x=xs, y=ys, line_width=4)
         out.append(plot)
 
     show(row(out))
+
+"""
+name    score       matches missmatches     indels  indel ops       % identity
+chr1    434082      219848  0       1247    920     99.58417509942655
+chr2    299750      574595  85160   142053  56703   78.5716141506712
+chr3    608894      308063  0       1206    1205    99.61037029372584
+chr4    -1208226    817711  379702  384677  141983  58.75973147803492
+chr5    1135982     577393  0       3297    3118    99.46288700817038
+chr6    106         153     4       282800  13      0.05407182009987383
+chr7    -517024     177887  93499   846960  33576   16.08429546270368
+chr8    -860        377     48      546241  69      0.06896400335124812
+chr9    -801522     147732  217448  754041  14984   13.311875549660472
+chr10   -1161596    219792  269995  320413  71505   29.26139578476781
+chr11   -653602     219154  139554  464473  40936   27.19636246759516
+chr12   -1305272    347611  349548  406525  52381   32.53526492096221
+chr13   -43778      17169   3191    850231  3139    1.9739837473153636
+chr14   -743488     511724  176595  304046  116035  58.67351560215787
+chr15   -1052266    673227  247627  424202  152199  56.02554169582813
+chr16   -844228     567840  190310  377936  127638  55.16164097721901
+"""
