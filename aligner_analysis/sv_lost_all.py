@@ -2,6 +2,10 @@ import aligner_analysis.sv_lost_translocation
 
 import aligner_analysis.sv_lost_duplication
 
+import aligner_analysis.sv_lost_dup_inv
+
+import aligner_analysis.sv_lost_nested_inv
+
 import aligner_analysis.sv_lost_inversion
 
 import aligner_analysis.sv_lost_indel

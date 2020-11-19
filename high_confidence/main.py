@@ -44,7 +44,9 @@ def regex_match(folder, regex):
 read_datasets = [
     #("Illumina", regex_match(read_data_dir + "PRJEB7245/UFRJ50816/illumina_hiseq_2500/", "*.trimmed.fastq"), None, 50),
     #("PacBio", regex_match(read_data_dir + "PRJEB7245/UFRJ50816/pacBioSMRT/", "*.fasta"), None, 50),
-    ("SimulatedPacBio", regex_match(read_data_dir + "simulated/UFRJ50816/pacbio_CCS/", "*.fasta"), None, 100),
+    
+    #("SimulatedPacBio", regex_match(read_data_dir + "simulated/UFRJ50816/pacbio_CCS/", "*.fasta"), None, 100),
+    ("SimulatedIllumina", regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-250/", "*.bwa.read*.fastq.gz"), None, 100),
 ]
 
 def uFRJ50816_filter(pack):
@@ -65,8 +67,10 @@ def compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index):
 
 def run_ma(pack, individual="HG002"):
     param = ParameterSetManager()
+    #param.set_selected("SV-PacBio")
+    param.set_selected("SV-Illumina")
     mm_index = MinimizerIndex(param, pack.contigSeqs(), pack.contigNames())
-    seq_ids = [1] #load_reads(individual, param)
+    seq_ids = [4]#load_reads(individual, param)
     #return
     sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index)
     print("caller_id", sv_caller_run_id)
@@ -83,5 +87,6 @@ if __name__ == "__main__":
 
 ## Simulated reads:
 # ./SURVIVOR simreads /MAdata/genome/yeasts/UFRJ50816/fasta/genome.fna ../HG002_PacBio_CCS_10kb_error_profile_mm2.txt 100 /MAdata/ena/simulated/UFRJ50816/pacbio_CCS/survivor_reads.fasta
+# ./dwgsim -1 250 -2 250 /MAdata/genome/yeasts/UFRJ50816/fasta/genome.fna /MAdata/ena/simulated/UFRJ50816/Illumina-250/
 
 # java -jar ~/workspace/trimmomatic/Trimmomatic-0.39/trimmomatic-0.39.jar PE -threads 32 SRR4074411.1_1.fastq SRR4074411.1_2.fastq SRR4074411.1_1.paired.trimmed.fastq SRR4074411.1_1.unpaired.trimmed.fastq SRR4074411.1_2.paired.trimmed.fastq SRR4074411.1_2.unpaired.trimmed.fastq ILLUMINACLIP:adapters.fa:2:30:10 SLIDINGWINDOW:5:20 MINLEN:36

@@ -108,5 +108,5 @@ if False:
     print_binary_search_plot_box_plot(file_name_in="inversion_overlap", title="Overlap - Inversion")
 
 if True:
-    #accuracy_plot(inversion, filename_out="inversion_overlap")
+    accuracy_plot(inversion, filename_out="inversion_overlap")
     print_accuracy_plot(file_name_in="inversion_overlap", title="Accuracy - Inversion")

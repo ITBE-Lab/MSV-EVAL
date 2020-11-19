@@ -11,7 +11,7 @@ reference_genome = genome_dir + "YPS138"
 #reference_genome = "vivax"
 if __name__ == "__main__":
     db_name = "UFRJ50816"
-    run_ids = [1,2,3]
+    run_ids = [8,9,10]
 
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     call_table = SvCallTable(db_conn)
@@ -26,21 +26,57 @@ if __name__ == "__main__":
     reconstructed_query_genome = call_table.reconstruct_sequenced_genome_from_seeds(seeds_list, pack)
     reconstructed_query_genome.store(reconstructed_query_genome_path + "/ma/genome")
 
-    #seeds_n_rects_reconstr = compute_seeds(reconstructed_query_genome_path, query_genome, db_name, 1)
+    out = []
+    print("contig_name", "nt in seeds", "nt in insertions", "nt in ends", "sequenced len", "reconstr len", sep="\t")
+    buckets = {}
+    for idx, ((contig_name, seeds, insertions), reconstr_contig, (y_start, assembly)) in enumerate(zip(seeds_list,
+                                                  reconstructed_query_genome.contigNucSeqs(),
+                                                  ret_query_genome)):
+        nt_in_seeds = 0
+        nt_in_ins = 0
+        nt_in_ends = len(insertions[0]) + len(insertions[-1])
+        ins_len = []
+        for seed in seeds:
+            nt_in_seeds += seed.size
+        for nuc_seq in insertions[1:-1]:
+            nt_in_ins += len(nuc_seq)
+            ins_len.append(len(nuc_seq))
+        print(contig_name, nt_in_seeds, nt_in_ins, nt_in_ends, len(assembly), len(reconstr_contig), sep="\t")
+        for l in ins_len:
+            if not l in buckets:
+                buckets[l] = 0
+            buckets[l] += 1
+    indel_distrib = figure(title="Insertion distrib", y_axis_type="log", plot_width=1000, plot_height=1000)
+    indel_distrib.vbar(x=[key for key, _ in buckets.items()],
+                        width=4/5,
+                        top=[val for _, val in buckets.items()],
+                        bottom=0.1,
+                        color="blue")
+    indel_distrib.xaxis.axis_label = "Amount"
+    indel_distrib.yaxis.axis_label = "Insertion length"
+    out.append(indel_distrib)
+
+    seeds_n_rects_reconstr = compute_seeds(reconstructed_query_genome_path, query_genome, db_name, 1)
 
 
     seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, [], []) for name, seeds, _ in seeds_list]
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, 1)
 
-    out = []
     out.append(render_seeds(seeds_list_display, reconstructed_query_genome_path, reference_genome,
                               "reconstructed on reference", "Reconstructed Genome", "Reference Genome"))
     out.append(render_seeds(seeds_n_rects, query_genome, reference_genome, "assembly on reference",
                             "Sequenced Genome", "Reference Genome"))
-    #out.append(render_seeds(seeds_n_rects_reconstr, reconstructed_query_genome_path, query_genome,
-    #                          "reconstructed on assembly"))
+    out.append(render_seeds(seeds_n_rects_reconstr, reconstructed_query_genome_path, query_genome,
+                              "reconstructed on assembly", "Reconstructed Genome", "Sequenced Genome"))
 
+    if False: # exact match comparison
+        print("name", "perfect match", sep="\t")
+        for name, reconstr, (y_start, assembly) in zip(
+                                                reconstructed_query_genome.contigNames(),
+                                                reconstructed_query_genome.contigNucSeqs(),
+                                                ret_query_genome):
+            print(name, reconstr.equals(assembly), sep="\t")
     if True:
         print("name", "score", "matches", "missmatches", "indels", "indel ops", "% identity", sep="\t")
         xs = []
@@ -64,6 +100,7 @@ if __name__ == "__main__":
             indelops = 0
             l_total = max(len(reconstr), len(assembly))
             nw_alignment = runKsw(reconstr, assembly, 1000)
+            printed_error = False
             for op, l in nw_alignment.data:
                 if op == MatchType.match or op == MatchType.seed:
                     matches += l
@@ -76,6 +113,9 @@ if __name__ == "__main__":
                     # break line
                     xs.append(float("NaN"))
                     ys.append(float("NaN"))
+                    if not printed_error:
+                        printed_error = True
+                        print("Mismatch:", x, y, reconstr[y-l], "!=", assembly[x-l])
                 if op == MatchType.insertion or op == MatchType.deletion:
                     indels += l
                     indelops += 1
@@ -83,41 +123,40 @@ if __name__ == "__main__":
                         y += l
                     else:
                         x += l
+                    if not printed_error:
+                        printed_error = True
+                        print("Indel:", x, y)
                 xs.append(x + x_start)
                 ys.append(y + y_start)
             xs.append(float("NaN"))
             ys.append(float("NaN"))
             iden = 100 * matches / l_total
             print(name, nw_alignment.get_score(), matches, mismatches, indels, indelops, iden, sep="\t")
-            break
         plot = figure(title="alignments reconstructed on assembly", plot_width=1000, plot_height=1000)
+        decorate_plot(plot, reconstructed_query_genome_path, query_genome)
         plot.xaxis.axis_label = "Sequenced Genome"
         plot.yaxis.axis_label = "Reconstructed Genome"
-        for x in cx:
-            plot.line(y=[x, x], x=[0, cy[-1]], color="black")
-        for y in cy:
-            plot.line(y=[0, cx[-1]], x=[y, y], color="black")
         plot.line(x=xs, y=ys, line_width=4)
         out.append(plot)
 
     show(row(out))
 
 """
-name    score       matches missmatches     indels  indel ops       % identity
-chr1    434082      219848  0       1247    920     99.58417509942655
-chr2    299750      574595  85160   142053  56703   78.5716141506712
-chr3    608894      308063  0       1206    1205    99.61037029372584
-chr4    -1208226    817711  379702  384677  141983  58.75973147803492
-chr5    1135982     577393  0       3297    3118    99.46288700817038
-chr6    106         153     4       282800  13      0.05407182009987383
-chr7    -517024     177887  93499   846960  33576   16.08429546270368
-chr8    -860        377     48      546241  69      0.06896400335124812
-chr9    -801522     147732  217448  754041  14984   13.311875549660472
-chr10   -1161596    219792  269995  320413  71505   29.26139578476781
-chr11   -653602     219154  139554  464473  40936   27.19636246759516
-chr12   -1305272    347611  349548  406525  52381   32.53526492096221
-chr13   -43778      17169   3191    850231  3139    1.9739837473153636
-chr14   -743488     511724  176595  304046  116035  58.67351560215787
-chr15   -1052266    673227  247627  424202  152199  56.02554169582813
-chr16   -844228     567840  190310  377936  127638  55.16164097721901
+contig_name     nt in seeds     nt in insertions        nt in ends      sequenced len   reconstr len
+chr1            205485             14038                654             220177          220177
+chr2            696721             30811                3769            731301          731301
+chr3            304050             3621                 393             308064          308064
+chr4            1338350            45047                8221            1391618         1391618
+chr5            551437             25561                574             577572          577572
+chr6            277427             4826                 704             282957          282957
+chr7            1053727            51673                567             1105967         1105967
+chr8            519975             26251                436             546662          546662
+chr9            328747             45315                563             374625          374625
+chr10           689704             40243                21186           751133          751133
+chr11           789360             15916                545             805821          805821
+chr12           1001039            59147                8227            1068413         1068413
+chr13           811600             49844                8320            869764          869764
+chr14           852128             19503                524             872155          872155
+chr15           1163943            28849                8851            1201643         1201643
+chr16           1009782            19463                166             1029411         1029411
 """

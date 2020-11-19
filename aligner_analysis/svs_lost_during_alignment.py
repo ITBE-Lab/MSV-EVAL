@@ -181,9 +181,12 @@ def compare_seeds(params, reads_by_name, points_by_name, fm_index, pack, mems=Tr
             minimizers = promise_me(seeding_module, fm_index_pledge, locked_read, pack_pledge)
             seeds = promise_me(seed_lumping, minimizers, locked_read, pack_pledge)
             if reseeding:
-                min_len_seeds = promise_me(min_len, seeds)
-                recursive_reseeding = RecursiveReseeding(params, pack)
-                seeds = promise_me(recursive_reseeding, min_len_seeds, pack_pledge, locked_read)
+                soc_module = StripOfConsiderationSeeds(params)
+                soc_filter = GetAllFeasibleSoCsAsSet(params)
+                recursive_reseeding = RecursiveReseedingSoCs(params, pack)
+                socs = promise_me(soc_module, seeds, locked_read, pack_pledge)
+                soc_filtered_seeds = promise_me(soc_filter, socs)
+                seeds = promise_me(recursive_reseeding, soc_filtered_seeds, pack_pledge, locked_read)
                 original_seeds_list.append(seeds)
             else:
                 original_seeds_list = None
