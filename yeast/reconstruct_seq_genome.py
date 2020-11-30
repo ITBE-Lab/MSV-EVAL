@@ -9,21 +9,28 @@ reconstructed_query_genome_path = "/MAdata/genome/reconstructed/yeast/UFRJ50816"
 #reference_genome = "YPS138-chrVII-section"
 reference_genome = genome_dir + "YPS138"
 #reference_genome = "vivax"
+
+
 if __name__ == "__main__":
     db_name = "UFRJ50816"
-    run_ids = [8,9,10]
+    run_ids = [1, 2, 3, 4]
+    #run_ids = [1, 2]
 
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     call_table = SvCallTable(db_conn)
+
+    #call_table.copy_path(3, 2, 110)
+    #call_table.copy_path(5, 1, 0)
+
     jump_table = SvJumpTable(db_conn) # initialize jump table
     param = ParameterSetManager()
     param.set_selected("SV-PacBio")
     pack, _, _, ret_query_genome = load_genomes(query_genome, reference_genome, param)
 
 
-    seeds_list = call_table.calls_to_seeds_by_id_auto(pack, run_ids, True, 0)
+    seeds_list = call_table.calls_to_seeds_by_id(pack, run_ids, True, 0)
 
-    reconstructed_query_genome = call_table.reconstruct_sequenced_genome_from_seeds(seeds_list, pack)
+    reconstructed_query_genome = call_table.reconstruct_sequenced_genome(seeds_list, pack)
     reconstructed_query_genome.store(reconstructed_query_genome_path + "/ma/genome")
 
     out = []
@@ -56,19 +63,19 @@ if __name__ == "__main__":
     indel_distrib.yaxis.axis_label = "Insertion length"
     out.append(indel_distrib)
 
-    seeds_n_rects_reconstr = compute_seeds(reconstructed_query_genome_path, query_genome, db_name, 1)
-
-
-    seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, [], []) for name, seeds, _ in seeds_list]
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, 1)
-
-    out.append(render_seeds(seeds_list_display, reconstructed_query_genome_path, reference_genome,
-                              "reconstructed on reference", "Reconstructed Genome", "Reference Genome"))
     out.append(render_seeds(seeds_n_rects, query_genome, reference_genome, "assembly on reference",
                             "Sequenced Genome", "Reference Genome"))
-    out.append(render_seeds(seeds_n_rects_reconstr, reconstructed_query_genome_path, query_genome,
-                              "reconstructed on assembly", "Reconstructed Genome", "Sequenced Genome"))
+
+    seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, [], []) for name, seeds, _ in seeds_list]
+    out.append(render_seeds(seeds_list_display, reconstructed_query_genome_path, reference_genome,
+                              "reconstructed on reference", "Reconstructed Genome", "Reference Genome"))
+
+    if False:
+        seeds_n_rects_reconstr = compute_seeds(reconstructed_query_genome_path, query_genome, db_name, 1)
+        out.append(render_seeds(seeds_n_rects_reconstr, reconstructed_query_genome_path, query_genome,
+                                "reconstructed on assembly", "Reconstructed Genome", "Sequenced Genome"))
 
     if False: # exact match comparison
         print("name", "perfect match", sep="\t")
@@ -77,7 +84,7 @@ if __name__ == "__main__":
                                                 reconstructed_query_genome.contigNucSeqs(),
                                                 ret_query_genome):
             print(name, reconstr.equals(assembly), sep="\t")
-    if True:
+    if False:
         print("name", "score", "matches", "missmatches", "indels", "indel ops", "% identity", sep="\t")
         xs = []
         cx = [0]

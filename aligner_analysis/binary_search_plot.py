@@ -199,8 +199,7 @@ def binary_search_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translo
                 print_n_write("\n", file_out)
 
 def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocation_overlap", gap_size_range=[50],
-                    #test_sets=default_test_set, sv_sizes=range(25, 501, 25), read_size=2000, num_reads=1000):
-                    test_sets=default_test_set, sv_sizes=range(25, 501, 50), read_size=2000, num_reads=100):
+                    test_sets=default_test_set, sv_sizes=range(25, 501, 25), read_size=2000, num_reads=1000):
     params = ParameterSetManager()
     params.set_selected("SV-PacBio")
 

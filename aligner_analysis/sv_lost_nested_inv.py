@@ -22,30 +22,25 @@ def nest_inv(sv_size, gap_size, genome_section, ref_start, min_dist=50):
     points = []
     offset = random.randint(min_dist, (len(genome_section) - sv_size*2)-min_dist)
     g = str(genome_section)
-    # before duplication
+    # before inversions
     read = g[:offset] 
     points.append((offset, ref_start+offset, True))
 
-    # section b (section that was duplicated)
-    read += invert(g[offset:offset + sv_size])
+    # section b (section that was inverted twice)
+    read += g[offset + sv_size:offset + sv_size*2] 
     points.append((offset, ref_start+offset+sv_size, True))
     points.append((offset+sv_size, ref_start+offset+sv_size*2, True))
 
-    # section a (section to be duplicated)
-    read += g[offset:offset + sv_size] 
+    # section a (section to be inverted once)
+    read += invert(g[offset:offset + sv_size])
     points.append((offset+sv_size, ref_start+offset+sv_size, False))
     points.append((offset+sv_size*2, ref_start+offset, False))
 
-    # after duplication
-    read += g[offset + sv_size:len(genome_section)-sv_size]
+    # after inversions
+    read += g[offset + sv_size*2:len(genome_section)]
     points.append((offset+sv_size*2, ref_start+offset+sv_size*2, True))
 
     return points, NucSeq(read)
-
-def nest_inv_size(read_size, sv_size, gap_size):
-    assert sv_size < read_size
-    return read_size - sv_size
-
 def main():
     params = ParameterSetManager()
 
@@ -54,7 +49,7 @@ def main():
     fm_index = FMIndex()
     fm_index.load(genome_dir + "/ma/genome")
 
-    seeds_by_name, read_by_name = create_reads(pack, 1000, 100, lambda x,y: dup_inv(100, 20, x,y))
+    seeds_by_name, read_by_name = create_reads(pack, 1000, 100, lambda x,y: nest_inv(100, 20, x,y))
     path_sam = create_alignment(read_by_name, mm2, "mm2")
     print("Minimap 2 alignment:")
     comp = compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, path_sam)
@@ -71,5 +66,5 @@ if False:
     print_binary_search_plot_box_plot(file_name_in="nested_inversion_overlap", title="Overlap - Nested Inversion")
 
 if True:
-    accuracy_plot(nest_inv, nest_inv_size, "nested_inversion_overlap")
+    accuracy_plot(nest_inv, filename_out="nested_inversion_overlap")
     print_accuracy_plot(file_name_in="nested_inversion_overlap", title="Accuracy - Nested Inversion")

@@ -268,6 +268,8 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, min
                                    "SV's form genome assembly that are not covered by any alignments", -1).cpp_module.id
     small_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, "Ground Truth - Small",
                                    "SV's form genome assembly that are too small for pacBio reads", -1).cpp_module.id
+    contig_start_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, "Ground Truth - Contig Start",
+                                   "SV's form genome assembly that are not covered by any alignments", -1).cpp_module.id
 
     pack, fm_index, mm_index, query_genomes = load_genomes(query_genome_str, reference_genome, parameter_set_manager)
 
@@ -278,32 +280,40 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, min
     cnt_large = 0
     cnt_contig_border = 0
 
-    idx = 0
-    for jumps_, (y_start, query_genome) in zip(jumps, query_genomes):
+    for contig_idx, (jumps_, (y_start, query_genome)) in enumerate(zip(jumps, query_genomes)):
         query_genome.check()
         is_first = True
+        idx = 0
         for jump in jumps_:
             jump.id = idx
             assert(jump.num_supp_nt() > 0)
             f = jump.from_pos
             t = jump.to_pos
             if not jump.from_known():
-                f = t
+                if jump.from_forward:
+                    f = pack.start_of_sequence_id(pack.seq_id_for_pos(t))
+                else:
+                    f = pack.end_of_sequence_id(pack.seq_id_for_pos(t))
             if not jump.to_known():
-                t = f
+                if jump.from_forward:
+                    t = pack.end_of_sequence_id(pack.seq_id_for_pos(f))
+                else:
+                    t = pack.start_of_sequence_id(pack.seq_id_for_pos(f))
 
-            call = SvCall(f, t, 0, 0, jump.from_forward, jump.to_forward, 1,
-                            jump.num_supp_nt())
+            call = SvCall(f, t, 0, 0, jump.from_forward, jump.to_forward, 1, jump.num_supp_nt())
             if jump.query_from < jump.query_to:
                 call.inserted_sequence = NucSeq(query_genome, jump.query_from - y_start, jump.query_to - y_start)
                 call.inserted_sequence.check()
             call.order_id = idx
             idx += 1
+            call.ctg_order_id = contig_idx
             call.mirrored = jump.was_mirrored
             from_forward = jump.from_forward
             if jump.was_mirrored:
                 from_forward = not jump.to_forward
-            if contig_filter.cpp_module.by_contig_border(jump, pack) or not jump.from_known() or not jump.to_known():
+            if not jump.from_known() or not jump.to_known():
+                sv_call_table.insert_call(contig_start_caller_run_id, call)
+            elif contig_filter.cpp_module.by_contig_border(jump, pack):
                 cnt_contig_border += 1
                 sv_call_table.insert_call(contig_border_caller_run_id, call)
             elif max(abs(f - t), abs(jump.query_from - jump.query_to)) < min_size:
