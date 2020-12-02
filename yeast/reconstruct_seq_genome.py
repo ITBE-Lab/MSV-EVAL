@@ -84,7 +84,7 @@ if __name__ == "__main__":
                                                 reconstructed_query_genome.contigNucSeqs(),
                                                 ret_query_genome):
             print(name, reconstr.equals(assembly), sep="\t")
-    if False:
+    if True:
         print("name", "score", "matches", "missmatches", "indels", "indel ops", "% identity", sep="\t")
         xs = []
         cx = [0]

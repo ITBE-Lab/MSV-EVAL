@@ -289,16 +289,19 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, min
             assert(jump.num_supp_nt() > 0)
             f = jump.from_pos
             t = jump.to_pos
-            if not jump.from_known():
-                if jump.from_forward:
-                    f = pack.start_of_sequence_id(pack.seq_id_for_pos(t))
-                else:
-                    f = pack.end_of_sequence_id(pack.seq_id_for_pos(t))
-            if not jump.to_known():
-                if jump.from_forward:
-                    t = pack.end_of_sequence_id(pack.seq_id_for_pos(f))
-                else:
-                    t = pack.start_of_sequence_id(pack.seq_id_for_pos(f))
+            if (not jump.from_known() or not jump.to_known()) and not jump.from_forward:
+                # flip from and to information for dummy jumps from reverse strand seeds
+                # Why do we need to do this?:
+                # On reads we do not know the orientation of the reads. So, in order to unify forward and reverse
+                # strand reads, we mirror the dummy calls as well. Since they technically do not have a x and y position
+                # they cannot get the mirrored flag. Instead we simply mirror all reverse strand dummy calls.
+                # Hence these calls are wrong in the context of the reconstruction.
+                # since we do not (and cannot since there is no coverage at chrom ends) analyze these calls we can
+                # place them as we wish... we choose to simply mirror everything back to the original position
+                # since i do not want to do this in the cpp code i do it there in the py code.
+                tmp = f
+                f = t
+                t = tmp
 
             call = SvCall(f, t, 0, 0, jump.from_forward, jump.to_forward, 1, jump.num_supp_nt())
             if jump.query_from < jump.query_to:
@@ -308,9 +311,6 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, min
             idx += 1
             call.ctg_order_id = contig_idx
             call.mirrored = jump.was_mirrored
-            from_forward = jump.from_forward
-            if jump.was_mirrored:
-                from_forward = not jump.to_forward
             if not jump.from_known() or not jump.to_known():
                 sv_call_table.insert_call(contig_start_caller_run_id, call)
             elif contig_filter.cpp_module.by_contig_border(jump, pack):
