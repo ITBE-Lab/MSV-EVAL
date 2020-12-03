@@ -13,14 +13,16 @@ reference_genome = genome_dir + "YPS138"
 
 if __name__ == "__main__":
     db_name = "UFRJ50816"
-    run_ids = [1, 2, 3, 4]
-    #run_ids = [1, 2]
+    #run_ids = [1, 2, 3, 4]
+    run_ids = [5, 6]
 
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     call_table = SvCallTable(db_conn)
 
-    #call_table.copy_path(3, 2, 110)
-    #call_table.copy_path(5, 1, 0)
+    # copy order from 1 to 5 (pacBio)
+    #call_table.copy_path(1, 5, 100)
+    # copy order from 3 to 6 (Illumina)
+    #call_table.copy_path(3, 6, 0)
 
     jump_table = SvJumpTable(db_conn) # initialize jump table
     param = ParameterSetManager()
@@ -30,7 +32,9 @@ if __name__ == "__main__":
 
     seeds_list = call_table.calls_to_seeds_by_id(pack, run_ids, True, 0)
 
+    print("reconstructing...")
     reconstructed_query_genome = call_table.reconstruct_sequenced_genome(seeds_list, pack)
+    print("done")
     reconstructed_query_genome.store(reconstructed_query_genome_path + "/ma/genome")
 
     out = []
@@ -85,12 +89,13 @@ if __name__ == "__main__":
                                                 ret_query_genome):
             print(name, reconstr.equals(assembly), sep="\t")
     if True:
-        print("name", "score", "matches", "missmatches", "indels", "indel ops", "% identity", sep="\t")
+        print("name", "score", "% of max score", "matches", "missmatches", "indels", "indel ops", "% identity",
+                sep="\t")
         xs = []
         cx = [0]
         ys = []
         cy = [0]
-        for x_start, name, reconstr, (y_start, assembly) in zip(
+        for y_start, name, reconstr, (x_start, assembly) in zip(
                                                 reconstructed_query_genome.contigStarts(),
                                                 reconstructed_query_genome.contigNames(),
                                                 reconstructed_query_genome.contigNucSeqs(),
@@ -99,15 +104,15 @@ if __name__ == "__main__":
             y = 0
             xs.append(x_start)
             ys.append(y_start)
-            cx.append(x_start + len(reconstr))
-            cy.append(y_start + len(assembly))
+            cx.append(x_start + len(assembly))
+            cy.append(y_start + len(reconstr))
             matches = 0
             mismatches = 0
             indels = 0
             indelops = 0
-            l_total = max(len(reconstr), len(assembly))
-            nw_alignment = runKsw(reconstr, assembly, 1000)
-            printed_error = False
+            l_total = min(len(reconstr), len(assembly))
+            nw_alignment = runKsw(reconstr, assembly, 10000)
+            printed_error = True # set to false in order to print the postion of the first error
             for op, l in nw_alignment.data:
                 if op == MatchType.match or op == MatchType.seed:
                     matches += l
@@ -138,7 +143,21 @@ if __name__ == "__main__":
             xs.append(float("NaN"))
             ys.append(float("NaN"))
             iden = 100 * matches / l_total
-            print(name, nw_alignment.get_score(), matches, mismatches, indels, indelops, iden, sep="\t")
+
+            match_score = param.by_name("Match Score").get()
+            gap_open_penalty = param.by_name("Gap penalty").get()
+            gap_open_penalty_2 = param.by_name("Second Gap penalty").get()
+            gap_extend_penalty = param.by_name("Extend Penalty").get()
+            gap_extend_penalty_2 = param.by_name("Second Extend Penalty").get()
+            gap_penalty = 0
+            if len(reconstr) != len(assembly):
+                gapLen = abs(len(reconstr) - len(assembly))
+                gap_penalty = min(gap_open_penalty + gap_extend_penalty * gapLen,
+                                  gap_open_penalty_2 + gap_extend_penalty_2 * gapLen)
+            percent_of_max_score = (100.0 * nw_alignment.get_score()) / (match_score * l_total - gap_penalty)
+
+            print(name, nw_alignment.get_score(), percent_of_max_score, matches, mismatches, indels, indelops, iden,
+                  sep="\t")
         plot = figure(title="alignments reconstructed on assembly", plot_width=1000, plot_height=1000)
         decorate_plot(plot, reconstructed_query_genome_path, query_genome)
         plot.xaxis.axis_label = "Sequenced Genome"
@@ -166,4 +185,94 @@ chr13           811600             49844                8320            869764  
 chr14           852128             19503                524             872155          872155
 chr15           1163943            28849                8851            1201643         1201643
 chr16           1009782            19463                166             1029411         1029411
+"""
+
+
+"""
+chr1    150029  11825   1       220177  161855
+chr2    348831  21451   1       731301  370283
+chr3    171755  2434    0       308064  174189
+chr4    704895  31696   2       1391618 736593
+chr5    276762  17546   2       577572  294310
+chr6    179867  1809    1       282957  181677
+chr7    794300  50328   0       1105967 844628
+chr8    312796  22533   1       546662  335330
+chr9    214000  9502    2       374625  223504
+chr10   439853  35692   5       751133  475550
+chr11   426265  11321   1       805821  437587
+chr12   600929  27645   1       1068413 628575
+chr13   1153526 46186   2       869764  1199714
+chr14   460195  17037   1       872155  477233
+chr15   597630  23566   2       1201643 621198
+chr16   532746  17050   2       1029411 549798
+name    score   % of max score    matches missmatches     indels  indel ops       % identity
+Indel: 2 0
+chr1    147752  0       123492  8515    118018  5596    76.29792097865374
+using filesystem because: 398825922000 / 96636764160 bytes are required.
+that is 371.436 / 90 gigabytes.
+^[[BCyclicFileCache hits: 12662144791 misses: 63 = 100%
+Indel: 37565 0
+chr2    409736  0       322153  47368   362542  1196    87.00183373257751
+Indel: 14 0
+chr3    318204  0       171881  417     137657  736     98.67500243987853
+using filesystem because: 1396207914096 / 96636764160 bytes are required.
+that is 1300.32 / 90 gigabytes.
+CyclicFileCache hits: 46956358766 misses: 176 = 100%
+Indel: 617631 0
+chr4    -1700974        0       207962  528592  655103  72      28.232959042510586
+using filesystem because: 247865305744 / 96636764160 bytes are required.
+that is 230.843 / 90 gigabytes.
+CyclicFileCache hits: 7933702195 misses: 36 = 100%
+Indel: 32386 0
+chr5    515124  0       290112  765     290128  1732    98.57361285719139
+Indel: 0 2322
+chr6    217898  0       160902  8614    125602  5756    88.56487062203801
+using filesystem because: 511773446608 / 96636764160 bytes are required.
+that is 476.626 / 90 gigabytes.
+CyclicFileCache hits: 25549552388 misses: 86 = 100%
+Indel: 107 0
+chr7    10420   0       559605  235322  360741  10479   66.25461149760605
+using filesystem because: 187292552848 / 96636764160 bytes are required.
+that is 174.43 / 90 gigabytes.
+CyclicFileCache hits: 7492523883 misses: 25 = 100%
+Indel: 3 2
+chr8    505084  0       318104  9228    227328  6721    94.86297080487877
+Indel: 138 0
+chr9    217832  0       200787  13298   169959  10163   89.83597608991337
+using filesystem because: 339310054672 / 96636764160 bytes are required.
+that is 316.007 / 90 gigabytes.
+CyclicFileCache hits: 14052374229 misses: 54 = 100%
+Indel: 0 3031
+chr10   744078  0       419405  3115    381643  3444    88.19367048680475
+using filesystem because: 459145442464 / 96636764160 bytes are required.
+that is 427.613 / 90 gigabytes.
+CyclicFileCache hits: 15937831046 misses: 75 = 100%
+Indel: 25737 0
+chr11   175716  0       326492  107045  376334  2143    74.61190574674293
+using filesystem because: 748140476784 / 96636764160 bytes are required.
+that is 696.76 / 90 gigabytes.
+CyclicFileCache hits: 28566848494 misses: 130 = 100%
+Indel: 0 1
+chr12   -750196 0       297720  330017  441514  752     47.36427633933898
+using filesystem because: 684947219568 / 96636764160 bytes are required.
+that is 637.907 / 90 gigabytes.
+CyclicFileCache hits: 32561515015 misses: 118 = 100%
+Indel: 17 0
+chr13   -1656092        0       397072  443265  388804  57171   45.652843759916486
+using filesystem because: 534292481440 / 96636764160 bytes are required.
+that is 497.599 / 90 gigabytes.
+CyclicFileCache hits: 18721733612 misses: 89 = 100%
+Indel: 15707 0
+chr14   -94750  0       307560  168588  397092  1044    64.44650726165206
+using filesystem because: 1059930420496 / 96636764160 bytes are required.
+that is 987.137 / 90 gigabytes.
+CyclicFileCache hits: 34586212516 misses: 131 = 100%
+Indel: 526944 0
+chr15   -1436462        0       176262  444754  580809  370     28.374527928293393
+using filesystem because: 759030533136 / 96636764160 bytes are required.
+that is 706.902 / 90 gigabytes.
+CyclicFileCache hits: 25813880701 misses: 132 = 100%
+Mismatch: 2 2 A != T
+chr16   -823002 0       234070  314318  482433  2404    42.5738180204366
+
 """

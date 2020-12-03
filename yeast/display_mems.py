@@ -366,8 +366,8 @@ def render_seeds(seeds_1, query_genome, reference_genome, title="seeds", y_axis=
                 else:
                     seed = seed_
                     reason = None
-                #if seed.size < 20:
-                #    continue
+                if seed.size == 0:
+                    continue
                 xs[filtered][seed.on_forward_strand].append([seed.start_ref,
                                             seed.start_ref + seed.size * (1 if seed.on_forward_strand else -1)])
                 ys[filtered][seed.on_forward_strand].append([seed.start + y_start, seed.start + seed.size + y_start])
