@@ -20,9 +20,9 @@ if __name__ == "__main__":
     call_table = SvCallTable(db_conn)
 
     # copy order from 1 to 5 (pacBio)
-    #call_table.copy_path(1, 5, 100)
+    call_table.copy_path(1, 5, 100)
     # copy order from 3 to 6 (Illumina)
-    #call_table.copy_path(3, 6, 0)
+    call_table.copy_path(3, 6, 0)
 
     jump_table = SvJumpTable(db_conn) # initialize jump table
     param = ParameterSetManager()
@@ -145,12 +145,12 @@ if __name__ == "__main__":
             iden = 100 * matches / l_total
 
             match_score = param.by_name("Match Score").get()
-            gap_open_penalty = param.by_name("Gap penalty").get()
-            gap_open_penalty_2 = param.by_name("Second Gap penalty").get()
-            gap_extend_penalty = param.by_name("Extend Penalty").get()
-            gap_extend_penalty_2 = param.by_name("Second Extend Penalty").get()
             gap_penalty = 0
             if len(reconstr) != len(assembly):
+                gap_open_penalty = param.by_name("Gap penalty").get()
+                gap_open_penalty_2 = param.by_name("Second Gap penalty").get()
+                gap_extend_penalty = param.by_name("Extend Penalty").get()
+                gap_extend_penalty_2 = param.by_name("Second Extend Penalty").get()
                 gapLen = abs(len(reconstr) - len(assembly))
                 gap_penalty = min(gap_open_penalty + gap_extend_penalty * gapLen,
                                   gap_open_penalty_2 + gap_extend_penalty_2 * gapLen)
@@ -205,74 +205,22 @@ chr13   1153526 46186   2       869764  1199714
 chr14   460195  17037   1       872155  477233
 chr15   597630  23566   2       1201643 621198
 chr16   532746  17050   2       1029411 549798
-name    score   % of max score    matches missmatches     indels  indel ops       % identity
-Indel: 2 0
-chr1    147752  0       123492  8515    118018  5596    76.29792097865374
-using filesystem because: 398825922000 / 96636764160 bytes are required.
-that is 371.436 / 90 gigabytes.
-^[[BCyclicFileCache hits: 12662144791 misses: 63 = 100%
-Indel: 37565 0
-chr2    409736  0       322153  47368   362542  1196    87.00183373257751
-Indel: 14 0
-chr3    318204  0       171881  417     137657  736     98.67500243987853
-using filesystem because: 1396207914096 / 96636764160 bytes are required.
-that is 1300.32 / 90 gigabytes.
-CyclicFileCache hits: 46956358766 misses: 176 = 100%
-Indel: 617631 0
-chr4    -1700974        0       207962  528592  655103  72      28.232959042510586
-using filesystem because: 247865305744 / 96636764160 bytes are required.
-that is 230.843 / 90 gigabytes.
-CyclicFileCache hits: 7933702195 misses: 36 = 100%
-Indel: 32386 0
-chr5    515124  0       290112  765     290128  1732    98.57361285719139
-Indel: 0 2322
-chr6    217898  0       160902  8614    125602  5756    88.56487062203801
-using filesystem because: 511773446608 / 96636764160 bytes are required.
-that is 476.626 / 90 gigabytes.
-CyclicFileCache hits: 25549552388 misses: 86 = 100%
-Indel: 107 0
-chr7    10420   0       559605  235322  360741  10479   66.25461149760605
-using filesystem because: 187292552848 / 96636764160 bytes are required.
-that is 174.43 / 90 gigabytes.
-CyclicFileCache hits: 7492523883 misses: 25 = 100%
-Indel: 3 2
-chr8    505084  0       318104  9228    227328  6721    94.86297080487877
-Indel: 138 0
-chr9    217832  0       200787  13298   169959  10163   89.83597608991337
-using filesystem because: 339310054672 / 96636764160 bytes are required.
-that is 316.007 / 90 gigabytes.
-CyclicFileCache hits: 14052374229 misses: 54 = 100%
-Indel: 0 3031
-chr10   744078  0       419405  3115    381643  3444    88.19367048680475
-using filesystem because: 459145442464 / 96636764160 bytes are required.
-that is 427.613 / 90 gigabytes.
-CyclicFileCache hits: 15937831046 misses: 75 = 100%
-Indel: 25737 0
-chr11   175716  0       326492  107045  376334  2143    74.61190574674293
-using filesystem because: 748140476784 / 96636764160 bytes are required.
-that is 696.76 / 90 gigabytes.
-CyclicFileCache hits: 28566848494 misses: 130 = 100%
-Indel: 0 1
-chr12   -750196 0       297720  330017  441514  752     47.36427633933898
-using filesystem because: 684947219568 / 96636764160 bytes are required.
-that is 637.907 / 90 gigabytes.
-CyclicFileCache hits: 32561515015 misses: 118 = 100%
-Indel: 17 0
-chr13   -1656092        0       397072  443265  388804  57171   45.652843759916486
-using filesystem because: 534292481440 / 96636764160 bytes are required.
-that is 497.599 / 90 gigabytes.
-CyclicFileCache hits: 18721733612 misses: 89 = 100%
-Indel: 15707 0
-chr14   -94750  0       307560  168588  397092  1044    64.44650726165206
-using filesystem because: 1059930420496 / 96636764160 bytes are required.
-that is 987.137 / 90 gigabytes.
-CyclicFileCache hits: 34586212516 misses: 131 = 100%
-Indel: 526944 0
-chr15   -1436462        0       176262  444754  580809  370     28.374527928293393
-using filesystem because: 759030533136 / 96636764160 bytes are required.
-that is 706.902 / 90 gigabytes.
-CyclicFileCache hits: 25813880701 misses: 132 = 100%
-Mismatch: 2 2 A != T
-chr16   -823002 0       234070  314318  482433  2404    42.5738180204366
+name    score   % of max score  matches missmatches     indels  indel ops       % identity
+chr1    433574  99.86870715707231       218253  324     9386    86      99.12615759139238
+chr2    1430666 99.25813069471242       718865  486     16827   202     99.25948734376468
+chr3    608188  99.64169567888592       305622  341     9931    76      99.20730757245248
+chr4    2728520 100.45797603237901      1367793 408     24457   145     99.89424798118081
+chr5    1137284 99.58015163574498       572040  613     5491    166     99.7932748920581
+chr6    527774  98.0852182866021        265665  292     24729   87      97.06926916247086
+chr7    2193042 99.992157628029         1098983 292     7152    125     99.93161989024628
+chr8    1074774 98.61669037023444       540218  570     15198   131     98.82120944934896
+chr9    678316  102.32584801885056      342029  644     35128   143     98.89547172320869
+chr10   1426034 95.94949382129597       740585  4858    27388   3276    98.59572139687646
+chr11   1596412 99.47738003326273       801502  525     5315    178     99.74537924305704
+chr12   2096408 100.25513217376916      1051670 586     17071   160     99.85757285148647
+chr13   1687042 100.71904563468135      846861  719     22866   185     99.83483876443835
+chr14   1732516 99.65264256810973       869303  588     10259   159     99.67299390589976
+chr15   2357332 99.74181635704657       1184944 1288    17546   417     99.71195766964246
+chr16   2030518 100.11971855292418      1018132 516     11290   128     99.89766232491966
 
 """

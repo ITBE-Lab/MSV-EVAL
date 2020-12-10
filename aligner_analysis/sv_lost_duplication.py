@@ -2,7 +2,7 @@ from aligner_analysis.binary_search_plot import *
 
 def duplication(sv_size, gap_size, genome_section, ref_start, min_dist=50):
     points = []
-    total_size = sv_size*2 + gap_size
+    total_size = sv_size*3
     offset = random.randint(min_dist, (len(genome_section) - total_size)-min_dist)
     total_size += offset
     g = str(genome_section)
@@ -13,17 +13,17 @@ def duplication(sv_size, gap_size, genome_section, ref_start, min_dist=50):
     read += g[offset:offset + sv_size] 
 
     # between duplication
-    read += g[offset + sv_size:offset + sv_size + gap_size]
-    points.append((offset+sv_size+gap_size, ref_start+offset+sv_size+gap_size, True))
+    read += g[offset + sv_size:offset + sv_size *2]
+    points.append((offset+sv_size*2, ref_start+offset+sv_size*2, True))
 
     # section b (section that was duplicated)
     read += g[offset:offset + sv_size]
-    points.append((offset+sv_size+gap_size, ref_start+offset, True))
-    points.append((offset+sv_size*2+gap_size, ref_start+offset+sv_size, True))
+    points.append((offset+sv_size*2, ref_start+offset, True))
+    points.append((offset+sv_size*3, ref_start+offset+sv_size, True))
 
     # after duplication
-    read += g[offset + sv_size + gap_size:len(genome_section)-sv_size]
-    points.append((offset+sv_size*2+gap_size, ref_start+offset+sv_size+gap_size, True))
+    read += g[offset + sv_size *2:len(genome_section)-sv_size]
+    points.append((offset+sv_size*3, ref_start+offset+sv_size*2, True))
 
     return points, NucSeq(read)
 
@@ -51,9 +51,6 @@ def main():
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
 
 #main()
-if False:
-    binary_search_plot(duplication, "duplication_overlap")
-    print_binary_search_plot_box_plot(file_name_in="duplication_overlap", title="Overlap - Duplication")
 
 if True:
     accuracy_plot(duplication, dup_size, "duplication_overlap")

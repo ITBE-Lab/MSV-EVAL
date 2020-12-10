@@ -64,9 +64,6 @@ def main():
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
 
 #main()
-if False:
-    binary_search_plot(dup_inv, "dup_inv_overlap")
-    print_binary_search_plot_box_plot(file_name_in="dup_inv_overlap", title="Overlap - Duplication")
 
 if True:
     accuracy_plot(dup_inv, dup_inv_size, "dup_inv_overlap")

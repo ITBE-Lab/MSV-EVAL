@@ -48,6 +48,11 @@ def pbmm2(read_set, sam_file_path, json_dict):
     #          + read_set["fasta_file"] + ".bam " + sam_file_path + 
     #          ".sorted.bam --sort --preset CCS --sample sample1 --rg '@RG\tID:movie1' ")
 
+def sw(read_set, sam_file_path, json_dict):
+    ref_file = json_dict["reference_path"] + "/fasta/genome.fna"
+    os.system("~/workspace/klib/ksw -m 32 -f " + ref_file + " " + read_set["fasta_file"] + " > " +
+              sam_file_path)
+
 def ngmlr(read_set, sam_file_path, json_dict):
     presetting = None # noop
     if read_set["technology"] == "pb":

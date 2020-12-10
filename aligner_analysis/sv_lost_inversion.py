@@ -22,7 +22,7 @@ def invert(seq):
 
 def inversion(sv_size, gap_size, genome_section, ref_start, min_dist=50):
     points = []
-    total_size = sv_size + gap_size
+    total_size = sv_size *2
     offset = random.randint(min_dist, (len(genome_section) - total_size)-min_dist)
     total_size += offset
     g = str(genome_section)
@@ -32,8 +32,8 @@ def inversion(sv_size, gap_size, genome_section, ref_start, min_dist=50):
     points.append((offset, ref_start+offset, True))
 
     # inverted secion
-    read += invert( g[offset + gap_size:total_size] )
-    points.append((offset+sv_size, ref_start+offset+gap_size-1, False))
+    read += invert( g[offset + sv_size:total_size] )
+    points.append((offset+sv_size, ref_start+offset+sv_size-1, False))
     points.append((offset, ref_start+total_size-1, False))
 
     # after inversion
@@ -103,9 +103,6 @@ def main():
 #main()
 #plot_quads(inversion)
 #print_sam_file()
-if False:
-    binary_search_plot(inversion, "inversion_overlap")
-    print_binary_search_plot_box_plot(file_name_in="inversion_overlap", title="Overlap - Inversion")
 
 if True:
     accuracy_plot(inversion, filename_out="inversion_overlap")

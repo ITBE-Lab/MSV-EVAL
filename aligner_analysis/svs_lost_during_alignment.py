@@ -22,6 +22,7 @@ def choice_adj_size(l, total_len):
 def create_reads(pack, size, amount, func_get_seeds_and_read):
     lumper = SeedLumping(ParameterSetManager())
     read_by_name = ReadByName()
+    genome_section_by_name = ReadByName()
     points_by_name = {}
     contigs = [(x, y) for x, y in zip(pack.contigLengths(), pack.contigStarts()) if x > size]
     total_len = sum(x for x, _ in contigs)
@@ -29,20 +30,23 @@ def create_reads(pack, size, amount, func_get_seeds_and_read):
         contig_len, contig_start = choice_adj_size(contigs, total_len)
         start = random.randrange(contig_len - size)
         genome_section = pack.extract_from_to(start+contig_start, start+size+contig_start)
-        return func_get_seeds_and_read(genome_section, start + contig_start)
+        return func_get_seeds_and_read(genome_section, start + contig_start), genome_section, start + contig_start
     for idx in range(amount):
         read = NucSeq("N")
         while 'n' in str(read) or 'N' in str(read):
-            points, read = read_and_seeds()
+            (points, read), genome_section, sec_offset = read_and_seeds()
         read.name = "read" + str(idx)
+        genome_section.name = "read" + str(idx)
         read_by_name.append(read)
-        points_by_name[read.name] = points
-    return points_by_name, read_by_name
+        genome_section_by_name.append(genome_section)
+        points_by_name[read.name] = (points, sec_offset)
+    return points_by_name, read_by_name, genome_section_by_name
 
 
 def create_scattered_read(pack, amount, num_pieces, size_pieces):
     lumper = SeedLumping(ParameterSetManager())
     read_by_name = ReadByName()
+    genome_section_by_name = ReadByName()
     points_by_name = {}
     contigs = [(x, y) for x, y in zip(pack.contigLengths(), pack.contigStarts()) if x > size_pieces]
     total_len = sum(x for x, _ in contigs)
@@ -63,12 +67,15 @@ def create_scattered_read(pack, amount, num_pieces, size_pieces):
             points, read = read_and_points()
         read.name = "read" + str(idx)
         read_by_name.append(read)
-        points_by_name[read.name] = points
-    return points_by_name, read_by_name
+        genome_section = NucSeq()
+        genome_section.name = "read" + str(idx)
+        genome_section_by_name.append(genome_section)
+        points_by_name[read.name] = (points, 0)
+    return points_by_name, read_by_name, genome_section_by_name
 
 
 def compare(params, data, points_by_name, reads, pack_pledge, fm_index_pledge,
-            unlock_targets=None, render_one=True, original_seeds_list=None):
+            unlock_targets=None, render_one=True, original_seeds_list=None, ignore_genome_offset=False):
     compare_module = CompareSeedSets(params)
     lumper = SeedLumping(params)
     get_rectangles = SvJumpsFromSeeds(params, pack_pledge.get())
@@ -106,8 +113,10 @@ def compare(params, data, points_by_name, reads, pack_pledge, fm_index_pledge,
 
         res.simultaneous_get(params.get_num_threads())
 
-    def matches(seed, point):
+    def matches(seed, point, sec_offset):
         q,r,f = point
+        if ignore_genome_offset:
+            r -= sec_offset
         def nearby_start(max_diff=5):
             return abs(q-seed.start) <= max_diff and abs(r-seed.start_ref) <= max_diff
         def nearby_end(max_diff=5):
@@ -119,11 +128,12 @@ def compare(params, data, points_by_name, reads, pack_pledge, fm_index_pledge,
 
     all_found = {}
     for name, point_values in points_by_name.items():
-        all_found[name] = [False]*len(point_values)
+        all_found[name] = [False]*len(point_values[0])
     for read, seeds in collector.cpp_module.collection:
         for seed in seeds:
-            for idx, point in enumerate(points_by_name[read.name]):
-                if matches(seed, point):
+            sec_offset = points_by_name[read.name][1]
+            for idx, point in enumerate(points_by_name[read.name][0]):
+                if matches(seed, point, sec_offset):
                     all_found[read.name][idx] = True
 
     s = 0
@@ -202,6 +212,43 @@ def compare_seeds(params, reads_by_name, points_by_name, fm_index, pack, mems=Tr
     return compare(params, data, points_by_name, reads, pack_pledge, fm_index_pledge,
                    unlock_targets, render_one, original_seeds_list=original_seeds_list)
 
+def compare_nw(params, reads_by_name, genome_section_by_name, points_by_name, pack, render_one=False):
+    #params.by_name("Number of Threads").set(1)
+    #params.by_name("Use all Processor Cores").set(False)
+
+    splitter = NucSeqSplitter(params)
+    lock = Lock(params)
+    genome_section_by_name_pledge = Pledge()
+    genome_section_by_name_pledge.set(genome_section_by_name)
+    pack_pledge = Pledge()
+    pack_pledge.set(pack)
+
+    reads_vec = ContainerVectorNucSeq()
+    for name, read in reads_by_name:
+        reads_vec.append(read)
+    reads_vec_pledge = Pledge()
+    reads_vec_pledge.set(reads_vec)
+
+    nw_alignment = NWAlignment(params)
+    alignment_to_seeds = AlignmentToSeeds(params)
+    read_by_name = GetReadByReadName(params)
+
+    data = []
+    reads = []
+    unlock_targets = []
+    read = promise_me(splitter, reads_vec_pledge)
+    for _ in range(params.get_num_threads()):
+        locked_read = promise_me(lock, read)
+        unlock_targets.append(locked_read)
+        reads.append(locked_read)
+        genome_section_pl = promise_me(read_by_name, locked_read, genome_section_by_name_pledge)
+        alignment_pl = promise_me(nw_alignment, locked_read, genome_section_pl)
+        seeds_pl = promise_me(alignment_to_seeds, alignment_pl, pack_pledge)
+        data.append(seeds_pl)
+
+    return compare(params, data, points_by_name, reads, pack_pledge, None, unlock_targets, render_one,
+                    ignore_genome_offset=True)
+
 def compare_alignment(params, reads_by_name_pledge, points_by_name, alignments, pack_pledge, fm_index_pledge,
                       unlock_targets=None, render_one=False):
     align_to_seeds = AlignmentToSeeds(params)
@@ -221,6 +268,7 @@ def compare_alignment(params, reads_by_name_pledge, points_by_name, alignments, 
 
 def compare_alignment_from_file_queue(params, reads_by_name, points_by_name, pack, fm_index, queue_pledge,
                                       render_one=False):
+    file_reader = None # no op
     file_reader = SamFileReader(params)
     queue_picker = FilePicker(params)
     queue_placer = FileAlignmentPlacer(params)

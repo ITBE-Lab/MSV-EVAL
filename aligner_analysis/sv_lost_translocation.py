@@ -4,7 +4,7 @@ only_sv = True
 no_sv = False
 def translocation(sv_size, gap_size, genome_section, ref_start, min_dist=100):
     points = []
-    total_size = sv_size*2 + gap_size
+    total_size = sv_size*3
     offset = random.randint(min_dist, (len(genome_section) - total_size)-min_dist)
     total_size += offset
     g = str(genome_section)
@@ -14,19 +14,19 @@ def translocation(sv_size, gap_size, genome_section, ref_start, min_dist=100):
     points.append((offset, ref_start+offset, True))
 
     # section a
-    read += g[offset + sv_size + gap_size:total_size] 
-    points.append((offset+sv_size+gap_size, ref_start+offset, True))
-    points.append((offset+sv_size+gap_size+sv_size, ref_start+offset+sv_size, True))
+    read += g[offset + sv_size *2:total_size] 
+    points.append((offset+sv_size*2, ref_start+offset, True))
+    points.append((offset+sv_size*3, ref_start+offset+sv_size, True))
 
     # within translocation
-    read += g[offset + sv_size:offset + sv_size + gap_size]
+    read += g[offset + sv_size:offset + sv_size *2]
     points.append((offset+sv_size, ref_start+offset+sv_size, True))
-    points.append((offset+sv_size+gap_size, ref_start+offset+sv_size+gap_size, True))
+    points.append((offset+sv_size*2, ref_start+offset+sv_size*2, True))
 
     # section b
     read += g[offset:offset + sv_size]
-    points.append((offset, ref_start+offset+sv_size+gap_size, True))
-    points.append((offset+sv_size, ref_start+offset+sv_size+gap_size+sv_size, True))
+    points.append((offset, ref_start+offset+sv_size*2, True))
+    points.append((offset+sv_size, ref_start+offset+sv_size*3, True))
 
     # after tranlocation
     read += g[total_size:]
@@ -57,9 +57,6 @@ def main():
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
 
 #main()
-if False:
-    #binary_search_plot(translocation)
-    print_binary_search_plot_box_plot(file_name_in="translocation_overlap", title="Overlap - translocation")
 
 if True:
     accuracy_plot(translocation, filename_out="translocation_overlap")

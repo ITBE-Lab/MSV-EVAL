@@ -61,9 +61,6 @@ def main():
           100 * comp.amount_overlap / comp.amount_ground_truth, "% (seeds)")
 
 #main()
-if False:
-    binary_search_plot(nest_inv, "nested_inversion_overlap")
-    print_binary_search_plot_box_plot(file_name_in="nested_inversion_overlap", title="Overlap - Nested Inversion")
 
 if True:
     accuracy_plot(nest_inv, filename_out="nested_inversion_overlap")
