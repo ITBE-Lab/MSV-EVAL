@@ -71,14 +71,14 @@ class MM2TestSet:
     def color_light(self):
         return self.c2
 
-class SwTestSet:
+class NWTestSet:
     def __init__(self, name="SW"):
         self.sw = lambda x,y,z: sw(x,y,z)
         self._name = name
         self.c = "purple"
         self.c2 = "pink"
 
-        self._display_name = "SW Alignment"
+        self._display_name = "NW Alignment"
     def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix, genome_section_by_name):
         return compare_nw(params, read_by_name, genome_section_by_name, seeds_by_name, pack)
 
@@ -150,9 +150,9 @@ def print_n_write(s, f):
     print(s, end="")
     f.write(s)
 
-default_test_set = [SwTestSet(), SeedsTestSet(False, True), MATestSet(), MM2TestSet(),
+default_test_set = [NWTestSet(), SeedsTestSet(False, True), MATestSet(), MM2TestSet(),
                     MM2TestSet("-z 400,1 --splice -P", "extra_sensitive"), NgmlrTestSet()]
-#default_test_set = [SwTestSet()]
+#default_test_set = [NWTestSet()]
 
 def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocation_overlap",
                     test_sets=default_test_set, sv_sizes=range(25, 501, 25), read_size=2000, num_reads=1000):

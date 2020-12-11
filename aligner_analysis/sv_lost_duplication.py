@@ -2,9 +2,7 @@ from aligner_analysis.binary_search_plot import *
 
 def duplication(sv_size, gap_size, genome_section, ref_start, min_dist=50):
     points = []
-    total_size = sv_size*3
-    offset = random.randint(min_dist, (len(genome_section) - total_size)-min_dist)
-    total_size += offset
+    offset = random.randint(min_dist, (len(genome_section) - sv_size*2)-min_dist)
     g = str(genome_section)
     # before duplication
     read = g[:offset] 
@@ -22,7 +20,7 @@ def duplication(sv_size, gap_size, genome_section, ref_start, min_dist=50):
     points.append((offset+sv_size*3, ref_start+offset+sv_size, True))
 
     # after duplication
-    read += g[offset + sv_size *2:len(genome_section)-sv_size]
+    read += g[offset + sv_size *2:]
     points.append((offset+sv_size*3, ref_start+offset+sv_size*2, True))
 
     return points, NucSeq(read)

@@ -20,9 +20,9 @@ if __name__ == "__main__":
     call_table = SvCallTable(db_conn)
 
     # copy order from 1 to 5 (pacBio)
-    call_table.copy_path(1, 5, 100)
+    #call_table.copy_path(1, 5, 100)
     # copy order from 3 to 6 (Illumina)
-    call_table.copy_path(3, 6, 0)
+    #call_table.copy_path(3, 6, 0)
 
     jump_table = SvJumpTable(db_conn) # initialize jump table
     param = ParameterSetManager()
@@ -30,9 +30,10 @@ if __name__ == "__main__":
     pack, _, _, ret_query_genome = load_genomes(query_genome, reference_genome, param)
 
 
-    seeds_list = call_table.calls_to_seeds_by_id(pack, run_ids, True, 0)
-
     print("reconstructing...")
+    seeds_list = call_table.calls_to_seeds_by_id(pack, run_ids, True, True)
+    exit()
+
     reconstructed_query_genome = call_table.reconstruct_sequenced_genome(seeds_list, pack)
     print("done")
     reconstructed_query_genome.store(reconstructed_query_genome_path + "/ma/genome")
@@ -222,5 +223,4 @@ chr13   1687042 100.71904563468135      846861  719     22866   185     99.83483
 chr14   1732516 99.65264256810973       869303  588     10259   159     99.67299390589976
 chr15   2357332 99.74181635704657       1184944 1288    17546   417     99.71195766964246
 chr16   2030518 100.11971855292418      1018132 516     11290   128     99.89766232491966
-
 """
