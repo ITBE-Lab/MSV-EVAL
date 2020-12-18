@@ -1,4 +1,5 @@
-
+from bokeh.events import DoubleTap
+from bokeh.models.callbacks import CustomJS
 
 def point_to_px(val):
     return val * 1.33333
@@ -101,6 +102,6 @@ def style_plot(plot):
     plot.title.text_font_size  = "20pt"
     plot.title.text_color = "black"
     plot.title.text_font = "calibri"
-    #plot.js_on_event(events.DoubleTap, CustomJS(args=dict(other=plot.legend[0]),
-    #         code="other.visible = !other.visible;"
-    #))
+    plot.js_on_event(DoubleTap, CustomJS(args=dict(other=plot.legend[0]),
+             code="other.visible = !other.visible;"
+    ))

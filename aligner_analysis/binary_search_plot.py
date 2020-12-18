@@ -6,6 +6,8 @@ from bokeh.transform import dodge
 from bokeh.layouts import column
 from bokeh.io import output_file, export_svgs
 from sv_util.bokeh_style_helper import *
+from bokeh.models import NumeralTickFormatter
+
 class MATestSet:
     def __init__(self, params=ParameterSetManager(), name="ma", render_one=False):
         params.by_name("Detect Small Inversions").set(True)
@@ -197,7 +199,7 @@ def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocatio
             print_n_write("\n", file_out)
 
 def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scattered read", 
-                            test_sets=default_test_set, x_label="SV Size", save_svg=True):
+                            test_sets=default_test_set, x_label="SV Size [nt]", save_svg=True):
     with open(data_dir + "/" + file_name_in + ".tsv", "r") as file_in:
         output_file(data_dir + "/bokeh_out_" + file_name_in + ".html")
         lines = file_in.readlines()
@@ -209,9 +211,10 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
 
         xs = [int(x) for x in lines[0].split("\t")[2:]]
 
-        plot = figure(title=title, plot_width=800, y_range=(-0.05, 1.05), x_range=(-10,510))
+        plot = figure(title=title, plot_height=450, plot_width=600, y_range=(-0.05, 1.05), x_range=(-10,510))
         plot.xaxis.axis_label = x_label
-        plot.yaxis.axis_label = "Accuracy"
+        plot.yaxis.axis_label = "Recall [%]"
+        plot.yaxis.formatter = NumeralTickFormatter(format='0%')
         funcs = [
             plot.x,
             plot.circle,

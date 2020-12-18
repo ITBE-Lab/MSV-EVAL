@@ -63,5 +63,5 @@ def main():
 #main()
 
 if True:
-    accuracy_plot(nest_inv, filename_out="nested_inversion_overlap")
+    #accuracy_plot(nest_inv, filename_out="nested_inversion_overlap")
     print_accuracy_plot(file_name_in="nested_inversion_overlap", title="Accuracy - Nested Inversion")

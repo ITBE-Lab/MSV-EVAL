@@ -10,6 +10,84 @@ reconstructed_query_genome_path = "/MAdata/genome/reconstructed/yeast/UFRJ50816"
 reference_genome = genome_dir + "YPS138"
 #reference_genome = "vivax"
 
+def nw_comparison(reconstructed_query_genome, ret_query_genome,
+                  title="alignments reconstructed on assembly"):
+    print("name", "score", "% of max score", "matches", "missmatches", "indels", "indel ops", "% identity",
+            sep="\t")
+    xs = []
+    cx = [0]
+    ys = []
+    cy = [0]
+    for y_start, name, reconstr, (x_start, assembly) in zip(
+                                            reconstructed_query_genome.contigStarts(),
+                                            reconstructed_query_genome.contigNames(),
+                                            reconstructed_query_genome.contigNucSeqs(),
+                                            ret_query_genome):
+        x = 0
+        y = 0
+        xs.append(x_start)
+        ys.append(y_start)
+        cx.append(x_start + len(assembly))
+        cy.append(y_start + len(reconstr))
+        matches = 0
+        mismatches = 0
+        indels = 0
+        indelops = 0
+        l_total = min(len(reconstr), len(assembly))
+        param.by_name("Minimal Bandwidth in Gaps").set(10000)
+        nw_alignment = runKsw(reconstr, assembly)
+        printed_error = True # set to false in order to print the postion of the first error
+        for op, l in nw_alignment.data:
+            if op == MatchType.match or op == MatchType.seed:
+                matches += l
+                x += l
+                y += l
+            if op == MatchType.missmatch:
+                mismatches += l
+                x += l
+                y += l
+                # break line
+                xs.append(float("NaN"))
+                ys.append(float("NaN"))
+                if not printed_error:
+                    printed_error = True
+                    print("Mismatch:", x, y, reconstr[y-l], "!=", assembly[x-l])
+            if op == MatchType.insertion or op == MatchType.deletion:
+                indels += l
+                indelops += 1
+                if op == MatchType.insertion:
+                    y += l
+                else:
+                    x += l
+                if not printed_error:
+                    printed_error = True
+                    print("Indel:", x, y)
+            xs.append(x + x_start)
+            ys.append(y + y_start)
+        xs.append(float("NaN"))
+        ys.append(float("NaN"))
+        iden = 100 * matches / l_total
+
+        match_score = param.by_name("Match Score").get()
+        gap_penalty = 0
+        if len(reconstr) != len(assembly):
+            gap_open_penalty = param.by_name("Gap penalty").get()
+            gap_open_penalty_2 = param.by_name("Second Gap penalty").get()
+            gap_extend_penalty = param.by_name("Extend Penalty").get()
+            gap_extend_penalty_2 = param.by_name("Second Extend Penalty").get()
+            gapLen = abs(len(reconstr) - len(assembly))
+            gap_penalty = min(gap_open_penalty + gap_extend_penalty * gapLen,
+                                gap_open_penalty_2 + gap_extend_penalty_2 * gapLen)
+        percent_of_max_score = (100.0 * nw_alignment.get_score()) / (match_score * l_total - gap_penalty)
+
+        print(name, nw_alignment.get_score(), percent_of_max_score, matches, mismatches, indels, indelops, iden,
+                sep="\t")
+    plot = figure(title=title, plot_width=1000, plot_height=1000)
+    decorate_plot(plot, reconstructed_query_genome_path, query_genome)
+    plot.xaxis.axis_label = "Sequenced Genome"
+    plot.yaxis.axis_label = "Reconstructed Genome"
+    plot.line(x=xs, y=ys, line_width=4)
+    return plot
 
 if __name__ == "__main__":
     db_name = "UFRJ50816"
@@ -32,7 +110,6 @@ if __name__ == "__main__":
 
     print("reconstructing...")
     seeds_list = call_table.calls_to_seeds_by_id(pack, run_ids, True, True)
-    exit()
 
     reconstructed_query_genome = call_table.reconstruct_sequenced_genome(seeds_list, pack)
     print("done")
@@ -41,23 +118,60 @@ if __name__ == "__main__":
     out = []
     print("contig_name", "nt in seeds", "nt in insertions", "nt in ends", "sequenced len", "reconstr len", sep="\t")
     buckets = {}
+    nt_insertion_total = 0
+    nt_seeds_total = 0
+    nt_ends_total = 0
+    req_len_total = 0
+    num_insertions = 0
+    num_insertions_size_one = 0
+    num_insertions_larger_eq_hundred = 0
     for idx, ((contig_name, seeds, insertions), reconstr_contig, (y_start, assembly)) in enumerate(zip(seeds_list,
                                                   reconstructed_query_genome.contigNucSeqs(),
                                                   ret_query_genome)):
         nt_in_seeds = 0
         nt_in_ins = 0
+        if len(insertions[0]) > 0:
+            num_insertions += 1
+        if len(insertions[0]) == 1:
+            num_insertions_size_one += 1
+        if len(insertions[0]) >= 100:
+            num_insertions_larger_eq_hundred += 1
+        if len(insertions[-1]) > 0:
+            num_insertions += 1
+        if len(insertions[-1]) == 1:
+            num_insertions_size_one += 1
+        if len(insertions[-1]) >= 100:
+            num_insertions_larger_eq_hundred += 1
         nt_in_ends = len(insertions[0]) + len(insertions[-1])
+        nt_ends_total += nt_in_ends
         ins_len = []
         for seed in seeds:
             nt_in_seeds += seed.size
+            nt_seeds_total += seed.size
         for nuc_seq in insertions[1:-1]:
             nt_in_ins += len(nuc_seq)
             ins_len.append(len(nuc_seq))
+            nt_insertion_total += len(nuc_seq)
+            if len(nuc_seq) > 0:
+                num_insertions += 1
+            if len(nuc_seq) == 1:
+                num_insertions_size_one += 1
+            if len(nuc_seq) >= 100:
+                num_insertions_larger_eq_hundred += 1
+        req_len_total += len(reconstr_contig)
         print(contig_name, nt_in_seeds, nt_in_ins, nt_in_ends, len(assembly), len(reconstr_contig), sep="\t")
         for l in ins_len:
             if not l in buckets:
                 buckets[l] = 0
             buckets[l] += 1
+    print("nt in insertion total:", nt_insertion_total)
+    print("nt in seeds total:", nt_seeds_total)
+    print("nt in ends total:", nt_ends_total)
+    print("reconstr len total:", req_len_total)
+    if nt_insertion_total + nt_seeds_total + nt_ends_total != req_len_total:
+        print("WARNING: lengths do not match up:", nt_insertion_total + nt_seeds_total)
+    print("there are", num_insertions, "insertions in total,", num_insertions_size_one, "are of size 1 nt and",
+          num_insertions_larger_eq_hundred, "are of size >= 100 nt. Full distribution shown in plot.")
     indel_distrib = figure(title="Insertion distrib", y_axis_type="log", plot_width=1000, plot_height=1000)
     indel_distrib.vbar(x=[key for key, _ in buckets.items()],
                         width=4/5,
@@ -90,80 +204,13 @@ if __name__ == "__main__":
                                                 ret_query_genome):
             print(name, reconstr.equals(assembly), sep="\t")
     if True:
-        print("name", "score", "% of max score", "matches", "missmatches", "indels", "indel ops", "% identity",
-                sep="\t")
-        xs = []
-        cx = [0]
-        ys = []
-        cy = [0]
-        for y_start, name, reconstr, (x_start, assembly) in zip(
-                                                reconstructed_query_genome.contigStarts(),
-                                                reconstructed_query_genome.contigNames(),
-                                                reconstructed_query_genome.contigNucSeqs(),
-                                                ret_query_genome):
-            x = 0
-            y = 0
-            xs.append(x_start)
-            ys.append(y_start)
-            cx.append(x_start + len(assembly))
-            cy.append(y_start + len(reconstr))
-            matches = 0
-            mismatches = 0
-            indels = 0
-            indelops = 0
-            l_total = min(len(reconstr), len(assembly))
-            nw_alignment = runKsw(reconstr, assembly, 10000)
-            printed_error = True # set to false in order to print the postion of the first error
-            for op, l in nw_alignment.data:
-                if op == MatchType.match or op == MatchType.seed:
-                    matches += l
-                    x += l
-                    y += l
-                if op == MatchType.missmatch:
-                    mismatches += l
-                    x += l
-                    y += l
-                    # break line
-                    xs.append(float("NaN"))
-                    ys.append(float("NaN"))
-                    if not printed_error:
-                        printed_error = True
-                        print("Mismatch:", x, y, reconstr[y-l], "!=", assembly[x-l])
-                if op == MatchType.insertion or op == MatchType.deletion:
-                    indels += l
-                    indelops += 1
-                    if op == MatchType.insertion:
-                        y += l
-                    else:
-                        x += l
-                    if not printed_error:
-                        printed_error = True
-                        print("Indel:", x, y)
-                xs.append(x + x_start)
-                ys.append(y + y_start)
-            xs.append(float("NaN"))
-            ys.append(float("NaN"))
-            iden = 100 * matches / l_total
+        print("NW comparison for reconstruction & sequenced genome")
+        plot = nw_comparison(reconstructed_query_genome, ret_query_genome)
+        out.append(plot)
 
-            match_score = param.by_name("Match Score").get()
-            gap_penalty = 0
-            if len(reconstr) != len(assembly):
-                gap_open_penalty = param.by_name("Gap penalty").get()
-                gap_open_penalty_2 = param.by_name("Second Gap penalty").get()
-                gap_extend_penalty = param.by_name("Extend Penalty").get()
-                gap_extend_penalty_2 = param.by_name("Second Extend Penalty").get()
-                gapLen = abs(len(reconstr) - len(assembly))
-                gap_penalty = min(gap_open_penalty + gap_extend_penalty * gapLen,
-                                  gap_open_penalty_2 + gap_extend_penalty_2 * gapLen)
-            percent_of_max_score = (100.0 * nw_alignment.get_score()) / (match_score * l_total - gap_penalty)
-
-            print(name, nw_alignment.get_score(), percent_of_max_score, matches, mismatches, indels, indelops, iden,
-                  sep="\t")
-        plot = figure(title="alignments reconstructed on assembly", plot_width=1000, plot_height=1000)
-        decorate_plot(plot, reconstructed_query_genome_path, query_genome)
-        plot.xaxis.axis_label = "Sequenced Genome"
-        plot.yaxis.axis_label = "Reconstructed Genome"
-        plot.line(x=xs, y=ys, line_width=4)
+    if True:
+        print("NW comparison for reference & sequenced genome")
+        plot = nw_comparison(pack, ret_query_genome, title="alignments reference on assembly")
         out.append(plot)
 
     show(row(out))
@@ -186,7 +233,11 @@ chr13           811600             49844                8320            869764  
 chr14           852128             19503                524             872155          872155
 chr15           1163943            28849                8851            1201643         1201643
 chr16           1009782            19463                166             1029411         1029411
+
+total nt in insertion: 480,108
+total seqeunced len 12,137,283
 """
+
 
 
 """

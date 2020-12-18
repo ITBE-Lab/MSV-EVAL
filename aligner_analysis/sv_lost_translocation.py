@@ -59,5 +59,5 @@ def main():
 #main()
 
 if True:
-    accuracy_plot(translocation, filename_out="translocation_overlap")
+    #accuracy_plot(translocation, filename_out="translocation_overlap")
     print_accuracy_plot(file_name_in="translocation_overlap", title="Accuracy - Translocation")

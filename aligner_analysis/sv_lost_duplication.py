@@ -51,5 +51,5 @@ def main():
 #main()
 
 if True:
-    accuracy_plot(duplication, dup_size, "duplication_overlap")
+    #accuracy_plot(duplication, dup_size, "duplication_overlap")
     print_accuracy_plot(file_name_in="duplication_overlap", title="Accuracy - Duplication")
