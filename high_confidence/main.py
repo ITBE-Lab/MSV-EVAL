@@ -42,11 +42,11 @@ def regex_match(folder, regex):
 #]
 
 read_datasets = [
-    #("Illumina", regex_match(read_data_dir + "PRJEB7245/UFRJ50816/illumina_hiseq_2500/", "*.trimmed.fastq"), None, 50),
+    ("Illumina", regex_match(read_data_dir + "PRJEB7245/UFRJ50816/illumina_hiseq_2500/", "*.trimmed.fastq"), None, 50),
     #("PacBio", regex_match(read_data_dir + "PRJEB7245/UFRJ50816/pacBioSMRT/", "*.fasta"), None, 50),
     
     #("SimulatedPacBio", regex_match(read_data_dir + "simulated/UFRJ50816/pacbio_CCS/", "*.fasta"), None, 100),
-    ("SimulatedIllumina", regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-250/", "*.bwa.read*.fastq.gz"), None, 100),
+    #("SimulatedIllumina", regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-250/", "*.bwa.read*.fastq.gz"), None, 100),
 ]
 
 def uFRJ50816_filter(pack):
@@ -67,10 +67,11 @@ def compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index):
 
 def run_ma(pack, individual="HG002"):
     param = ParameterSetManager()
-    #param.set_selected("SV-PacBio")
-    param.set_selected("SV-Illumina")
+    param.set_selected("SV-PacBio")
+    param.by_name("Do Dummy Jumps").set(False)
+    #param.set_selected("SV-Illumina")
     mm_index = MinimizerIndex(param, pack.contigSeqs(), pack.contigNames())
-    seq_ids = [2]#load_reads(individual, param)
+    seq_ids = [3]#load_reads(individual, param)
     #return
     sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index)
     print("caller_id", sv_caller_run_id)
