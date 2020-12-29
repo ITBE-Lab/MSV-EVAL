@@ -249,7 +249,7 @@ def create_dataset(reference_path, # dir with reference
             # save the sequenced genome
             
             print("\treconstructing sequenced genome")
-            seq_pack = SvCallTable(DbConn(dataset_name)).reconstruct_sequenced_genome(ref_pack, caller_id)
+            seq_pack = reconstruct_sequenced_genome(ref_pack, caller_id)
             if not chromosome is None:
                 seq_pack_ = Pack()
                 seq_pack_.append(seq_pack.contigNames()[ref_pack.id_of_sequence(chromosome)], "no_description_given", 

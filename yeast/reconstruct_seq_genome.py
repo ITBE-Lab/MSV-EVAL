@@ -104,7 +104,7 @@ if __name__ == "__main__":
     print("reconstructing...")
     seeds_list = call_table.calls_to_seeds_by_id(pack, run_ids, True, True)
 
-    reconstructed_query_genome = call_table.reconstruct_sequenced_genome(seeds_list, pack)
+    reconstructed_query_genome = reconstruct_sequenced_genome(seeds_list, pack)
     print("done")
     reconstructed_query_genome.store(reconstructed_query_genome_path + "/ma/genome")
 

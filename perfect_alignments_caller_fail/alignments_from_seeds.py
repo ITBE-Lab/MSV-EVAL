@@ -19,14 +19,6 @@ def seeds_to_alignments(seeds, start, end, ref_pack):
         alignment.supplementary = True
     return ret
 
-def contigs_from_seeds(seeds, ref_pack):
-    ret = []
-    for seed in seeds:
-        start_of_contig = ref_pack.start_of_sequence_id( ref_pack.seq_id_for_pos( seed.start_ref ) )
-        if seed.start_ref > 0 and seed.start_ref == start_of_contig:
-            ret.append(seed.start)
-
-    return ret
 
 def crop_seeds(seeds, insertions, read_start, read_end):
     # Find rightmost seed less than or equal to start
@@ -41,6 +33,7 @@ def crop_seeds(seeds, insertions, read_start, read_end):
         if idx < len(seeds) and seeds[idx].start < read_end:
             s = seeds[idx].start
         ins = str(insertions[idx-1])[-(s-read_start):]
+        ret_seeds.append(Seed(q_pos, 0, s, seeds[idx].on_forward_strand))
         q_pos += len(ins)
         ret_ins.append(NucSeq(ins))
     while idx < len(seeds) and seeds[idx].start < read_end:
@@ -73,62 +66,33 @@ def rev_comp(read, seeds):
         seed.start = len(read) - (seed.start + seed.size)
     return read, seeds
 
-def alignments_from_db(call_table, ref_pack, caller_run, size, amount, start=0, end=None, paired_dist=None):
-    if end is None:
-        end = ref_pack.unpacked_size_single_strand
+def alignments_from_seeds(seeds, insertions, ref_pack, size, amount, paired_dist=None):
     ret = []
-
-    seeds, insertions = call_table.calls_to_seeds(ref_pack, caller_run)
-    contig_starts = contigs_from_seeds(seeds, ref_pack)
-    seq_genome_size = max(seed.start + seed.size for seed in seeds)
+    y_end = seeds[-1].start + seeds[-1].size
     for idx in range(amount):
         def append_single():
-            while True:
-                # @note no reverse strand reads for now
-                read_start = random.randrange(start, end - size)
-                read_end = read_start + size
-                read_contig_id = bisect_right(contig_starts, read_start) - 1
-                c_s = contig_starts[read_contig_id]
-                if read_contig_id + 1 < len(contig_starts):
-                    c_l = contig_starts[read_contig_id + 1] - c_s
-                else:
-                    c_l = seq_genome_size
-                if read_start + size <= c_s + c_l:
-                    # break only if read is not bridging
-                    # @note this affects the coverage at chromosome endpoints...
-                    # shouldn't matter though - we will place our SVs with margins to the endpoints.
-                    break
+            read_start = random.randrange(0, y_end - size)
+            read_end = read_start + size
             c_seeds, c_ins = crop_seeds(seeds, insertions, read_start, read_end)
-            read = call_table.reconstruct_sequenced_genome_from_seeds(c_seeds, c_ins, ref_pack).extract_forward_strand()
+            read = reconstruct_sequenced_genome([("read_" + str(idx), c_seeds, c_ins)],
+                                                           ref_pack).extract_forward_strand()
             read.name = "read_" + str(idx)
             read.id = idx
             if random.choice([True, False]):
                 read, c_seeds = rev_comp(read, c_seeds)
             ret.append( (read, seeds_to_alignments(c_seeds, read_start, read_end, ref_pack)) )
         def append_paired():
-            while True:
-                # @note no reverse strand reads for now
-                total_size = size * 2 + paired_dist
-                read_start = random.randrange(start, end - total_size)
-                read_end = read_start + total_size
-                read_contig_id = bisect_right(contig_starts, read_start) - 1
-                c_s = contig_starts[read_contig_id]
-                if read_contig_id + 1 < len(contig_starts):
-                    c_l = contig_starts[read_contig_id + 1] - c_s
-                else:
-                    c_l = seq_genome_size
-                if read_start + total_size <= c_s + c_l:
-                    # break only if read is not bridging
-                    # @note this affects the coverage at chromosome endpoints...
-                    # shouldn't matter though - we will place our SVs with margins to the endpoints.
-                    break
+            total_size = size * 2 + paired_dist
+            read_start = random.randrange(0, y_end - total_size)
+            read_end = read_start + total_size
             c_seeds, c_ins = crop_seeds(seeds, insertions, read_start, read_start + size)
             c_seeds_2, c_ins_2 = crop_seeds(seeds, insertions, read_end - size, read_end)
-            read = call_table.reconstruct_sequenced_genome_from_seeds(c_seeds, c_ins, ref_pack).extract_forward_strand()
+            read = reconstruct_sequenced_genome([("read_prim_" + str(idx*2), c_seeds, c_ins)],
+                                                            ref_pack).extract_forward_strand()
             read.name = "read_prim_" + str(idx*2)
             read.id = idx*2
-            read_2 = call_table.reconstruct_sequenced_genome_from_seeds(c_seeds_2, c_ins_2,
-                                                                        ref_pack).extract_forward_strand()
+            read_2 = reconstruct_sequenced_genome([("read_mate_" + str(idx*2+1), c_seeds_2, c_ins_2)],
+                                                              ref_pack).extract_forward_strand()
             read_2.name = "read_mate_" + str(idx*2+1)
             read_2.id = idx*2+1
 
@@ -137,13 +101,13 @@ def alignments_from_db(call_table, ref_pack, caller_run, size, amount, start=0, 
                 print(len(read), size)
                 print(read)
                 print(c_seeds)
-                print(read_start, start)
+                print(read_start, read_end)
                 assert False
             if len(read_2) != size:
                 print(len(read_2), size)
                 print(read_2)
                 print(c_seeds_2)
-                print(read_start, start)
+                print(read_start, read_end)
                 assert False
 
             if random.choice([True, False]):

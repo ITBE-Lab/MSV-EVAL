@@ -41,7 +41,7 @@ def pbHoney(bam_file, vcf_file, reference_path):
 
 def delly(bam_file, vcf_file, reference_path):
     os.system("~/workspace/delly/delly call -g " + reference_path + "/fasta/genome.fna " + bam_file
-                + " -o " + vcf_file + ".bcf ") #>/dev/null 2>&1")
+                + " -o " + vcf_file + ".bcf >/dev/null 2>&1")
 
     os.system("~/workspace/bcftools/bcftools-1.9/bcftools view " + vcf_file + ".bcf > " + vcf_file)
 

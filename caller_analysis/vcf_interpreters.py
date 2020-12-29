@@ -164,7 +164,7 @@ def default_vcf_interpreter(call, call_inserter, pack, error_file):
     except Exception as e:
         log_error(call, error_file, "default", e)
 
-def sniffles_interpreter(call, call_inserter, pack, error_file, call_desc):
+def sniffles_interpreter(call, pack, error_file):
     def find_confidence(call):
         if call["FILTER"] != "PASS":
             return 0
@@ -197,35 +197,7 @@ def sniffles_interpreter(call, call_inserter, pack, error_file, call_desc):
         else:
             raise Exception("found neither precise nor imprecise in INFO")
 
-        to_recognize = 1
-        to_insert = []
-        if "/" in call["ALT"]:
-            to_recognize = 2
-        if "DEL" in call["ALT"]:
-            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, True, find_confidence(call), 1))
-            to_recognize -= 1
-        if "INV" in call["ALT"]:
-            to_insert.append(SvCall(from_pos, to_pos-1, std_from, std_to, True, False, find_confidence(call), 1))
-            to_insert.append(SvCall(from_pos+1, to_pos, std_from, std_to, False, True, find_confidence(call), 1))
-            to_recognize -= 1
-        if "INS" in call["ALT"]:
-            to_insert.append(SvCall(from_pos, from_pos + 1, std_from, std_from, True, True,
-                                      find_confidence(call), 1))
-            to_recognize -= 1
-        if "DUP" in call["ALT"]:
-            to_insert.append(SvCall(from_pos, to_pos, std_to, std_from, False, False, find_confidence(call), 1))
-            to_recognize -= 1
-        if "TRA" in call["ALT"]:
-            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, True, find_confidence(call), 1))
-            to_recognize -= 1
-        for call_to_insert in to_insert:
-            call_inserter.insert(call_to_insert)
-            call_desc.insert(call_to_insert.id, call["ALT"][1:-1] + call["ID"])
-
-        if to_recognize != 0:
-            raise Exception("could not classify call")
-
-        return from_pos, to_pos, int(call["ID"]), call["ALT"]
+        return from_pos, to_pos, int(call["ID"]), call["ALT"] + "-conf:" + str(find_confidence(call))
     except Exception as e:
         log_error(call, error_file, "sniffles", e)
 
@@ -288,7 +260,7 @@ def pb_sv_interpreter(call, call_inserter, pack, error_file):
     except Exception as e:
         log_error(call, error_file, "pb_sv", e)
 
-def delly_interpreter(call, call_inserter, pack, error_file, call_desc):
+def delly_interpreter(call, pack, error_file):
     def find_confidence(call):
         if call["FILTER"] != "PASS":
             return 0
@@ -326,36 +298,11 @@ def delly_interpreter(call, call_inserter, pack, error_file, call_desc):
         else:
             raise Exception("found neither precise nor imprecise in INFO")
 
-        to_insert = []
-        if call["ALT"] == "<DEL>":
-            call_name = "<DEL>"
-            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, True, find_confidence(call), 1))
-        elif call["ALT"] == "<INV>":
-            # delly calls inversion twice once 3t3 once 5t5 (or head to head and tail to tail) of reads
-            if call["INFO"]["CT"] == "3to3":
-                call_name = "<INV-3to3>"
-                to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, False, find_confidence(call), 1))
-            else:
-                call_name = "<INV-5to5>"
-                assert call["INFO"]["CT"] == "5to5"
-                to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, False, True, find_confidence(call), 1))
-        elif call["ALT"] == "<DUP>":
-            call_name = "<DUP>"
-            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, False, False, find_confidence(call), 1))
-        elif call["ALT"] == "<INS>":
-            call_name = "<INS>"
-            to_insert.append(SvCall(from_pos, from_pos + 1, std_from, std_to, True, True, find_confidence(call), 1))
-        elif call["INFO"]["SVTYPE"] == "BND":
-            call_name = "BND"
-            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, False, find_confidence(call), 1))
-            to_insert.append(SvCall(from_pos, to_pos, std_to, std_from, False, True, find_confidence(call), 1))
-        else:
-            raise Exception("could not classify call")
-        for call_to_insert in to_insert:
-            call_inserter.insert(call_to_insert)
-            call_desc.insert(call_to_insert.id, call["ALT"][1:-1] + str(int(call["ID"][4:])))
+        call_name = call["ALT"] + " " + call["INFO"]["SVTYPE"]
+        if "CT" in call["INFO"]:
+            call_name += " " + call["INFO"]["CT"]
 
-        return from_pos, to_pos, int(call["ID"][4:]), call_name
+        return from_pos, to_pos, int(call["ID"][4:]), call_name + "-conf:" + str(find_confidence(call))
     except Exception as e:
         log_error(call, error_file, "delly", e)
 
