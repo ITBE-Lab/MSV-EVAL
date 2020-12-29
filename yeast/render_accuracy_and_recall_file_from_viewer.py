@@ -5,10 +5,10 @@ from bokeh.transform import dodge
 from bokeh.layouts import column
 from bokeh.io import output_file, export_svgs, show
 from sv_util.bokeh_style_helper import *
+from sv_util.settings import *
 from bokeh.models import NumeralTickFormatter
 
 
-data_dir = "/MAdata/sv_caller_analysis/accuracy_recall"
 
 def render_accuracy_n_recall_pic(tsv_file, outfile, x_range=(-11,271), y_range=(-0.051,1.051)):
     table = None
@@ -49,7 +49,7 @@ def render_accuracy_n_recall_pic(tsv_file, outfile, x_range=(-11,271), y_range=(
     style_plot(plot)
     show(plot)
     plot.output_backend = "svg"
-    export_svgs(plot, filename=data_dir + "/bokeh_out_" + outfile + ".svg")
+    export_svgs(plot, filename=accuracy_recall_data_dir + "/bokeh_out_" + outfile + ".svg")
 
 
 if __name__ == "__main__":
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     #                             "ufrj50816-Illumina-Simulated")
     #render_accuracy_n_recall_pic("/usr/home/markus/workspace/aligner/build.zeus/MSV/sv_visualization/ufrj50816-6.tsv",
     #                             "ufrj50816-Illumina-Simulated-zoom", x_range=(10,70), y_range=(0.8,1))
-    render_accuracy_n_recall_pic("/usr/home/markus/workspace/aligner/build.zeus/MSV/sv_visualization/ufrj50816-7.tsv",
+    render_accuracy_n_recall_pic(accuracy_recall_data_dir + "/ufrj50816-7.tsv",
                                  "ufrj50816-PacBio-RealWorld")
-    render_accuracy_n_recall_pic("/usr/home/markus/workspace/aligner/build.zeus/MSV/sv_visualization/ufrj50816-8.tsv",
+    render_accuracy_n_recall_pic(accuracy_recall_data_dir + "/ufrj50816-8.tsv",
                                  "ufrj50816-Illumina-RealWorld")

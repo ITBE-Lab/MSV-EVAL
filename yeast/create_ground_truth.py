@@ -6,9 +6,8 @@ from bokeh.io import output_file
 from MA import *
 from MSV import *
 from sv_util.os_aligners import *
+from sv_util.settings import *
 from bisect import bisect_right, bisect_left
-
-global_prefix = "/MAdata/"
 
 def load_genomes(query_genome, reference_genome, params):
     pack = Pack()
@@ -496,7 +495,7 @@ def render_seeds(seeds_1, query_genome, reference_genome, title="seeds", y_axis=
     plot.add_tools(HoverTool(tooltips=[("filtered due to", "@rs")]))
     return plot
 
-genome_dir = global_prefix + "genome/yeasts/"
+genome_dir = main_data_folder + "/genome/yeasts/"
 
 #query_genome = "knowlesiStrain"
 #query_genome = "UFRJ50816-chrVII-section"
@@ -511,7 +510,7 @@ reference_genome = genome_dir + "YPS138"
 db_name = "UFRJ50816"
 seq_id = 1
 
-if __name__ == "__main__":
+if True:
     out = []
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, seq_id)
@@ -524,8 +523,3 @@ if __name__ == "__main__":
     out.append(render_jumps(jumps, query_genome, reference_genome))
     show(row(out))
 
-
-# ~/workspace/samtools/samtools view -h minimap2.sorted.bam "chrIX:251682-259682" > minimap2.filtered.bam
-
-
-# ~/workspace/samtools/samtools view minimap2.filtered.bam | awk '{print length($10), $1}' | sort -n

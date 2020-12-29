@@ -1,4 +1,5 @@
-from aligner_analysis.svs_lost_during_alignment import *
+from svs_hidden_to_aligners.svs_lost_during_alignment import *
+from sv_util.settings import *
 from MA import *
 from bokeh.models import FactorRange
 from bokeh.models import PrintfTickFormatter
@@ -16,15 +17,15 @@ class MATestSet:
         self.render_one = render_one
 
     def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix, genome_section_by_name):
-        path_sam = data_dir + "/sam/" + self._name + suffix + ".sam"
+        path_sam = sv_hidden_to_aligners_data_dir + "/sam/" + self._name + suffix + ".sam"
         # write reads
-        reads_path = data_dir + "/reads/" + self._name + suffix + ".fasta"
+        reads_path = sv_hidden_to_aligners_data_dir + "/reads/" + self._name + suffix + ".fasta"
         with open(reads_path, 'w') as fasta_file:
             for name, read in read_by_name:
                 fasta_file.write(">" + name + "\n")
                 fasta_file.write(str(read) + "\n")
         # align
-        quick_align_paths([reads_path], genome_dir + "/ma/genome", self.params, path_sam)
+        quick_align_paths([reads_path], human_genome_dir + "/ma/genome", self.params, path_sam)
         return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, fm_index, [path_sam],
                                                  self.render_one)
     def name(self):
@@ -55,7 +56,7 @@ class MM2TestSet:
 
         self._display_name = "Minimap 2 Alignment"
         if len(mm_extra) > 0:
-            self._display_name = "Minimap 2 Alignment extra sensitive"
+            self._display_name = "Minimap 2 Alignment extra"
     def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix, genome_section_by_name):
         path_sam = create_alignment(read_by_name, self.mm2, self._name + suffix)
         return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, fm_index, path_sam)
@@ -153,8 +154,7 @@ def print_n_write(s, f):
     f.write(s)
 
 default_test_set = [NWTestSet(), SeedsTestSet(False, True), MATestSet(), MM2TestSet(),
-                    MM2TestSet("-z 400,1 --splice -P", "extra_sensitive"), NgmlrTestSet()]
-#default_test_set = [NWTestSet()]
+                    MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), NgmlrTestSet()]
 
 def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocation_overlap",
                     test_sets=default_test_set, sv_sizes=range(25, 501, 25), read_size=2000, num_reads=1000):
@@ -162,12 +162,12 @@ def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocatio
     params.set_selected("SV-PacBio")
 
     pack = Pack()
-    pack.load(genome_dir + "/ma/genome")
+    pack.load(human_genome_dir + "/ma/genome")
     fm_index = FMIndex()
-    fm_index.load(genome_dir + "/ma/genome")
-    mm_index = MinimizerIndex(params, genome_dir + "/ma/genome.mmi")
+    fm_index.load(human_genome_dir + "/ma/genome")
+    mm_index = MinimizerIndex(params, human_genome_dir + "/ma/genome.mmi")
 
-    with open(data_dir + "/" + filename_out + ".tsv", "w") as file_out:
+    with open(sv_hidden_to_aligners_data_dir + "/" + filename_out + ".tsv", "w") as file_out:
         # header of outfile
         print_n_write("gap_size\ttest_set", file_out)
         for sv_size in sv_sizes:
@@ -200,8 +200,8 @@ def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocatio
 
 def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scattered read", 
                             test_sets=default_test_set, x_label="SV Size [nt]", save_svg=True):
-    with open(data_dir + "/" + file_name_in + ".tsv", "r") as file_in:
-        output_file(data_dir + "/bokeh_out_" + file_name_in + ".html")
+    with open(sv_hidden_to_aligners_data_dir + "/" + file_name_in + ".tsv", "r") as file_in:
+        output_file(sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".html")
         lines = file_in.readlines()
         header = lines[0]
 
@@ -239,4 +239,4 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
         show(plot)
         if save_svg:
             plot.output_backend = "svg"
-            export_svgs(plot, filename=data_dir + "/bokeh_out_" + file_name_in + ".svg")
+            export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".svg")

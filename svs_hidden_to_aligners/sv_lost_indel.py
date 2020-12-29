@@ -1,4 +1,4 @@
-from aligner_analysis.binary_search_plot import *
+from svs_hidden_to_aligners.binary_search_plot import *
 import random
 
 
@@ -73,8 +73,8 @@ def main():
 #main()
 
 if True:
-    #accuracy_plot(insertion, ins_size, "insertion_overlap")
+    accuracy_plot(insertion, ins_size, "insertion_overlap")
     print_accuracy_plot(file_name_in="insertion_overlap", title="Accuracy - Insertion")
 
-    #accuracy_plot(deletion, del_size, "deletion_overlap")
+    accuracy_plot(deletion, del_size, "deletion_overlap")
     print_accuracy_plot(file_name_in="deletion_overlap", title="Accuracy - Deletion")

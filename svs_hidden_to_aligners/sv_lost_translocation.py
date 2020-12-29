@@ -1,4 +1,4 @@
-from aligner_analysis.binary_search_plot import *
+from svs_hidden_to_aligners.binary_search_plot import *
 
 only_sv = True
 no_sv = False
@@ -59,5 +59,5 @@ def main():
 #main()
 
 if True:
-    #accuracy_plot(translocation, filename_out="translocation_overlap")
+    accuracy_plot(translocation, filename_out="translocation_overlap")
     print_accuracy_plot(file_name_in="translocation_overlap", title="Accuracy - Translocation")

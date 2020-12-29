@@ -1,9 +1,11 @@
 import os
 
+from sv_util.settings import *
+
 def sniffles(bam_file, vcf_file, reference_path):
     # threads: -t
     # Minimum number of reads that support a SV: -s
-    os.system("~/workspace/Sniffles/bin/sniffles-core-1.0.8/sniffles -t 32 -s 2 -m " + bam_file + " -v " + vcf_file
+    os.system(sniffles_path + " -t 32 -s 2 -m " + bam_file + " -v " + vcf_file
                 + " >/dev/null 2>&1")
 
 def pbHoney(bam_file, vcf_file, reference_path):
@@ -40,10 +42,10 @@ def pbHoney(bam_file, vcf_file, reference_path):
 
 
 def delly(bam_file, vcf_file, reference_path):
-    os.system("~/workspace/delly/delly call -g " + reference_path + "/fasta/genome.fna " + bam_file
+    os.system(delly_path + " call -g " + reference_path + "/fasta/genome.fna " + bam_file
                 + " -o " + vcf_file + ".bcf >/dev/null 2>&1")
 
-    os.system("~/workspace/bcftools/bcftools-1.9/bcftools view " + vcf_file + ".bcf > " + vcf_file)
+    os.system(bcf_tools_path + " view " + vcf_file + ".bcf > " + vcf_file)
 
 def manta(bam_file, vcf_file, reference_path):
     # prepare manta

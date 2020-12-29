@@ -1,0 +1,13 @@
+import svs_hidden_to_aligners.sv_lost_translocation
+
+import svs_hidden_to_aligners.sv_lost_duplication
+
+import svs_hidden_to_aligners.sv_lost_dup_inv
+
+import svs_hidden_to_aligners.sv_lost_nested_inv
+
+import svs_hidden_to_aligners.sv_lost_inversion
+
+import svs_hidden_to_aligners.sv_lost_indel
+
+import svs_hidden_to_aligners.svs_lost_scattered_read

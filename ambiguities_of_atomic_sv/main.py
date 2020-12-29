@@ -1,20 +1,15 @@
 from MSV import *
 from MA import *
 import random
-from perfect_alignments_caller_fail.alignments_from_seeds import *
+from ambiguities_of_atomic_sv.alignments_from_seeds import *
 from bokeh.io import output_file
-from caller_analysis.os_sv_callers import *
-from caller_analysis.vcf_interpreters import *
+from ambiguities_of_atomic_sv.os_sv_callers import *
+from ambiguities_of_atomic_sv.vcf_interpreters import *
 import os
 from sv_util.os_aligners import *
-from perfect_alignments_caller_fail.compute_errors import *
+from ambiguities_of_atomic_sv.compute_errors import *
+from sv_util.settings import *
 
-global_prefix = "/MAdata/sv_caller_analysis/sv_lost_during_calling/"
-sam_folder = global_prefix + "sam/"
-fasta_folder = global_prefix + "fasta/"
-vcf_folder = global_prefix + "vcf/"
-genome_dir = "/MAdata/genome/human"
-db_prefix = "/MAdata/sv_datasets/"
 
 def random_nuc_seq(l):
     ret = ""
@@ -22,9 +17,6 @@ def random_nuc_seq(l):
         ret += random.choice(['a', 'c', 'g', 't'])
     return ret
 
-#
-# the genome reconstruction test ppt file contains the calls inserted here
-#
 def four_nested_svs_calls(l, j):
     return ([
         Seed(0, j*l, 0, True),
@@ -191,7 +183,6 @@ def overlapping_inversions_2(l, j):
         Seed((j+3)*l, (j+1)*l, (j+3)*l, True),
     ], "overlapping_inversions_2", None)
 
-db_name = "perfect_alignment_caller_fail"
 l = 1000
 j = 10
 coverage = 100
@@ -204,7 +195,6 @@ callers = [
 ]
 paired_dist = 100
 paired_size = 250
-genome = genome_dir + "/GRCh38.p12"
 
 def run_msv(pack, seeds, insertions):
     s = libMA.containers.Seeds(seeds)
@@ -219,7 +209,7 @@ def run_msv(pack, seeds, insertions):
 
 if __name__ == "__main__":
     reference = Pack()
-    reference.load(genome + "/ma/genome")
+    reference.load(human_genome_dir + "/ma/genome")
 
     chr1_len = reference.contigLengths()[0]
 
@@ -236,7 +226,7 @@ if __name__ == "__main__":
         inversion_overlapping_duplication, # selected
         translocation_in_duplication,
         duplication_of_inversion,
-        overlapping_inversions_in_duplication, # selected @todo
+        overlapping_inversions_in_duplication, # selected
         inverted_duplication, # selected
         duplicated_inversion, # selected
         inversion_after_duplication, # selected
@@ -245,7 +235,7 @@ if __name__ == "__main__":
         overlapping_inversions_2,
     ]
 
-    output_file(global_prefix + "/bokeh_out_perfect_alignments_experiment.html")
+    output_file(ambiguities_of_atomic_sv_data_dir + "/bokeh_out_perfect_alignments_experiment.html")
     sets = []
     for sv_func in svs:
         ref_section = "N"
@@ -288,7 +278,7 @@ if __name__ == "__main__":
             alignment_to_file(alignments_list[:1], sam_folder + "us", reference)
         if False: # use ngmlr
             read_to_file(alignments_list[:1], fasta_folder + file_name)
-            json_dict = { "reference_path": genome }
+            json_dict = { "reference_path": human_genome_dir }
             read_set = {
                 "fasta_file": fasta_folder + file_name + ".fasta",
                 "name": "perfect_alignments_caller_fail",
@@ -304,11 +294,11 @@ if __name__ == "__main__":
         msv_entries = run_msv(reference, seeds, insertions)
         # other callers
         from_to_calls_lists = []
-        with open(global_prefix + "/vcf_errors.log", "w") as error_file:
+        with open(ambiguities_of_atomic_sv_data_dir + "/vcf_errors.log", "w") as error_file:
             for caller, caller_name, interpreter, read_type in callers:
                 vcf_file_path = vcf_folder + file_name + "-" + caller_name + ".vcf"
                 caller( (sam_file_name if read_type=="single" else sam_file_name_paired) + ".sorted.bam",
-                        vcf_file_path, genome)
+                        vcf_file_path, human_genome_dir)
                 if not os.path.exists( vcf_file_path ):
                     print("caller did not create calls: ", caller_name)
                 else:

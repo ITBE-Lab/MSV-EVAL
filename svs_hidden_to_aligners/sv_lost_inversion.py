@@ -1,4 +1,4 @@
-from aligner_analysis.binary_search_plot import *
+from svs_hidden_to_aligners.binary_search_plot import *
 import random
 
 
@@ -105,5 +105,5 @@ def main():
 #print_sam_file()
 
 if True:
-    #accuracy_plot(inversion, filename_out="inversion_overlap")
+    accuracy_plot(inversion, filename_out="inversion_overlap")
     print_accuracy_plot(file_name_in="inversion_overlap", title="Accuracy - Inversion")

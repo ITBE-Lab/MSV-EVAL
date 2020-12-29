@@ -1,4 +1,4 @@
-from aligner_analysis.binary_search_plot import *
+from svs_hidden_to_aligners.binary_search_plot import *
 
 
 

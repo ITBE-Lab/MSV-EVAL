@@ -1,10 +1,10 @@
-from yeast.display_mems import *
+from sv_util.settings import *
 
 
+genome_dir = main_data_folder + "/genome/yeasts/"
 #query_genome = "knowlesiStrain"
 #query_genome = "UFRJ50816-chrVII-section"
 query_genome = genome_dir + "UFRJ50816"
-reconstructed_query_genome_path = "/MAdata/genome/reconstructed/yeast/UFRJ50816"
 #query_genome = "YPS138-chrVII-section"
 #reference_genome = "YPS138-chrVII-section"
 reference_genome = genome_dir + "YPS138"
@@ -19,7 +19,7 @@ def nw_comparison(reconstructed_query_genome, ret_query_genome,
     ys = []
     cy = [0]
     # write cigar memory dumps to ssd
-    MS.util.ksw_file_prefix = "/MAdata/tmp/.CIGARMemoryManager"
+    MS.util.ksw_file_prefix = tmp_ksw_file_prefix
     for y_start, name, reconstr, (x_start, assembly) in zip(
                                             reconstructed_query_genome.contigStarts(),
                                             reconstructed_query_genome.contigNames(),
@@ -82,18 +82,18 @@ def nw_comparison(reconstructed_query_genome, ret_query_genome,
     plot.line(x=xs, y=ys, line_width=4)
     return plot
 
-if __name__ == "__main__":
+if True:
     db_name = "UFRJ50816"
-    run_ids = [1, 2, 3, 4]
-    #run_ids = [5, 6]
+    #run_ids = [3, 4, 5, 6]
+    run_ids = [1, 2]
 
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     call_table = SvCallTable(db_conn)
 
-    # copy order from 1 to 5 (pacBio)
-    #call_table.copy_path(1, 5, 100)
-    # copy order from 3 to 6 (Illumina)
-    #call_table.copy_path(3, 6, 0)
+    # copy order from 3 to 1 (pacBio)
+    call_table.copy_path(3, 1, 100)
+    # copy order from 5 to 2 (Illumina)
+    call_table.copy_path(5, 2, 0)
 
     jump_table = SvJumpTable(db_conn) # initialize jump table
     param = ParameterSetManager()
@@ -178,12 +178,12 @@ if __name__ == "__main__":
 
 
     seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, 1)
-    if False:
+    if True:
         out.append(render_seeds(seeds_n_rects, query_genome, reference_genome, "assembly on reference",
                                 "Sequenced Genome", "Reference Genome"))
 
     seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, [], []) for name, seeds, _ in seeds_list]
-    if False:
+    if True:
         out.append(render_seeds(seeds_list_display, reconstructed_query_genome_path, reference_genome,
                                 "reconstructed on reference", "Reconstructed Genome", "Reference Genome"))
     if True:
@@ -196,19 +196,12 @@ if __name__ == "__main__":
         out.append(render_seeds(seeds_n_rects_reconstr, reconstructed_query_genome_path, query_genome,
                                 "reconstructed on assembly", "Reconstructed Genome", "Sequenced Genome"))
 
-    if False: # exact match comparison
-        print("name", "perfect match", sep="\t")
-        for name, reconstr, (y_start, assembly) in zip(
-                                                reconstructed_query_genome.contigNames(),
-                                                reconstructed_query_genome.contigNucSeqs(),
-                                                ret_query_genome):
-            print(name, reconstr.equals(assembly), sep="\t")
-    if False:
+    if True:
         print("NW comparison for reconstruction & sequenced genome")
         plot = nw_comparison(reconstructed_query_genome, ret_query_genome)
         out.append(plot)
 
-    if False:
+    if True:
         print("NW comparison for reference & sequenced genome")
         plot = nw_comparison(pack, ret_query_genome, title="alignments reference on assembly")
         out.append(plot)

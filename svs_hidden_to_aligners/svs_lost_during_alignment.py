@@ -4,12 +4,11 @@ import random
 from sv_util.os_aligners import *
 from bokeh.plotting import figure, show
 from sv_util.bokeh_style_helper import *
+from sv_util.settings import *
 from bokeh.plotting import ColumnDataSource
 from bokeh.layouts import column, row, grid
 from bokeh.models.tools import HoverTool
 
-genome_dir = "/MAdata/genome/human/GRCh38.p12"
-data_dir = "/MAdata/sv_caller_analysis/sv_lost_during_alignment"
 
 def choice_adj_size(l, total_len):
     x = random.randrange(total_len)
@@ -307,15 +306,15 @@ def compare_alignment_from_file_paths(params, reads_by_name, points_by_name, pac
                                              render_one)
 
 def create_alignment(read_by_name, aligner, sam_name):
-    reads_path = data_dir + "/reads/" + sam_name + ".fasta"
+    reads_path = sv_hidden_to_aligners_data_dir + "/reads/" + sam_name + ".fasta"
     with open(reads_path, 'w') as fasta_file:
         for name, read in read_by_name:
             fasta_file.write(">" + name + "\n")
             fasta_file.write(str(read) + "\n")
 
-    json_dict = {"reference_path":genome_dir}
+    json_dict = {"reference_path":human_genome_dir}
     read_json = {"technology":"pb", "name":"n/a", "fasta_file":reads_path}
-    path_sam = data_dir + "/sam/" + sam_name + ".sam"
+    path_sam = sv_hidden_to_aligners_data_dir + "/sam/" + sam_name + ".sam"
     aligner(read_json, path_sam, json_dict)
 
     return [path_sam]

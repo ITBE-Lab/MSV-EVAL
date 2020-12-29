@@ -3,6 +3,7 @@ from bokeh.models import ColumnDataSource, LabelSet
 from bokeh.plotting import figure, show
 from bokeh.models import FactorRange
 from bokeh.layouts import column, gridplot
+from bokeh.models.tools import HoverTool
 
 def call_to_points(x_range, entries, dataset_name, sections):
     plot = figure(title='Entries - ' + dataset_name, x_range=x_range, y_range=x_range)
@@ -20,7 +21,7 @@ def call_to_points(x_range, entries, dataset_name, sections):
         fs.append("fow" if jump.from_forward else "rev")
         ts.append("fow" if jump.to_forward else "rev")
     plot.x(x="xs", y="ys", color="cs", line_width=4, source=ColumnDataSource(data={
-                    "xs":xs, "ys":ys, "cs":cs,
+                    "xs":xs, "ys":ys, "cs":cs, "fs":fs, "ts":ts,
                 }))
     plot.add_tools(HoverTool(tooltips=[("x, y", "@xs, @ys"), ("strandinfo", "from @fs to @ts")]))
     return plot
