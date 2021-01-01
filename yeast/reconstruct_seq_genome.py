@@ -1,5 +1,6 @@
 from sv_util.settings import *
-
+from MSV import *
+from yeast.load_genomes import *
 
 genome_dir = main_data_folder + "/genome/yeasts/"
 #query_genome = "knowlesiStrain"
@@ -11,7 +12,7 @@ reference_genome = genome_dir + "YPS138"
 #reference_genome = "vivax"
 
 def nw_comparison(reconstructed_query_genome, ret_query_genome,
-                  title="alignments reconstructed on assembly"):
+                  title="alignments reconstructed on assembly", y_axis_label="Reconstructed Genome"):
     print("name", "score", "% of max score", "matches", "missmatches", "indels", "indel ops", "% identity",
             sep="\t")
     xs = []
@@ -78,7 +79,7 @@ def nw_comparison(reconstructed_query_genome, ret_query_genome,
     plot = figure(title=title, plot_width=1000, plot_height=1000)
     decorate_plot(plot, reconstructed_query_genome_path, query_genome)
     plot.xaxis.axis_label = "Sequenced Genome"
-    plot.yaxis.axis_label = "Reconstructed Genome"
+    plot.yaxis.axis_label = y_axis_label
     plot.line(x=xs, y=ys, line_width=4)
     return plot
 
@@ -90,10 +91,12 @@ if True:
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
     call_table = SvCallTable(db_conn)
 
-    # copy order from 3 to 1 (pacBio)
-    call_table.copy_path(3, 1, 100)
-    # copy order from 5 to 2 (Illumina)
-    call_table.copy_path(5, 2, 0)
+    print("copying path information... (may take a while)")
+    # copy order from 5 to 1 (Illumina)
+    call_table.copy_path(5, 1, 0)
+    # copy order from 3 to 2 (pacBio)
+    call_table.copy_path(3, 2, 100)
+    print("done")
 
     jump_table = SvJumpTable(db_conn) # initialize jump table
     param = ParameterSetManager()
@@ -186,15 +189,15 @@ if True:
     if True:
         out.append(render_seeds(seeds_list_display, reconstructed_query_genome_path, reference_genome,
                                 "reconstructed on reference", "Reconstructed Genome", "Reference Genome"))
-    if True:
+    if False:
         out.append(render_seeds(seeds_list_display, reconstructed_query_genome_path, reference_genome,
                                 "reconstructed on reference (x & y squeezed)", "Reconstructed Genome",
                                 "Reference Genome", True))
 
-    if False:
+    if True:
         seeds_n_rects_reconstr = compute_seeds(reconstructed_query_genome_path, query_genome, db_name, 1)
         out.append(render_seeds(seeds_n_rects_reconstr, reconstructed_query_genome_path, query_genome,
-                                "reconstructed on assembly", "Reconstructed Genome", "Sequenced Genome"))
+                                "reconstructed on sequenced genome", "Reconstructed Genome", "Sequenced Genome"))
 
     if True:
         print("NW comparison for reconstruction & sequenced genome")
@@ -203,7 +206,8 @@ if True:
 
     if True:
         print("NW comparison for reference & sequenced genome")
-        plot = nw_comparison(pack, ret_query_genome, title="alignments reference on assembly")
+        plot = nw_comparison(pack, ret_query_genome, title="alignments reference on assembly",
+                             y_axis_label="Reference Genome")
         out.append(plot)
 
     show(row(out))
