@@ -42,7 +42,7 @@ def simulate_reads():
               " simreads " + main_data_folder + "/genome/yeasts/UFRJ50816/fasta/genome.fna " +
               survivor_error_profile_path + " 100 " + read_data_dir +
               "simulated/UFRJ50816/pacbio_CCS/survivor_reads.fasta")
-    os.system("./dwgsim -r 0 -1 250 -2 250 /MAdata/genome/yeasts/UFRJ50816/fasta/genome.fna /MAdata/ena/simulated/UFRJ50816/Illumina-250/")
+    os.system(dwgsim_path + " -r 0 -1 250 -2 250 /MAdata/genome/yeasts/UFRJ50816/fasta/genome.fna /MAdata/ena/simulated/UFRJ50816/Illumina-250/")
 
 if True:
     simulate_reads()

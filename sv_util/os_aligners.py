@@ -1,4 +1,5 @@
 import os
+from sv_util.settings import *
 
 def bwa(read_set, sam_file_path, json_dict):
     index_str = json_dict["reference_path"] + "/bwa/genome"
@@ -26,7 +27,7 @@ def mm2(read_set, sam_file_path, json_dict, extra=""):
         presetting = "map-ont"
     index_str = json_dict["reference_path"] + "/minimap/genome." + presetting + ".mmi"
     # -c output CIGAR in PAF; -a output SAM
-    s = "~/workspace/minimap2/minimap2 --MD -c -a -t 32 -x " + presetting + " " + extra + " -R \"@RG\\tID:1\\tSM:" \
+    s = minimap_path + " --MD -c -a -t 32 -x " + presetting + " " + extra + " -R \"@RG\\tID:1\\tSM:" \
         + read_set["name"] + "\" " + index_str + " " \
         + read_set["fasta_file"] + " > " + sam_file_path + " 2> /dev/null"
     #print(s)
@@ -61,7 +62,7 @@ def ngmlr(read_set, sam_file_path, json_dict):
         presetting = "ont"
     index_str = json_dict["reference_path"] + "/ngmlr/genome.fna"
     # -c output CIGAR in PAF; -a output SAM
-    os.system("~/workspace/ngmlr/bin/ngmlr-0.2.8/ngmlr -r " + index_str + " -q " + read_set["fasta_file"]
+    os.system(ngmrl_path + " -r " + index_str + " -q " + read_set["fasta_file"]
                 + " --rg-id 1, --rg-sm " + read_set["name"]
                 + " -t 32 -x " + presetting + " > " + sam_file_path + " 2> /dev/null")
 
@@ -84,10 +85,9 @@ def blasr(read_set, sam_file_path, json_dict):
 
 def sam_to_bam(sam_file_path):
     # create sorted and indexed bam files
-    sam_tools_pref = "~/workspace/samtools/samtools "
     to_bam_cmd = sam_tools_pref + "view -Sb " + sam_file_path + ".sam > " + sam_file_path + ".bam"
     os.system(to_bam_cmd)
-    sort_cmd = sam_tools_pref + "sort -@ 32 -m 1G " + sam_file_path + ".bam > " \
+    sort_cmd = sam_tools_pref + "sort -@ 7 -m 1G " + sam_file_path + ".bam > " \
                 + sam_file_path + ".sorted.bam"
     os.system(sort_cmd + " 2> /dev/null")
     index_cmd = sam_tools_pref + "index " + sam_file_path + ".sorted.bam > " \

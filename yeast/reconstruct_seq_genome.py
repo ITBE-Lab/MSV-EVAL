@@ -167,7 +167,8 @@ if True:
     if nt_insertion_total + nt_seeds_total + nt_ends_total != req_len_total:
         print("WARNING: lengths do not match up:", nt_insertion_total + nt_seeds_total)
     print("there are", num_insertions, "insertions in total,", num_insertions_size_one, "are of size 1 nt and",
-          num_insertions_larger_eq_hundred, "are of size >= 100 nt. Full distribution shown in plot.")
+          num_insertions_larger_eq_hundred, "are of size >= 100 nt.")
+    MS.util.ksw_file_system_min_gb_size = ksw_file_system_min_gb_size
     if False:
         indel_distrib = figure(title="Insertion distrib", y_axis_type="log", plot_width=1000, plot_height=1000)
         indel_distrib.vbar(x=[key for key, _ in buckets.items()],
@@ -180,13 +181,13 @@ if True:
         out.append(indel_distrib)
 
 
-    seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, 1)
     if True:
+        seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, 1)
         out.append(render_seeds(seeds_n_rects, query_genome, reference_genome, "assembly on reference",
                                 "Sequenced Genome", "Reference Genome"))
 
-    seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, [], []) for name, seeds, _ in seeds_list]
     if True:
+        seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, [], []) for name, seeds, _ in seeds_list]
         out.append(render_seeds(seeds_list_display, reconstructed_query_genome_path, reference_genome,
                                 "reconstructed on reference", "Reconstructed Genome", "Reference Genome"))
     if False:

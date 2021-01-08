@@ -80,7 +80,10 @@ def delly_interpreter(call, pack, error_file):
 
     def find_from_and_to_pos(call):
         from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - 1
-        to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - 1
+        if "CHR2" in call["INFO"]:
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["INFO"]["CHR2"]) - 1
+        else:
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["CHROM"]) - 1
         return from_pos, to_pos
 
     try:
@@ -126,8 +129,8 @@ def vcf_parser(file_name):
 
         def __str__(self):
             s = ""
-            for info_line in self.info:
-                s += info_line + "\n"
+            #for info_line in self.info:
+            #    s += info_line + "\n"
             s += "{\n"
             for key, val in self.data.items():
                 for _ in range(self.layer + 1):
