@@ -28,4 +28,7 @@ tmp_ksw_file_prefix = main_data_folder + "/tmp/.CIGARMemoryManager"
 
 accuracy_recall_data_dir = main_data_folder + "/sv_caller_analysis/yeast_analysis"
 
+# Warning: enabling the NW alignments will cause the machine to use large
+# amounts of Disk & RAM space 
+run_ksw = False
 ksw_file_system_min_gb_size = 8

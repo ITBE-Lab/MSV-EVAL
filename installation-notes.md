@@ -5,7 +5,7 @@ User: MSV Password: default
 
 ## Basics
 
-    sudo apt-get install build-essential git cmake python-3 python3-dev python3-pip zlib1g zlib1g-dev autoconf clang libc++-dev libc++abi-dev
+    sudo apt-get install build-essential git cmake python3 python3-dev python3-pip zlib1g zlib1g-dev autoconf clang libc++-dev libc++abi-dev
 
 
 ## Install PostgreSQL
@@ -48,24 +48,27 @@ User: MSV Password: default
     sudo service postgresql restart
 
 
+## Install MSV as Python Module
+
+    # add this line to your ~/.bashrc file to permanently install MSV
+    export PYTHONPATH=$PYTHONPATH:~/buildMA
+
+
 ## Dowload & Compile MSV
 
     git clone @todo
+    git checkout svCaller
     mkdir buildMA
-    CC=\"clang\" CXX=\"clang++\" cmake -DWITH_PYTHON=ON ../MA/
+    cd buildMA
+    CC="clang" CXX="clang++" cmake -DWITH_PYTHON=ON ../MA/
     make -j 32
     cd ..
-
-
-## Install MSV as Python Module
-
-    # add this line to your ~/.bash_rc file to permanently install MSV
-    export PYTHONPATH=$PYTHONPATH:~/buildMA
 
 
 ## iInstall MSV-EVAL
 
     git clone @todo
+    @todo add survivor sample file & adjust path...
     sudo pip3 install bokeh==1.4.0
 
 

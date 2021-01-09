@@ -200,12 +200,12 @@ if True:
         out.append(render_seeds(seeds_n_rects_reconstr, reconstructed_query_genome_path, query_genome,
                                 "reconstructed on sequenced genome", "Reconstructed Genome", "Sequenced Genome"))
 
-    if True:
+    if run_ksw:
         print("NW comparison for reconstruction & sequenced genome")
         plot = nw_comparison(reconstructed_query_genome, ret_query_genome)
         out.append(plot)
 
-    if True:
+    if run_ksw:
         print("NW comparison for reference & sequenced genome")
         plot = nw_comparison(pack, ret_query_genome, title="alignments reference on assembly",
                              y_axis_label="Reference Genome")
