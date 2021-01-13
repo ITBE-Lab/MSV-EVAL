@@ -1,11 +1,10 @@
-Virtual Box Version 6.1.16
-Ubuntu 20.04.1
-10 GB disk 16GB ram
-User: MSV Password: default
+# Installation Notes
+The below commands install all required software for reproducing the experiments in "State-of-the-art structural variant calling: What went conceptually wrong and how to fix it?". As environment, we suggest an Ubuntu 20.04.1 installation.
+
 
 ## Basics
 
-    sudo apt-get install build-essential git cmake python3 python3-dev python3-pip zlib1g zlib1g-dev autoconf clang libc++-dev libc++abi-dev
+    sudo apt-get -y install build-essential git cmake python3 python3-dev python3-pip zlib1g zlib1g-dev autoconf clang libc++-dev libc++abi-dev
 
 
 ## Install PostgreSQL
@@ -30,45 +29,41 @@ User: MSV Password: default
     sudo -u postgres psql 
     # set password to admin
     \password postgres
-    admin
-    admin
+in the password prompt enter “admin” as password (without the double quotes)
+
     # quit
     \q
 
     # allow md5 connections
     sudo nano /etc/postgresql/12/main/pg_hba.conf
-    >
-    > replace line 
-    > local all postgres peer
-    > with
-    > local all postgres md5
-    >
+
+using the editor, replace the line "local all postgres peer" with "local all postgres md5"
 
     # restart service
     sudo service postgresql restart
 
 
-## Install MSV as Python Module
+## Install MSV as a Python Module
 
-    # add this line to your ~/.bashrc file to permanently install MSV
     export PYTHONPATH=$PYTHONPATH:~/buildMA
-
+if you intend to install MSV permanently, you should add the above export statement to your login bash-script (~/.bashrc file). If you omit this addition to your login bash-script, the above export directive gets lost after shell closure.
 
 ## Dowload & Compile MSV
 
-    git clone @todo
+    git clone https://github.com/ITBE-Lab/MA.git
+    cd MA
     git checkout svCaller
+    cd ..
     mkdir buildMA
     cd buildMA
     CC="clang" CXX="clang++" cmake -DWITH_PYTHON=ON ../MA/
-    make -j 32
+    make -j 8
     cd ..
 
 
-## iInstall MSV-EVAL
+## Install MSV-EVAL
 
-    git clone @todo
-    @todo add survivor sample file & adjust path...
+    git clone https://github.com/ITBE-Lab/MSV-EVAL.git
     sudo pip3 install bokeh==1.4.0
 
 
@@ -76,7 +71,7 @@ User: MSV Password: default
 
     git clone https://github.com/lh3/minimap2.git
     cd minimap2
-    make -j 32
+    make -j 8
     cd ..
 
 ## Install NGMLR
@@ -93,8 +88,8 @@ User: MSV Password: default
     mkdir build
     cd build
     cmake ..
-    make -j 32
-    mv sniffles-core-* sniffles-core
+    make -j 8
+    mv ../bin/sniffles-core-* ../bin/sniffles-core
     cd ../..
 
 
@@ -107,21 +102,21 @@ User: MSV Password: default
     cd ..
 
 
-## Install bcftools
+## Install Bcftools
 
-    sudo apt-get install bcftools
+    sudo apt-get -y install bcftools
 
 
-## Install samtools
+## Install Samtools
 
-    sudo apt-get install samtools
+    sudo apt-get -y install samtools
 
 
 ## Install SURVIVOR
 
     git clone https://github.com/fritzsedlazeck/SURVIVOR.git
     cd SURVIVOR/Debug
-    make -j 32
+    make -j 8
     cd ../..
 
 
@@ -129,11 +124,11 @@ User: MSV Password: default
 
     git clone --recursive https://github.com/nh13/DWGSIM.git
     cd DWGSIM
-    make -j 32
+    make -j 8
     cd ..
 
 
-## Setup Folder Structure (or reconfigure MS-EVAL/sv_util/settings.py)
+## Setup Folder Structure
 
     sudo mkdir /MAdata
     sudo chown msv:msv /MAdata
@@ -149,9 +144,10 @@ User: MSV Password: default
     mkdir -p /MAdata/ena/simulated/UFRJ50816/Illumina-250
     mkdir -p /MAdata/ena/simulated/UFRJ50816/pacbio_CCS
     mkdir -p /MAdata/tmp
-
+alternatively, you can reconfigure the script MS-EVAL/sv_util/settings.py 
 
 ## Download Yeast Genomes & Build Indices
+The below statements download the yeast genomes required for reproducing Fig. 4 and Table 1 of the manuscript.
 
     wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/002/079/115/GCA_002079115.1_ASM207911v1/GCA_002079115.1_ASM207911v1_genomic.fna.gz -O /MAdata/genome/yeasts/YPS138/fasta/genome.fna.gz
     gunzip /MAdata/genome/yeasts/YPS138/fasta/genome.fna.gz
@@ -174,7 +170,9 @@ User: MSV Password: default
     ~/buildMA/maCMD --Create_Index /MAdata/genome/yeasts/UFRJ50816/fasta/genome.fna,/MAdata/genome/yeasts/UFRJ50816/ma,genome
 
 
-## Download Human Genome & Build Indices (will take a long time)
+## Download Human Genome & Build Indices
+The below statements download the human genomee required for reproducing Fig. 1 and Fig. 2 of the manuscript.
+The downloading and index building can take several hours.
 
     wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.27_GRCh38.p12/GCA_000001405.27_GRCh38.p12_genomic.fna.gz -O /MAdata/genome/human/GRCh38.p12/fasta/genome.fna.gz
     gunzip /MAdata/genome/human/GRCh38.p12/fasta/genome.fna.gz
@@ -186,15 +184,26 @@ User: MSV Password: default
     mkdir /MAdata/genome/human/GRCh38.p12/ma
     ~/buildMA/maCMD --Create_Index /MAdata/genome/human/GRCh38.p12/fasta/genome.fna,/MAdata/genome/human/GRCh38.p12/ma,genome
 
-## adjust RAM max usage of KSW
+## Adjust Settings if necessary
 
-    adjust the parameter ksw_file_system_min_gb_size in MSV-Eval/sv_util/settings.py to match your ram - 4GB
-## Run experiments
+If you want to install some of the above components in different directories, you can adjust the paths in the script ~/MSV-Eval/sv_util/settings.py.
 
-    cd MSV-EVAL
+The data for Table 1 of the manuscript are computed via Dynamic Programming. By default this computation is disabled, since it writes large files (>250GB) to the disk. For enabling it, the following modifications of the script ~/MSV-Eval/sv_util/settings.py are requried:
+- Set the variable run_ksw to True.
+- Set the variable ksw_file_system_min_gb_size to at least 4GB less than the RAM of your machine (larger values increase comparison speed). E.g. if your machine has 32GB RAM, the maximal (and recommended) value is 28GB.
+
+
+## Run Experiments
+
+    cd ~/MSV-EVAL
+
+    # Fig. 1 (requires previous download of the human genome)
     python3 ambiguities_of_atomic_sv/main.py
-    python3 svs_hidden_to_aligners/main.py
-    python3 yeast/main.py
 
+    # Fig. 2 (requires previous download of the human genome)
+    python3 svs_hidden_to_aligners/main.py
+
+    # Fig. 4 & Table 1 (requires previous download of the yeast genomes)
+    python3 yeast/main.py
 
 

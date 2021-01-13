@@ -22,9 +22,9 @@ def load_reads(individual, param, read_datasets):
                                                     f_path_vec_2, coverage=coverage))
     return seq_ids
 
-def compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index):
+def compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index, name):
     jump_id = compute_sv_jumps(param, mm_index, pack, individual, seq_ids)
-    sv_caller_run_id = sweep_sv_jumps(param, individual, jump_id, "MA", "", [0], pack)
+    sv_caller_run_id = sweep_sv_jumps(param, individual, jump_id, name, "", [0], pack)
     return sv_caller_run_id
 
 def run_ma(pack, read_datasets, individual="HG002", parameter_set="SV-PacBio"):
@@ -33,7 +33,7 @@ def run_ma(pack, read_datasets, individual="HG002", parameter_set="SV-PacBio"):
     #param.by_name("Do Dummy Jumps").set(False) # required for real world reads
     mm_index = MinimizerIndex(param, pack.contigSeqs(), pack.contigNames())
     seq_ids = load_reads(individual, param, read_datasets)
-    sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index)
+    sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index, "M" + parameter_set)
     print("caller_id", sv_caller_run_id)
 
 
