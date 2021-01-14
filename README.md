@@ -1,10 +1,11 @@
 # State-of-the-art structural variant calling: What went conceptually wrong and how to fix it?
 
-This repository contains the scrips for the experiments performed in the manuscript [[Preprint] State-of-the-art structural variant calling: What went conceptually wrong and how to fix it?](https://@todo.com "")
+This repository contains the scrips for the experiments performed in the manuscript [[Preprint] State-of-the-art structural variant calling: What went conceptually wrong and how to fix it?](https://biorxiv.org/cgi/content/short/2021.01.12.426317v1 "bioRxiv preprint")
 
 ## Installation
-
-For conveniently performing the experiments, there is a ready-to-run [VirtualBox](https://www.virtualbox.org/ "Virtual Box Homepage") VM available for [download here](https://@todo.com "MSV-Ubuntu VM"). (The login does not require a password and the root password is “default”.)
+For conveniently performing the experiments, there is a ready-to-run [VirtualBox](https://www.virtualbox.org/ "Virtual Box Homepage") VM available for [download here](http://itbe.hanyang.ac.kr/ak/MSV/MSV-Ubuntu.7z "MSV-Ubuntu VM").
+The login does not require a password and the root password is “default”.
+In order to run the VM, extract the 7-zip archive and place the extracted "MSV-Ubuntu" folder in your "VirtualBox VMs" directory (usually located at: C:\Users\Username\VirtualBox VMs).
 
 Alternatively, there are [installation instructions](installation-notes.md "Installation Notes") for setting up a dedicated machine.
 
