@@ -7,7 +7,7 @@ from bokeh.transform import dodge
 from bokeh.layouts import column
 from bokeh.io import output_file, export_svgs
 from sv_util.bokeh_style_helper import *
-from bokeh.models import NumeralTickFormatter
+from bokeh.models import NumeralTickFormatter, FixedTicker
 
 class MATestSet:
     def __init__(self, params=ParameterSetManager(), name="ma", render_one=False):
@@ -155,9 +155,13 @@ def print_n_write(s, f):
 
 default_test_set = [NWTestSet(), SeedsTestSet(False, True), MATestSet(), MM2TestSet(),
                     MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), NgmlrTestSet()]
+#default_test_set = [MATestSet(), MM2TestSet(), SeedsTestSet(False, False)]
+
+default_range = range(50, 500, 50)
+#default_range = range(25, 501, 50)
 
 def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocation_overlap",
-                    test_sets=default_test_set, sv_sizes=range(25, 501, 25), read_size=2000, num_reads=1000):
+                    test_sets=default_test_set, sv_sizes=default_range, read_size=2000, num_reads=1000):
     params = ParameterSetManager()
     params.set_selected("SV-PacBio")
 
@@ -199,7 +203,7 @@ def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocatio
             print_n_write("\n", file_out)
 
 def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scattered read", 
-                            test_sets=default_test_set, x_label="SV Size [nt]", save_svg=True):
+                            test_sets=default_test_set, x_label="SV Size [nt]", save_svg=False):
     with open(sv_hidden_to_aligners_data_dir + "/" + file_name_in + ".tsv", "r") as file_in:
         output_file(sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".html")
         lines = file_in.readlines()
@@ -209,31 +213,38 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
         for test_set in test_sets:
             test_set_dict[test_set.name()] = test_set
 
-        xs = [int(x) for x in lines[0].split("\t")[2:]]
+        res = 4
+        xs = [int(x) for x in lines[0].split("\t")[2:]][::res]
+        test_sets = []
+        ys = {}
+        cs = {}
 
-        plot = figure(title=title, plot_height=450, plot_width=600, y_range=(-0.05, 1.05), x_range=(-10,510))
+        w = xs[1] - xs[0]
+        w_2 = w * 0.8
+
+        for line in lines[1:]:
+            cells = line.split("\t")
+            test_set = test_set_dict[cells[1]]
+            test_sets.append(test_set.display_name())
+            ys[test_set.display_name()] = [float(x) for x in cells[2:]][::res]
+            cs[test_set.display_name()] = color_scheme(test_set.color())
+
+        l = len(test_sets)
+
+        x_range = [(str(x) , test_set) for test_set in test_sets for x in xs]
+        plot = figure(title=title, plot_height=450, plot_width=600, y_range=(-0.05, 1.1))
         plot.xaxis.axis_label = x_label
         plot.yaxis.axis_label = "Recall [%]"
         plot.yaxis.formatter = NumeralTickFormatter(format='0%')
-        funcs = [
-            plot.x,
-            plot.circle,
-            plot.cross,
-            plot.square,
-            plot.triangle,
-            plot.diamond,
-            plot.circle_x,
-            plot.circle_cross,
-        ]
-        for line, func in zip(lines[1:],funcs):
-            cells = line.split("\t")
-            test_set = test_set_dict[cells[1]]
-            plot.line(x=xs, y=[float(x) for x in cells[2:]], line_color=color_scheme(test_set.color()),
-                      line_width=point_to_px(4),
-                      legend_label=test_set.display_name())
-            func(x=xs, y=[float(x) for x in cells[2:]], line_color=color_scheme(test_set.color()),
-                 line_width=point_to_px(2), fill_color=None,
-                 size=point_to_px(8), legend_label=test_set.display_name())
+        plot.xaxis.ticker = FixedTicker(ticks=xs)
+        w_3 = w_2/l*0.9
+        plot.xgrid.ticker = FixedTicker(ticks=[x + w/2 + w_3/2 for x in [xs[0]-w]+xs])
+
+        for idx, test_set in enumerate(test_sets):
+            plot.vbar(x=[w_3/2 + x - w_2/2 + idx * w_2 / l for x in xs],
+                      top=ys[test_set], fill_color=cs[test_set], line_color=None,
+                      legend_label=test_set, width=w_3)
+
         plot.legend.location = "bottom_right"
         style_plot(plot)
         show(plot)
