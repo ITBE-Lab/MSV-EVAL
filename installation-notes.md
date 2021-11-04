@@ -106,6 +106,10 @@ User: MSV Password: default
     chmod +x delly
     cd ..
 
+## Install GraphAligner and VG
+
+    @todo
+
 
 ## Install bcftools
 
@@ -185,6 +189,10 @@ User: MSV Password: default
     cp /MAdata/genome/human/GRCh38.p12/fasta/genome.fna /MAdata/genome/human/GRCh38.p12/ngmlr/genome.fna
     mkdir /MAdata/genome/human/GRCh38.p12/ma
     ~/buildMA/maCMD --Create_Index /MAdata/genome/human/GRCh38.p12/fasta/genome.fna,/MAdata/genome/human/GRCh38.p12/ma,genome
+
+    mkdir /MAdata/genome/human/GRCh38.p12/vg
+    printf "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n" > /MAdata/genome/human/GRCh38.p12/vg/empty.vcf
+    vg construct -r /MAdata/genome/human/GRCh38.p12/fasta/genome.fna -v /MAdata/genome/human/GRCh38.p12/vg/empty.vcf > /MAdata/genome/human/GRCh38.p12/vg/genome.vg
 
 ## adjust RAM max usage of KSW
 

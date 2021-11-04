@@ -50,9 +50,9 @@ def delly(bam_file, vcf_file, reference_path):
 def manta(bam_file, vcf_file, reference_path):
     # prepare manta
     os.system("rm -r " + vcf_file + ".manta") # clean up folder
-    os.system("python2 ~/workspace/manta/manta-1.5.0.centos6_x86_64/bin/configManta.py --referenceFasta " + reference_path + "/fasta/genome.fna --bam " + bam_file + " --runDir " + vcf_file + ".manta" )
+    os.system("python2 ~/miniconda3/envs/manta/share/manta-1.6.0-1/bin/configManta.py --referenceFasta " + reference_path + "/fasta/genome.fna --bam " + bam_file + " --runDir " + vcf_file + ".manta" )
     # actually run manta
-    os.system("python2 " + vcf_file + ".manta/runWorkflow.py -j 32 -m local" )
+    os.system("python2 " + vcf_file + ".manta/runWorkflow.py -j 32 -m local >" + vcf_file + ".manta/workflow.log.txt" )
 
     os.system("cp " + vcf_file + ".manta/results/variants/diploidSV.vcf.gz" + " " + vcf_file + ".gz")
     os.system("gunzip -f " + vcf_file + ".gz")

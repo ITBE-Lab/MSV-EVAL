@@ -83,6 +83,20 @@ def blasr(read_set, sam_file_path, json_dict):
                         out_file.write(column + "\t")
                     out_file.write("\n")
 
+def graph_aligner(read_set, sam_file_path, json_dict):
+    dev_null = "" #" 2> /dev/null "
+    s = graph_aligner_path + " -g " + json_dict["reference_path"] + "/vg/genome.vg -f " + read_set["fasta_file"] \
+                + " -a " + sam_file_path + ".gam -x vg 1>&2 " + dev_null
+    print(s)
+    os.system(s)
+    s = vg_path + " surject -x " + json_dict["reference_path"] + "/vg/genome.vg -b " + sam_file_path + ".gam > " + \
+            sam_file_path + ".bam" + dev_null
+    print(s)
+    os.system(s)
+    s = sam_tools_pref + "view -h -o " + sam_file_path + " " + sam_file_path + ".bam" + dev_null
+    print(s)
+    os.system(s)
+
 def sam_to_bam(sam_file_path):
     # create sorted and indexed bam files
     to_bam_cmd = sam_tools_pref + "view -Sb " + sam_file_path + ".sam > " + sam_file_path + ".bam"

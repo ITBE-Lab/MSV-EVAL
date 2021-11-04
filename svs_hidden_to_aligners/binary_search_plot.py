@@ -149,11 +149,34 @@ class SeedsTestSet:
     def color_light(self):
         return "lightblue"
 
+class GraphAligner:
+    def __init__(self):
+        pass
+
+    def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix, genome_section_by_name):
+        path_sam = create_alignment(read_by_name, graph_aligner, "graphaligner-" + suffix)
+        return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, fm_index, path_sam)
+
+    def name(self):
+        return "GraphAligner"
+
+    def display_name(self):
+        return "GraphAligner"
+
+    def bokeh_func(self, plot, x, y, c, l):
+        plot.circle(x=x, y=y, line_color=c, fill_color=None, legend_label=l,
+                    size=point_to_px(7), line_width=point_to_px(2))
+
+    def color(self):
+        return "teal"
+    def color_light(self):
+        return "lightteal"
+
 def print_n_write(s, f):
     print(s, end="")
     f.write(s)
 
-default_test_set = [NWTestSet(), SeedsTestSet(False, True), MATestSet(), MM2TestSet(),
+default_test_set = [GraphAligner(), NWTestSet(), SeedsTestSet(False, True), MATestSet(), MM2TestSet(),
                     MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), NgmlrTestSet()]
 #default_test_set = [MATestSet(), MM2TestSet(), SeedsTestSet(False, False)]
 

@@ -16,6 +16,7 @@ def seeds_to_alignments(seeds, start, end, ref_pack):
         ret[-1].mapping_quality = 60/254
     ret.sort(key=lambda x: x.get_score(), reverse=True)
     for alignment in ret[1:]:
+        #pass
         alignment.supplementary = True
     return ret
 

@@ -189,12 +189,12 @@ coverage = 100
 read_size = 2*l-1
 callers = [
     (sniffles, "sniffles", sniffles_interpreter, "single"),
-    #(manta, "manta", manta_interpreter, "paired"),
+    (manta, "manta", manta_interpreter, "paired"),
     (delly, "delly", delly_interpreter, "paired"),
     #(pbSv, "pbSv", pb_sv_interpreter),
 ]
 paired_dist = 100
-paired_size = 250
+paired_size = 50
 
 def run_msv(pack, seeds, insertions):
     s = libMA.containers.Seeds(seeds)

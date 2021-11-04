@@ -21,6 +21,8 @@ dwgsim_path = "~/workspace/DWGSIM/dwgsim"
 sam_tools_pref = "~/workspace/samtools/samtools "
 minimap_path = "~/workspace/minimap2/minimap2"
 ngmrl_path = "~/workspace/ngmlr/bin/ngmlr/ngmlr"
+vg_path = "~/workspace/vg"
+graph_aligner_path = "/usr/home/markus/miniconda3/bin/GraphAligner"
 
 reconstructed_query_genome_path = main_data_folder + "/genome/reconstructed/yeast/UFRJ50816"
 
