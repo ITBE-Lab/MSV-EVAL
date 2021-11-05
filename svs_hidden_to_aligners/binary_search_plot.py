@@ -5,6 +5,7 @@ from bokeh.models import FactorRange
 from bokeh.models import PrintfTickFormatter
 from bokeh.transform import dodge
 from bokeh.layouts import column
+from bokeh.plotting import save
 from bokeh.io import output_file, export_svgs
 from sv_util.bokeh_style_helper import *
 from bokeh.models import NumeralTickFormatter, FixedTicker
@@ -237,7 +238,7 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
             test_set_dict[test_set.name()] = test_set
 
         res = 4
-        xs = [int(x) for x in lines[0].split("\t")[2:]][::res]
+        xs = [int(x) for x in lines[0].split("\t")[2:]]
         test_sets = []
         ys = {}
         cs = {}
@@ -249,7 +250,7 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
             cells = line.split("\t")
             test_set = test_set_dict[cells[1]]
             test_sets.append(test_set.display_name())
-            ys[test_set.display_name()] = [float(x) for x in cells[2:]][::res]
+            ys[test_set.display_name()] = [float(x) for x in cells[2:]]
             cs[test_set.display_name()] = color_scheme(test_set.color())
 
         l = len(test_sets)
@@ -270,7 +271,10 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
 
         plot.legend.location = "bottom_right"
         style_plot(plot)
-        show(plot)
-        if save_svg:
-            plot.output_backend = "svg"
-            export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".svg")
+        if show_plots:
+            show(plot)
+        if save_plots:
+            save(plot)
+            if save_svg:
+                plot.output_backend = "svg"
+                export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".svg")

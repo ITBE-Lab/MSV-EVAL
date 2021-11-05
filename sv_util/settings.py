@@ -34,3 +34,6 @@ accuracy_recall_data_dir = main_data_folder + "/sv_caller_analysis/yeast_analysi
 # amounts of Disk & RAM space 
 run_ksw = False
 ksw_file_system_min_gb_size = 8
+
+show_plots = False
+save_plots = True

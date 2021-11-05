@@ -88,14 +88,16 @@ def alignments_from_seeds(seeds, insertions, ref_pack, size, amount, paired_dist
             read_end = read_start + total_size
             c_seeds, c_ins = crop_seeds(seeds, insertions, read_start, read_start + size)
             c_seeds_2, c_ins_2 = crop_seeds(seeds, insertions, read_end - size, read_end)
-            read = reconstruct_sequenced_genome([("read_prim_" + str(idx*2), c_seeds, c_ins)],
+            read = reconstruct_sequenced_genome([("read_" + str(idx), c_seeds, c_ins)],
                                                             ref_pack).extract_forward_strand()
-            read.name = "read_prim_" + str(idx*2)
-            read.id = idx*2
-            read_2 = reconstruct_sequenced_genome([("read_mate_" + str(idx*2+1), c_seeds_2, c_ins_2)],
+            read.name = "read_" + str(idx)
+            read.id = idx
+            read.set_const_quality(70)
+            read_2 = reconstruct_sequenced_genome([("read_" + str(idx), c_seeds_2, c_ins_2)],
                                                               ref_pack).extract_forward_strand()
-            read_2.name = "read_mate_" + str(idx*2+1)
-            read_2.id = idx*2+1
+            read_2.name = "read_" + str(idx)
+            read_2.id = idx
+            read_2.set_const_quality(70)
 
             # check reads
             if len(read) != size:
@@ -111,7 +113,7 @@ def alignments_from_seeds(seeds, insertions, ref_pack, size, amount, paired_dist
                 print(read_start, read_end)
                 assert False
 
-            if random.choice([True, False]):
+            if random.choice([True, False]) and False:
                 read, c_seeds = rev_comp(read, c_seeds)
             else:
                 read_2, c_seeds_2 = rev_comp(read_2, c_seeds_2)
@@ -126,9 +128,9 @@ def alignments_from_seeds(seeds, insertions, ref_pack, size, amount, paired_dist
                 alignment.stats.first = False
                 if len(alignments) > 0:
                     alignment.set_other(alignments[0]) # the first alignment in the list is the primary one
-            alignments.extend(alignments_2)
+            #alignments.extend(alignments_2)
 
-            ret.append( ((read, read_2), alignments) )
+            ret.append( ((read, read_2), alignments + alignments_2) )
         if paired_dist is None:
             append_single()
         else:

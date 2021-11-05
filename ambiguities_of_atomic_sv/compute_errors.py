@@ -1,9 +1,10 @@
 from MSV import *
 from bokeh.models import ColumnDataSource, LabelSet
-from bokeh.plotting import figure, show
+from bokeh.plotting import figure, show, save
 from bokeh.models import FactorRange
 from bokeh.layouts import column, gridplot
 from bokeh.models.tools import HoverTool
+from sv_util.settings import *
 
 def call_to_points(x_range, entries, dataset_name, sections):
     plot = figure(title='Entries - ' + dataset_name, x_range=x_range, y_range=x_range)
@@ -94,6 +95,9 @@ def render(sets, section_size):
         detail_plots1.append(seed_plot(seeds, dataset_name, sections) )
         detail_plots2.append(vcf_pic(detail_plots1[-1].x_range, from_to_calls_lists, dataset_name, sections))
         detail_plots3.append(call_to_points(detail_plots1[-1].x_range, msv_entries, dataset_name, sections))
-    show(gridplot([detail_plots1, detail_plots2, detail_plots3], plot_width=400, plot_height=400))
+    if show_plots:
+        show(gridplot([detail_plots1, detail_plots2, detail_plots3], plot_width=400, plot_height=400))
+    if save_plots:
+        save(gridplot([detail_plots1, detail_plots2, detail_plots3], plot_width=400, plot_height=400))
 
 

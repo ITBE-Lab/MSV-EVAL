@@ -58,7 +58,7 @@ def sniffles_interpreter(call, pack, error_file):
         else:
             raise Exception("found neither precise nor imprecise in INFO")
 
-        return from_pos, to_pos, int(call["ID"]), call["ALT"] + "-conf:" + str(find_confidence(call))
+        return [(from_pos, to_pos, int(call["ID"]), call["ALT"] + "-conf:" + str(find_confidence(call)))]
     except Exception as e:
         log_error(call, error_file, "sniffles", e)
 
@@ -107,13 +107,13 @@ def delly_interpreter(call, pack, error_file):
         if "CT" in call["INFO"]:
             call_name += " " + call["INFO"]["CT"]
 
-        return from_pos, to_pos, int(call["ID"][4:]), call_name + "-conf:" + str(find_confidence(call))
+        return [(from_pos, to_pos, int(call["ID"][4:]), call_name + "-conf:" + str(find_confidence(call)))]
     except Exception as e:
         log_error(call, error_file, "delly", e)
 
 
 bnd_mate_dict_manta = {}
-def manta_interpreter(call, call_inserter, pack, error_file, call_desc):
+def manta_interpreter(call, pack, error_file):
     def find_confidence(call):
         if call["FILTER"] != "PASS":
             return 0
@@ -152,11 +152,11 @@ def manta_interpreter(call, call_inserter, pack, error_file, call_desc):
 
         to_insert = []
         if call["ALT"] == "<DUP:TANDEM>":
-            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, False, False, find_confidence(call), 1))
+            to_insert.append((from_pos, to_pos, int(call["ID"]), call["ALT"] + "-conf:" + str(find_confidence(call))))
         elif call["ALT"] == "<DUP>":
-            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, False, False, find_confidence(call), 1))
+            to_insert.append((from_pos, to_pos, int(call["ID"]), call["ALT"] + "-conf:" + str(find_confidence(call))))
         elif call["INFO"]["SVTYPE"] == "DEL":
-            to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, True, find_confidence(call), 1))
+            to_insert.append((from_pos, to_pos, int(call["ID"]), call["ALT"] + "-conf:" + str(find_confidence(call))))
         elif call["INFO"]["SVTYPE"] == "BND":
             if call["INFO"]["MATEID"] in bnd_mate_dict_manta:
                 mate = bnd_mate_dict_manta[call["INFO"]["MATEID"]]
@@ -164,16 +164,14 @@ def manta_interpreter(call, call_inserter, pack, error_file, call_desc):
                 std_to = find_std_from(mate)
                 from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"]) - std_from//2
                 to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - std_to//2
-                to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, True, False, find_confidence(call), 1))
-                to_insert.append(SvCall(from_pos, to_pos, std_from, std_to, False, True, find_confidence(mate), 1))
+                to_insert.append((from_pos, to_pos, int(call["ID"]), call["ALT"] + "-conf:" + str(find_confidence(call))))
+                to_insert.append((from_pos, to_pos, int(call["ID"]), call["ALT"] + "-conf:" + str(find_confidence(call))))
                 del bnd_mate_dict_manta[call["INFO"]["MATEID"]]
             else:
                 bnd_mate_dict_manta[call["ID"]] = call
         else:
             raise Exception("could not classify call")
-        for call_to_insert in to_insert:
-            call_inserter.insert(call_to_insert)
-            call_desc.insert(call_to_insert.id, call["ALT"] + " - " + call["ID"])
+        return to_insert
 
     except Exception as e:
         log_error(call, error_file, "manta", e)
