@@ -68,9 +68,9 @@ def delly_interpreter(call, pack, error_file):
             return 0
         conf = 0
         if "PE" in call["INFO"]:
-            conf += int(call["INFO"]["PE"])
+            conf += int(float(call["INFO"]["PE"]))
         if "SR" in call["INFO"]:
-            conf += int(call["INFO"]["SR"])
+            conf += int(float(call["INFO"]["SR"]))
         return conf
 
     def find_std_from_std_to(call):
@@ -113,11 +113,13 @@ def delly_interpreter(call, pack, error_file):
 
 
 bnd_mate_dict_manta = {}
+manta_id = 0
 def manta_interpreter(call, pack, error_file):
+    global manta_id
     def find_confidence(call):
         if call["FILTER"] != "PASS":
             return 0
-        return int(call["QUAL"])
+        return int(float(call["QUAL"]))
 
     def find_std_from_std_to(call):
         std_from = call["INFO"]["CIPOS"].split(",")
@@ -152,25 +154,26 @@ def manta_interpreter(call, pack, error_file):
 
         to_insert = []
         if call["ALT"] == "<DUP:TANDEM>":
-            to_insert.append((from_pos, to_pos, int(call["ID"]), call["ALT"] + "-conf:" + str(find_confidence(call))))
+            to_insert.append((from_pos, to_pos, str(manta_id), call["ALT"] + "-conf:" + str(find_confidence(call))))
         elif call["ALT"] == "<DUP>":
-            to_insert.append((from_pos, to_pos, int(call["ID"]), call["ALT"] + "-conf:" + str(find_confidence(call))))
+            to_insert.append((from_pos, to_pos, str(manta_id), call["ALT"] + "-conf:" + str(find_confidence(call))))
         elif call["INFO"]["SVTYPE"] == "DEL":
-            to_insert.append((from_pos, to_pos, int(call["ID"]), call["ALT"] + "-conf:" + str(find_confidence(call))))
+            to_insert.append((from_pos, to_pos, str(manta_id), call["ALT"] + "-conf:" + str(find_confidence(call))))
+        elif call["INFO"]["SVTYPE"] == "INS":
+            to_insert.append((from_pos, to_pos, str(manta_id), call["ALT"] + "-conf:" + str(find_confidence(call))))
         elif call["INFO"]["SVTYPE"] == "BND":
             if call["INFO"]["MATEID"] in bnd_mate_dict_manta:
                 mate = bnd_mate_dict_manta[call["INFO"]["MATEID"]]
-                std_from = find_std_from(call)
-                std_to = find_std_from(mate)
-                from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"]) - std_from//2
-                to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - std_to//2
-                to_insert.append((from_pos, to_pos, int(call["ID"]), call["ALT"] + "-conf:" + str(find_confidence(call))))
-                to_insert.append((from_pos, to_pos, int(call["ID"]), call["ALT"] + "-conf:" + str(find_confidence(call))))
+                from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"])
+                to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+                to_insert.append((from_pos, to_pos, str(manta_id) + "_1", call["ALT"] + "-conf:" + str(find_confidence(call))))
+                to_insert.append((from_pos, to_pos, str(manta_id) + "_2", call["ALT"] + "-conf:" + str(find_confidence(call))))
                 del bnd_mate_dict_manta[call["INFO"]["MATEID"]]
             else:
                 bnd_mate_dict_manta[call["ID"]] = call
         else:
             raise Exception("could not classify call")
+        manta_id += 1
         return to_insert
 
     except Exception as e:

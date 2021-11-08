@@ -72,6 +72,7 @@ def vcf_pic(x_range, from_to_calls_lists, dataset_name, sections):
 
     plot = figure(title='VCF Output - ' + dataset_name, x_range=x_range, y_range=FactorRange(*sorted(ys,reverse=True)))
     plot.hbar(y=ys, left=lefts, right=rights, height=.8)
+    plot.x(y=ys, x=lefts, size=10, line_color="black")
     plot.add_layout(LabelSet(x='c', y='y', text='n', level='annotation', text_align='center', text_baseline='middle',
                              source=ColumnDataSource(data={'c':center, 'y':ys, 'n':names}), render_mode='canvas'))
     plot.xaxis.ticker = sections

@@ -23,6 +23,7 @@ minimap_path = "~/workspace/minimap2/minimap2"
 ngmrl_path = "~/workspace/ngmlr/bin/ngmlr/ngmlr"
 vg_path = "~/workspace/vg"
 graph_aligner_path = "/usr/home/markus/miniconda3/bin/GraphAligner"
+gridss_path = "~/workspace/gridss/gridss -j ~/workspace/gridss/gridss-2.12.2-gridss-jar-with-dependencies.jar "
 
 reconstructed_query_genome_path = main_data_folder + "/genome/reconstructed/yeast/UFRJ50816"
 

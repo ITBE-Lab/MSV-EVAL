@@ -15,6 +15,15 @@ def delly(bam_file, vcf_file, reference_path):
 
     os.system(bcf_tools_path + " view " + vcf_file + ".bcf > " + vcf_file)
 
+def gridss(bam_file, vcf_file, reference_path):
+    curr = os.getcwd()
+    if not os.path.exists(bam_file + ".gridss.work"):
+        os.mkdir(bam_file + ".gridss.work")
+    os.chdir(bam_file + ".gridss.work")
+    os.system(gridss_path + " -t 32 -r " + reference_path + " -o " + vcf_file + " -a assembly.bam " + bam_file + 
+              " >/dev/null 2>&1")
+    os.chdir(curr)
+
 def manta(bam_file, vcf_file, reference_path):
     # prepare manta
     os.system("rm -r " + vcf_file + ".manta") # clean up folder

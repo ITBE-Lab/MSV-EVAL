@@ -196,6 +196,7 @@ callers = [
     (sniffles, "sniffles", sniffles_interpreter, "single"),
     (manta, "manta", manta_interpreter, "paired"),
     (delly, "delly", delly_interpreter, "paired"),
+    (gridss, "gridss", manta_interpreter, "paired"),
     #(pbSv, "pbSv", pb_sv_interpreter),
 ]
 paired_dist = 100
@@ -219,26 +220,26 @@ if __name__ == "__main__":
     chr1_len = reference.contigLengths()[0]
 
     svs = [
-        #negative_control,
+        negative_control,
         inversion,
-        #four_nested_svs_calls,
-        #inversion_in_inversion,
-        #inversion_in_inversion_2, # selected
-        #insertion_in_inversion,
-        #inversion_in_translocation,
-        #inversion_in_translocation_separate_breakends,
-        #inversions_in_duplication,
-        #duplication_in_inversion,
-        #inversion_overlapping_duplication, # selected
-        #translocation_in_duplication,
-        #duplication_of_inversion,
-        #overlapping_inversions_in_duplication, # selected
-        #inverted_duplication, # selected
-        #duplicated_inversion, # selected
-        #inversion_after_duplication, # selected
-        #triple_inversion,
-        #overlapping_inversions,
-        #overlapping_inversions_2,
+        four_nested_svs_calls,
+        inversion_in_inversion,
+        inversion_in_inversion_2, # selected
+        insertion_in_inversion,
+        inversion_in_translocation,
+        inversion_in_translocation_separate_breakends,
+        inversions_in_duplication,
+        duplication_in_inversion,
+        inversion_overlapping_duplication, # selected
+        translocation_in_duplication,
+        duplication_of_inversion,
+        overlapping_inversions_in_duplication, # selected
+        inverted_duplication, # selected
+        duplicated_inversion, # selected
+        inversion_after_duplication, # selected
+        triple_inversion,
+        overlapping_inversions,
+        overlapping_inversions_2,
     ]
 
     output_file(ambiguities_of_atomic_sv_data_dir + "/bokeh_out_perfect_alignments_experiment.html")
