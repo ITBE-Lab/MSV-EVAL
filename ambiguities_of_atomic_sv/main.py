@@ -188,6 +188,66 @@ def negative_control(l, j):
         Seed(0, (j+0)*l, 0, True),
     ], "negative_control", None)
 
+
+def insertion_in_inversion_breakend(l, j):
+    return ([
+        Seed(0, j*l, 0, True),
+        Seed((j+1)*l, l, (j+1)*l, False),
+        Seed((j+2)*l, j*l, (j+1)*l, True),
+    ], "insertion_in_inversion_breakend", [random_nuc_seq(l), "", ""])
+
+
+def insertion_in_inversion_breakend_2(l, j):
+    return ([
+        Seed(0, j*l, 0, True),
+        Seed((j+0)*l, l, (j+1)*l, False),
+        Seed((j+2)*l, j*l, (j+1)*l, True),
+    ], "insertion_in_inversion_breakend_2", ["", random_nuc_seq(l), ""])
+
+
+def deletion_in_inversion_breakend(l, j):
+    return ([
+        Seed(0, j*l, 0, True),
+        Seed((j+0)*l, l, (j+2)*l, False),
+        Seed((j+1)*l, j*l, (j+2)*l, True),
+    ], "deletion_in_inversion_breakend", ["", "", ""])
+
+
+def deletion_in_inversion_breakend_2(l, j):
+    return ([
+        Seed(0, j*l, 0, True),
+        Seed((j+0)*l, l, (j+1)*l, False),
+        Seed((j+1)*l, j*l, (j+2)*l, True),
+    ], "deletion_in_inversion_breakend_2", ["", "", ""])
+
+def five_nested_inversions(l, j):
+    return ([
+        Seed(0, j*l, 0, True),                  # 0
+        Seed((j+0)*l, l, (j+9)*l, False),       # 1
+        Seed((j+1)*l, l, (j+1)*l, True),        # 2
+        Seed((j+2)*l, l, (j+7)*l, False),       # 3
+        Seed((j+3)*l, l, (j+3)*l, True),        # 4
+        Seed((j+4)*l, l, (j+5)*l, False),       # 5
+        Seed((j+5)*l, l, (j+5)*l, True),        # 6
+        Seed((j+6)*l, l, (j+3)*l, False),       # 7
+        Seed((j+7)*l, l, (j+7)*l, True),        # 8
+        Seed((j+8)*l, l, (j+1)*l, False),       # 9
+        Seed((j+9)*l, j*l, (j+9)*l, True),      # 10
+    ], "five_nested_inversions", ["", "", "", "", "", "", "", "", "", "", ""])
+
+def four_nested_inversions(l, j):
+    return ([
+        Seed(0, j*l, 0, True),                  # 0
+        Seed((j+0)*l, l, (j+7)*l, False),       # 1
+        Seed((j+1)*l, l, (j+1)*l, True),        # 2
+        Seed((j+2)*l, l, (j+5)*l, False),       # 3
+        Seed((j+3)*l, l, (j+3)*l, True),        # 4
+        Seed((j+4)*l, l, (j+3)*l, False),       # 5
+        Seed((j+5)*l, l, (j+5)*l, True),        # 6
+        Seed((j+6)*l, l, (j+1)*l, False),       # 7
+        Seed((j+7)*l, j*l, (j+7)*l, True),      # 8
+    ], "four_nested_inversions", ["", "", "", "", "", "", "", "", ""])
+
 l = 1000
 j = 10
 coverage = 100
@@ -196,7 +256,7 @@ callers = [
     (sniffles, "sniffles", sniffles_interpreter, "single"),
     (manta, "manta", manta_interpreter, "paired"),
     (delly, "delly", delly_interpreter, "paired"),
-    (gridss, "gridss", manta_interpreter, "paired"),
+    (gridss, "gridss", gridss_interpreter, "paired"),
     #(pbSv, "pbSv", pb_sv_interpreter),
 ]
 paired_dist = 100
@@ -240,6 +300,12 @@ if __name__ == "__main__":
         triple_inversion,
         overlapping_inversions,
         overlapping_inversions_2,
+        insertion_in_inversion_breakend,
+        insertion_in_inversion_breakend_2,
+        deletion_in_inversion_breakend,
+        deletion_in_inversion_breakend_2,
+        five_nested_inversions,
+        four_nested_inversions,
     ]
 
     output_file(ambiguities_of_atomic_sv_data_dir + "/bokeh_out_perfect_alignments_experiment.html")
@@ -301,14 +367,15 @@ if __name__ == "__main__":
         # other callers
         from_to_calls_lists = []
         with open(ambiguities_of_atomic_sv_data_dir + "/vcf_errors.log", "w") as error_file:
+            print("dataset:", name)
             for caller, caller_name, interpreter, read_type in callers:
                 vcf_file_path = vcf_folder + file_name + "-" + caller_name + ".vcf"
                 caller( (sam_file_name if read_type=="single" else sam_file_name_paired) + ".sorted.bam",
                         vcf_file_path, fasta_folder + file_name + ".genome.fasta")
                 if not os.path.exists( vcf_file_path ):
-                    print("caller did not create calls:", caller_name, "dataset:", name)
+                    print("caller did not create calls:", caller_name)
                 else:
-                    print("caller did create calls:", caller_name, "dataset:", name)
+                    print("caller did create calls:", caller_name)
                     from_to_calls_list = []
                     for call in vcf_parser(vcf_file_path):
                         a = interpreter(call, reference_section, error_file)

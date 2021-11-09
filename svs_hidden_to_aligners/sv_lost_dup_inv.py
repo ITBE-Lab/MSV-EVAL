@@ -66,5 +66,5 @@ def main():
 #main()
 
 if True:
-    #accuracy_plot(dup_inv, dup_inv_size, "dup_inv_overlap")
+    accuracy_plot(dup_inv, dup_inv_size, "dup_inv_overlap")
     print_accuracy_plot(file_name_in="dup_inv_overlap", title="Accuracy - Duplication & Inversion")

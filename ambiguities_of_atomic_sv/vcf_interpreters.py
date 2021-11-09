@@ -15,7 +15,7 @@ def log_error(call, error_file, interpreter_name, e=None):
         return
     logged_errors.add(key)
 
-    print("unrecognized sv:", call)
+    print("unrecognized sv:", call, "by", interpreter_name)
     error_file.write("============== unrecognized sv ==============\n")
     error_file.write("in interpreter: " + interpreter_name + "\n")
     error_file.write(str(call))
@@ -24,6 +24,7 @@ def log_error(call, error_file, interpreter_name, e=None):
         error_file.write(str(e))
         error_file.write(traceback.format_exc())
     error_file.write("\n\n\n")
+    exit()
 
 def sniffles_interpreter(call, pack, error_file):
     def find_confidence(call):
@@ -137,6 +138,9 @@ def manta_interpreter(call, pack, error_file):
             to_pos = 0
         return from_pos, to_pos
 
+    def find_bnd_name(call):
+        return "BND-" + call["ALT"][1] + "-" + call["ALT"][-1]
+
     try:
         from_pos, to_pos = find_from_and_to_pos(call)
         if "IMPRECISE" in call["INFO"]:
@@ -166,8 +170,8 @@ def manta_interpreter(call, pack, error_file):
                 mate = bnd_mate_dict_manta[call["INFO"]["MATEID"]]
                 from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"])
                 to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                to_insert.append((from_pos, to_pos, str(manta_id) + "_1", call["ALT"] + "-conf:" + str(find_confidence(call))))
-                to_insert.append((from_pos, to_pos, str(manta_id) + "_2", call["ALT"] + "-conf:" + str(find_confidence(call))))
+                to_insert.append((from_pos, to_pos, str(manta_id) + "_1", find_bnd_name(call) + "-conf:" + str(find_confidence(call))))
+                to_insert.append((from_pos, to_pos, str(manta_id) + "_2", find_bnd_name(call) + "-conf:" + str(find_confidence(call))))
                 del bnd_mate_dict_manta[call["INFO"]["MATEID"]]
             else:
                 bnd_mate_dict_manta[call["ID"]] = call
@@ -178,6 +182,44 @@ def manta_interpreter(call, pack, error_file):
 
     except Exception as e:
         log_error(call, error_file, "manta", e)
+
+bnd_mate_dict_gridss = {}
+def gridss_interpreter(call, pack, error_file):
+    def find_confidence(call):
+        if call["FILTER"] != "PASS":
+            return 0
+        return int(float(call["QUAL"]))
+
+    def find_bnd_name(call):
+        if call["ALT"][1] in "[]":
+            return "BND-" + call["ALT"][1] + "-" + call["ALT"][-1]
+        elif call["ALT"][0] in "[]":
+            return "BND-" + call["ALT"][0] + "-" + call["ALT"][-2]
+        else:
+            raise Exception("could not classify call")
+
+    try:
+        to_insert = []
+        if call["INFO"]["SVTYPE"] == "BND":
+            if "MATEID" in call["INFO"]:
+                if call["INFO"]["MATEID"] in bnd_mate_dict_gridss:
+                    mate = bnd_mate_dict_gridss[call["INFO"]["MATEID"]]
+                    from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"])
+                    to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+                    to_insert.append((from_pos, to_pos, call["ID"][6:] + "_1", find_bnd_name(call) + "-conf:" + str(find_confidence(call))))
+                    to_insert.append((from_pos, to_pos, call["ID"][6:] + "_2", find_bnd_name(call) + "-conf:" + str(find_confidence(call))))
+                    del bnd_mate_dict_gridss[call["INFO"]["MATEID"]]
+                else:
+                    bnd_mate_dict_gridss[call["ID"]] = call
+            else:
+                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+                to_insert.append((from_pos, from_pos, call["ID"][6:], "BND-INS-conf:" + str(find_confidence(call))))
+        else:
+            raise Exception("could not classify call")
+        return to_insert
+
+    except Exception as e:
+        log_error(call, error_file, "gridss", e)
 
 def vcf_parser(file_name):
     class VCFFile:

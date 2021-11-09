@@ -178,12 +178,12 @@ def print_n_write(s, f):
     f.write(s)
 
 default_test_set = [GraphAligner(), NWTestSet(), SeedsTestSet(False, True), MATestSet(), MM2TestSet(),
-                    MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), #NgmlrTestSet()
+                    MM2TestSet("-z 400,1 --splice -P", "mm2_extra")#, NgmlrTestSet()
                     ]
 #default_test_set = [MATestSet(), MM2TestSet(), SeedsTestSet(False, False)]
 
-#default_range = range(50, 500, 50)
-default_range = range(50, 500, 100)
+default_range = range(50, 500, 50)
+#default_range = range(50, 500, 100)
 
 def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocation_overlap",
                     test_sets=default_test_set, sv_sizes=default_range, read_size=2000, num_reads=100):
