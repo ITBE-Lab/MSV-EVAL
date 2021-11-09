@@ -191,10 +191,14 @@ def gridss_interpreter(call, pack, error_file):
         return int(float(call["QUAL"]))
 
     def find_bnd_name(call):
-        if call["ALT"][1] in "[]":
-            return "BND-" + call["ALT"][1] + "-" + call["ALT"][-1]
-        elif call["ALT"][0] in "[]":
-            return "BND-" + call["ALT"][0] + "-" + call["ALT"][-2]
+        if call["ALT"][1] == "[":
+            return "BND-fwd-rht"
+        if call["ALT"][1] == "]":
+            return "BND-rev-lft"
+        elif call["ALT"][0] == "[":
+            return "BND-rev-rht"
+        elif call["ALT"][0] == "]":
+            return "BND-fwd-lft"
         else:
             raise Exception("could not classify call")
 

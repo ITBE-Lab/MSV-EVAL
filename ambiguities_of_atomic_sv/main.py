@@ -248,6 +248,72 @@ def four_nested_inversions(l, j):
         Seed((j+7)*l, j*l, (j+7)*l, True),      # 8
     ], "four_nested_inversions", ["", "", "", "", "", "", "", "", ""])
 
+def sequenced_genome_repetition(l, j):
+    return ([
+        Seed(0, j*l, 0, True),                  # 0
+        Seed((j+0)*l, l, (j+1)*l, False),       # 1
+        Seed((j+1)*l, 2*l, (j+1)*l, True),        # 2
+        Seed((j+3)*l, 2*l, (j+0)*l, True),       # 3
+        Seed((j+5)*l, l, (j+3)*l, False),        # 4
+        Seed((j+6)*l, j*l, (j+3)*l, True),       # 5
+    ], "sequenced_genome_repetition", ["", "", "", "", "", "",])
+
+def deletion_and_duplication(l, j):
+    return ([
+        Seed(0, j*l, 0, True),                  # 0
+        Seed((j+0)*l, 3*l, (j+1)*l, True),       # 1
+        Seed((j+3)*l, l, (j+1)*l, True),        # 2
+        Seed((j+4)*l, l, (j+3)*l, True),       # 3
+        Seed((j+5)*l, j*l, (j+5)*l, True),        # 4
+    ], "deletion_and_duplication", ["", "", "", "", "", "",])
+
+def aBCDBDE(l, j):
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+1)*l, (j+4)*l, (j+2)*l, True),       # 1
+    ], "ABCDBDE", ["", ""])
+
+def aCABC(l, j):
+    return ([
+        Seed(0, (j+0)*l, 0, True),                  # 0
+        Seed((j+0)*l, (j+4)*l, (j+1)*l, True),      # 1
+    ], "ACABC", ["", ""])
+
+def two_inverisons_in_duplication(l, j):
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+1)*l, l, (j+2)*l, False),           # 1
+        Seed((j+2)*l, l, (j+2)*l, True),            # 2
+        Seed((j+3)*l, l, (j+0)*l, True),            # 3
+        Seed((j+4)*l, (j+1)*l, (j+2)*l, True),      # 4
+    ], "two_inverisons_in_duplication", ["", "", "", "", ""])
+
+def duplicated_inversion_flanked(l, j):
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+1)*l, l, (j+2)*l, True),            # 1
+        Seed((j+2)*l, l, (j+3)*l, False),           # 2
+        Seed((j+3)*l, (j+1)*l, (j+4)*l, True),      # 3
+    ], "duplicated_inversion_flanked", ["", "", "", ""])
+
+def translocations_in_duplication(l, j):
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+1)*l, l, (j+3)*l, True),            # 1
+        Seed((j+2)*l, l, (j+0)*l, True),            # 2
+        Seed((j+3)*l, l, (j+2)*l, True),            # 3
+        Seed((j+4)*l, l, (j+1)*l, True),            # 4
+        Seed((j+5)*l, (j+1)*l, (j+3)*l, True),      # 5
+    ], "translocations_in_duplication", ["", "", "", "", "", ""])
+
+def del_dup_inv(l, j):
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+1)*l, l, (j+2)*l, True),            # 1
+        Seed((j+2)*l, l, (j+3)*l, False),           # 2
+        Seed((j+3)*l, (j+1)*l, (j+3)*l, True),      # 3
+    ], "del_dup_inv", ["", "", "", ""])
+
 l = 1000
 j = 10
 coverage = 100
@@ -273,6 +339,39 @@ def run_msv(pack, seeds, insertions):
                                                           reconstructed_query_genome)
 
 
+def get_ref_section(section_size, j, l):
+    ref_section = "N"
+    while 'n' in ref_section or 'N' in ref_section:
+        offset = random.randrange(1000, chr1_len - section_size - 1000)
+        ref_section = str(reference.extract_from_to(offset, offset+section_size))
+    return ref_section, ""
+
+def get_ABCDBDE_section(section_size, j, l):
+    section_size = (2*j+5)*l
+    ref_section = "N"
+    while 'n' in ref_section or 'N' in ref_section:
+        offset = random.randrange(1000, chr1_len - section_size - 1000)
+        ref_section = str(reference.extract_from_to(offset, offset+section_size))
+    a = ref_section[:j*l]
+    b = ref_section[j*l:(j+1)*l]
+    c = ref_section[(j+1)*l:(j+2)*l]
+    d = ref_section[(j+2)*l:(j+3)*l]
+    e = ref_section[(j+3)*l:(2*j+4)*l]
+    return a + b + c + d + b + d + e, ""
+
+def get_ABCABC_section(section_size, j, l):
+    section_size = (2*j+3)*l
+    ref_section = "N"
+    while 'n' in ref_section or 'N' in ref_section:
+        offset = random.randrange(1000, chr1_len - section_size - 1000)
+        ref_section = str(reference.extract_from_to(offset, offset+section_size))
+    #print("get_ABCABC_section", j*l, (j+3)*l)
+    f = ref_section[:j*l]
+    abc = ref_section[j*l:(j+3)*l]
+    e = ref_section[(j+3)*l:]
+    return f + abc + abc + e, ""
+
+
 if __name__ == "__main__":
     reference = Pack()
     reference.load(human_genome_dir + "/ma/genome")
@@ -280,46 +379,53 @@ if __name__ == "__main__":
     chr1_len = reference.contigLengths()[0]
 
     svs = [
-        negative_control,
-        inversion,
-        four_nested_svs_calls,
-        inversion_in_inversion,
-        inversion_in_inversion_2, # selected
-        insertion_in_inversion,
-        inversion_in_translocation,
-        inversion_in_translocation_separate_breakends,
-        inversions_in_duplication,
-        duplication_in_inversion,
-        inversion_overlapping_duplication, # selected
-        translocation_in_duplication,
-        duplication_of_inversion,
-        overlapping_inversions_in_duplication, # selected
-        inverted_duplication, # selected
-        duplicated_inversion, # selected
-        inversion_after_duplication, # selected
-        triple_inversion,
-        overlapping_inversions,
-        overlapping_inversions_2,
-        insertion_in_inversion_breakend,
-        insertion_in_inversion_breakend_2,
-        deletion_in_inversion_breakend,
-        deletion_in_inversion_breakend_2,
-        five_nested_inversions,
-        four_nested_inversions,
+        #(negative_control, get_ref_section),
+        #(inversion, get_ref_section),
+        #(four_nested_svs_calls, get_ref_section),
+        #(inversion_in_inversion, get_ref_section),
+        #(inversion_in_inversion_2, get_ref_section), # selected
+        #(insertion_in_inversion, get_ref_section),
+        #(inversion_in_translocation, get_ref_section),
+        #(inversion_in_translocation_separate_breakends, get_ref_section),
+        #(inversions_in_duplication, get_ref_section),
+        #(duplication_in_inversion, get_ref_section),
+        #(inversion_overlapping_duplication, get_ref_section), # selected
+        #(translocation_in_duplication, get_ref_section),
+        #(duplication_of_inversion, get_ref_section),
+        #(overlapping_inversions_in_duplication, get_ref_section), # selected
+        #(inverted_duplication, get_ref_section), # selected
+        #(duplicated_inversion, get_ref_section), # selected
+        #(inversion_after_duplication, get_ref_section), # selected
+        #(triple_inversion, get_ref_section),
+        #(overlapping_inversions, get_ref_section),
+        #(overlapping_inversions_2, get_ref_section),
+        #(insertion_in_inversion_breakend, get_ref_section),
+        #(insertion_in_inversion_breakend_2, get_ref_section),
+        #(deletion_in_inversion_breakend, get_ref_section),
+        #(deletion_in_inversion_breakend_2, get_ref_section),
+        #(five_nested_inversions, get_ref_section),
+        #(four_nested_inversions, get_ref_section),
+        #(sequenced_genome_repetition, get_ref_section),
+        #(deletion_and_duplication, get_ref_section),
+        #(aBCDBDE, get_ABCDBDE_section),
+        (aCABC, get_ABCABC_section),
+        #(two_inverisons_in_duplication, get_ref_section),
+        #(duplicated_inversion_flanked, get_ref_section),
+        #(translocations_in_duplication, get_ref_section),
+        (del_dup_inv, get_ref_section),
     ]
 
     output_file(ambiguities_of_atomic_sv_data_dir + "/bokeh_out_perfect_alignments_experiment.html")
     sets = []
-    for sv_func in svs:
+    for sv_func, get_ref in svs:
         ref_section = "N"
         seeds, name, insertions = sv_func(l, j)
+        section_size = seeds[-1].start_ref + seeds[-1].size
+        ref_section, name_suffix = get_ref(section_size, j, l)
+        name = name + name_suffix
         file_name = "perfect_alignments_experiment-" + name
         if insertions is None:
             insertions = [""] * len(seeds)
-        section_size = seeds[-1].start_ref + seeds[-1].size
-        while 'n' in ref_section or 'N' in ref_section:
-            offset = random.randrange(1000, chr1_len - section_size - 1000)
-            ref_section = str(reference.extract_from_to(offset, offset+section_size))
 
         reference_section = Pack()
         reference_section.append("chr1", "section of chr1", NucSeq(ref_section))
@@ -329,6 +435,8 @@ if __name__ == "__main__":
             genome_out.write(">chr1\n")
             genome_out.write(ref_section)
             genome_out.write("\n")
+        if os.path.exists(fasta_folder + file_name + ".genome.fasta.fai"):
+            os.system("rm " + fasta_folder + file_name + ".genome.fasta.*")
         os.system(sam_tools_pref + "faidx " + fasta_folder + file_name + ".genome.fasta")
 
         #for seed in seeds:
