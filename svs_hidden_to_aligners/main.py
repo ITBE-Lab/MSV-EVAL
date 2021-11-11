@@ -10,4 +10,4 @@ import svs_hidden_to_aligners.sv_lost_inversion
 
 import svs_hidden_to_aligners.sv_lost_indel
 
-import svs_hidden_to_aligners.svs_lost_scattered_read
+#import svs_hidden_to_aligners.svs_lost_scattered_read

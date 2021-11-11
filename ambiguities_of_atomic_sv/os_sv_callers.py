@@ -13,14 +13,13 @@ def delly(bam_file, vcf_file, reference_path):
     os.system(delly_path + " call -g " + reference_path + " " + bam_file
                 + " -o " + vcf_file + ".bcf >/dev/null 2>&1")
 
-    os.system(bcf_tools_path + " view " + vcf_file + ".bcf > " + vcf_file)
+    if os.path.exists(vcf_file + ".bcf"):
+        os.system(bcf_tools_path + " view " + vcf_file + ".bcf > " + vcf_file)
 
 def gridss(bam_file, vcf_file, reference_path):
     curr = os.getcwd()
     if os.path.exists(bam_file + ".gridss.work"):
         os.system('rm -rf ' + bam_file + ".gridss.work")
-    if os.path.exists(vcf_file):
-        os.system('rm ' + vcf_file)
     os.mkdir(bam_file + ".gridss.work")
     os.chdir(bam_file + ".gridss.work")
     os.system(gridss_path + " -t 32 -r " + reference_path + " -o " + vcf_file + " -a assembly.bam " + bam_file + 
@@ -31,8 +30,6 @@ def manta(bam_file, vcf_file, reference_path):
     # prepare manta
     if os.path.exists(vcf_file + ".manta"):
         os.system('rm -rf ' + vcf_file + ".manta")
-    if os.path.exists(vcf_file):
-        os.system('rm ' + vcf_file)
     os.mkdir(vcf_file + ".manta")
     #manta_path = "~/miniconda3/envs/manta/share/manta-1.6.0-1/bin/configManta.py"
     manta_path = "~/workspace/manta/install/bin/configManta.py >/dev/null 2>&1"

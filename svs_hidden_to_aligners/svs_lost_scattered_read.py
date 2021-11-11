@@ -142,5 +142,5 @@ def main():
 
 
 if True:
-    #accuracy_plot(None, None, "scattered_overlap", gap_size_range=[4])
+    accuracy_plot(None, None, "scattered_overlap", gap_size_range=[4])
     print_accuracy_plot(file_name_in="scattered_overlap", title="Accuracy - Scattered Read")

@@ -14,7 +14,7 @@ from sv_util.settings import *
 def random_nuc_seq(l):
     ret = ""
     for _ in range(l):
-        ret += random.choice(['a', 'c', 'g', 't'])
+        ret += random.choice(['A', 'C', 'G', 'T'])
     return ret
 
 def four_nested_svs_calls(l, j):
@@ -314,13 +314,74 @@ def del_dup_inv(l, j):
         Seed((j+3)*l, (j+1)*l, (j+3)*l, True),      # 3
     ], "del_dup_inv", ["", "", "", ""])
 
-l = 1000
+def double_insertion_same(l, j):
+    ins = random_nuc_seq(l)
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+2)*l, l, (j+2)*l, False),            # 1
+        Seed((j+4)*l, (j+1)*l, (j+2)*l, True),      # 2
+    ], "double_insertion_same", [ins, ins, ""])
+
+def double_insertion_diff(l, j):
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+2)*l, l, (j+2)*l, False),            # 1
+        Seed((j+4)*l, (j+1)*l, (j+2)*l, True),      # 2
+    ], "double_insertion_diff", [random_nuc_seq(l), random_nuc_seq(l), ""])
+
+def insertion_and_deletion(l, j):
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+2)*l, (j+1)*l, (j+2)*l, True),      # 1
+    ], "insertion_and_deletion", [random_nuc_seq(l), ""])
+
+def insertion_and_inversion(l, j):
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+2)*l, (j+1)*l, (j+2)*l, False),      # 1
+    ], "insertion_and_inversion", [random_nuc_seq(l), ""])
+
+def insertion(l, j):
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+2)*l, (j+1)*l, (j+1)*l, True),      # 1
+    ], "insertion", [random_nuc_seq(l), ""])
+
+def check_insertion(seq, ref, insertions, j, l):
+    assert seq[:(j+1)*l] == ref[:(j+1)*l]
+    assert seq[(j+1)*l:(j+2)*l] == insertions[0]
+    assert seq[(j+2)*l:] == ref[(j+1)*l:]
+    assert seq == ref[:(j+1)*l] + insertions[0] + ref[(j+1)*l:]
+
+def duplication(l, j):
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+1)*l, (j+1)*l, (j+0)*l, True),      # 1
+    ], "duplication", ["", ""])
+
+def duplication_and_insertion(l, j):
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+2)*l, (j+1)*l, (j+0)*l, True),      # 1
+    ], "duplication_and_insertion", [random_nuc_seq(l), ""])
+
+def inversion_after_inversion(l, j):
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+1)*l, l, (j+2)*l, False),          # 1
+        Seed((j+2)*l, l, (j+2)*l, True),           # 2
+        Seed((j+3)*l, l, (j+4)*l, False),          # 3
+        Seed((j+4)*l, (j+1)*l, (j+4)*l, True),      # 4
+    ], "inversion_after_inversion", ["", "", "", "", ""])
+
+#l = 1000
+l = 100
 j = 10
 coverage = 100
 read_size = 2*l-1
 callers = [
     (sniffles, "sniffles", sniffles_interpreter, "single"),
-    (manta, "manta", manta_interpreter, "paired"),
+    #(manta, "manta", manta_interpreter, "paired"),
     (delly, "delly", delly_interpreter, "paired"),
     (gridss, "gridss", gridss_interpreter, "paired"),
     #(pbSv, "pbSv", pb_sv_interpreter),
@@ -373,51 +434,60 @@ def get_ABCABC_section(section_size, j, l):
 
 
 if __name__ == "__main__":
+    print("HAVE YOU ACTIVATED THE CONDA ENVIRONMENT?")
     reference = Pack()
     reference.load(human_genome_dir + "/ma/genome")
 
     chr1_len = reference.contigLengths()[0]
 
     svs = [
-        #(negative_control, get_ref_section),
-        #(inversion, get_ref_section),
-        #(four_nested_svs_calls, get_ref_section),
-        #(inversion_in_inversion, get_ref_section),
-        #(inversion_in_inversion_2, get_ref_section), # selected
-        #(insertion_in_inversion, get_ref_section),
-        #(inversion_in_translocation, get_ref_section),
-        #(inversion_in_translocation_separate_breakends, get_ref_section),
-        #(inversions_in_duplication, get_ref_section),
-        #(duplication_in_inversion, get_ref_section),
-        #(inversion_overlapping_duplication, get_ref_section), # selected
-        #(translocation_in_duplication, get_ref_section),
-        #(duplication_of_inversion, get_ref_section),
-        #(overlapping_inversions_in_duplication, get_ref_section), # selected
-        #(inverted_duplication, get_ref_section), # selected
-        #(duplicated_inversion, get_ref_section), # selected
-        #(inversion_after_duplication, get_ref_section), # selected
-        #(triple_inversion, get_ref_section),
-        #(overlapping_inversions, get_ref_section),
-        #(overlapping_inversions_2, get_ref_section),
-        #(insertion_in_inversion_breakend, get_ref_section),
-        #(insertion_in_inversion_breakend_2, get_ref_section),
-        #(deletion_in_inversion_breakend, get_ref_section),
-        #(deletion_in_inversion_breakend_2, get_ref_section),
-        #(five_nested_inversions, get_ref_section),
-        #(four_nested_inversions, get_ref_section),
-        #(sequenced_genome_repetition, get_ref_section),
-        #(deletion_and_duplication, get_ref_section),
-        #(aBCDBDE, get_ABCDBDE_section),
-        (aCABC, get_ABCABC_section),
-        #(two_inverisons_in_duplication, get_ref_section),
-        #(duplicated_inversion_flanked, get_ref_section),
-        #(translocations_in_duplication, get_ref_section),
-        (del_dup_inv, get_ref_section),
+        #(negative_control, get_ref_section, None),
+        #(inversion, get_ref_section, None),
+        #(four_nested_svs_calls, get_ref_section, None),
+        #(inversion_in_inversion, get_ref_section, None),
+        (inversion_in_inversion_2, get_ref_section, None), # selected
+        #(insertion_in_inversion, get_ref_section, None),
+        #(inversion_in_translocation, get_ref_section, None),
+        #(inversion_in_translocation_separate_breakends, get_ref_section, None),
+        #(inversions_in_duplication, get_ref_section, None),
+        #(duplication_in_inversion, get_ref_section, None),
+        #(inversion_overlapping_duplication, get_ref_section, None), # selected
+        #(translocation_in_duplication, get_ref_section, None),
+        #(duplication_of_inversion, get_ref_section, None),
+        #(overlapping_inversions_in_duplication, get_ref_section, None), # selected
+        (inverted_duplication, get_ref_section, None), # selected
+        (duplicated_inversion, get_ref_section, None), # selected
+        (inversion_after_duplication, get_ref_section, None), # selected
+        #(triple_inversion, get_ref_section, None),
+        #(overlapping_inversions, get_ref_section, None),
+        #(overlapping_inversions_2, get_ref_section, None),
+        #(insertion_in_inversion_breakend, get_ref_section, None),
+        #(insertion_in_inversion_breakend_2, get_ref_section, None),
+        #(deletion_in_inversion_breakend, get_ref_section, None),
+        #(deletion_in_inversion_breakend_2, get_ref_section, None),
+        #(five_nested_inversions, get_ref_section, None),
+        #(four_nested_inversions, get_ref_section, None),
+        #(sequenced_genome_repetition, get_ref_section, None),
+        #(deletion_and_duplication, get_ref_section, None),
+        #(aBCDBDE, get_ABCDBDE_section, None),
+        #(aCABC, get_ABCABC_section, None),
+        #(two_inverisons_in_duplication, get_ref_section, None),
+        #(duplicated_inversion_flanked, get_ref_section, None),
+        #(translocations_in_duplication, get_ref_section, None),
+        #(del_dup_inv, get_ref_section, None),
+        #(double_insertion_same, get_ref_section, None),
+        #(double_insertion_diff, get_ref_section, None),
+        #(insertion_and_deletion, get_ref_section, None),
+        #(insertion_and_inversion, get_ref_section, None),
+        #(insertion, get_ref_section, check_insertion),
+        #(duplication, get_ref_section, None),
+        #(duplication_and_insertion, get_ref_section, None),
+        (inversion_after_inversion, get_ref_section, None),
     ]
 
     output_file(ambiguities_of_atomic_sv_data_dir + "/bokeh_out_perfect_alignments_experiment.html")
     sets = []
-    for sv_func, get_ref in svs:
+    for sv_func, get_ref, check_genomes in svs:
         ref_section = "N"
         seeds, name, insertions = sv_func(l, j)
         section_size = seeds[-1].start_ref + seeds[-1].size
@@ -429,6 +499,11 @@ if __name__ == "__main__":
 
         reference_section = Pack()
         reference_section.append("chr1", "section of chr1", NucSeq(ref_section))
+
+        if not check_genomes is None:
+            [(seq_genome, _)] = alignments_from_seeds(seeds, insertions, reference_section,
+                                                      seeds[-1].start + seeds[-1].size, 1, do_revcomp=False)
+            check_genomes(str(seq_genome), str(ref_section), insertions, j, l)
 
         # create fake genome region
         with open(fasta_folder + file_name + ".genome.fasta", "w") as genome_out:
@@ -449,7 +524,7 @@ if __name__ == "__main__":
         num_reads_paired = (coverage * section_size) // (paired_size*2)
         # alignments with SVs
         alignments_list_paired = alignments_from_seeds(seeds, insertions, reference_section, paired_size,
-                                                        num_reads_paired, paired_dist=paired_dist)
+                                                        num_reads_paired, paired_dist=paired_dist, do_revcomp=False)
 
         if False:
             seed_printer = SeedPrinter(ParameterSetManager(), "alignment seed", x_range=(offset, offset+section_size),
@@ -478,6 +553,8 @@ if __name__ == "__main__":
             print("dataset:", name)
             for caller, caller_name, interpreter, read_type in callers:
                 vcf_file_path = vcf_folder + file_name + "-" + caller_name + ".vcf"
+                if os.path.exists(vcf_file_path):
+                    os.remove(vcf_file_path)
                 caller( (sam_file_name if read_type=="single" else sam_file_name_paired) + ".sorted.bam",
                         vcf_file_path, fasta_folder + file_name + ".genome.fasta")
                 if not os.path.exists( vcf_file_path ):

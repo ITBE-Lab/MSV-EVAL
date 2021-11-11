@@ -67,19 +67,19 @@ def rev_comp(read, seeds):
         seed.start = len(read) - (seed.start + seed.size)
     return read, seeds
 
-def alignments_from_seeds(seeds, insertions, ref_pack, size, amount, paired_dist=None):
+def alignments_from_seeds(seeds, insertions, ref_pack, size, amount, paired_dist=None, do_revcomp=True):
     ret = []
     y_end = seeds[-1].start + seeds[-1].size
     for idx in range(amount):
         def append_single():
-            read_start = random.randrange(0, y_end - size)
+            read_start = 0 if y_end == size else random.randrange(0, y_end - size)
             read_end = read_start + size
             c_seeds, c_ins = crop_seeds(seeds, insertions, read_start, read_end)
             read = reconstruct_sequenced_genome([("read_" + str(idx), c_seeds, c_ins)],
                                                            ref_pack).extract_forward_strand()
             read.name = "read_" + str(idx)
             read.id = idx
-            if random.choice([True, False]):
+            if random.choice([True, False]) and do_revcomp:
                 read, c_seeds = rev_comp(read, c_seeds)
             ret.append( (read, seeds_to_alignments(c_seeds, read_start, read_end, ref_pack)) )
         def append_paired():
@@ -113,7 +113,7 @@ def alignments_from_seeds(seeds, insertions, ref_pack, size, amount, paired_dist
                 print(read_start, read_end)
                 assert False
 
-            if random.choice([True, False]) and False:
+            if random.choice([True, False]) and do_revcomp:
                 read, c_seeds = rev_comp(read, c_seeds)
             else:
                 read_2, c_seeds_2 = rev_comp(read_2, c_seeds_2)
