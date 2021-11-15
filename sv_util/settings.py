@@ -30,6 +30,7 @@ reconstructed_query_genome_path = main_data_folder + "/genome/reconstructed/yeas
 tmp_ksw_file_prefix = main_data_folder + "/tmp/.CIGARMemoryManager"
 
 accuracy_recall_data_dir = main_data_folder + "/sv_caller_analysis/yeast_analysis"
+gridss_data_dir = main_data_folder + "/sv_caller_analysis/yeast_analysis/gridss"
 
 # Warning: enabling the NW alignments will cause the machine to use large
 # amounts of Disk & RAM space 

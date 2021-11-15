@@ -169,7 +169,7 @@ class GraphAligner:
                     size=point_to_px(7), line_width=point_to_px(2))
 
     def color(self):
-        return "teal"
+        return "black"#"teal"
     def color_light(self):
         return "lightteal"
 
@@ -177,7 +177,7 @@ def print_n_write(s, f):
     print(s, end="")
     f.write(s)
 
-default_test_set = [GraphAligner(), NWTestSet(), SeedsTestSet(False, True), MATestSet(), MM2TestSet(),
+default_test_set = [GraphAligner(), MM2TestSet(), SeedsTestSet(False, True), MATestSet(),  NWTestSet(),
                     MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), 
                     NgmlrTestSet()
                     ]
@@ -187,7 +187,8 @@ default_range = range(50, 500, 50)
 #default_range = range(50, 500, 100)
 
 def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocation_overlap",
-                    test_sets=default_test_set, sv_sizes=default_range, read_size=2000, num_reads=1000):
+                    test_sets=default_test_set, sv_sizes=default_range, read_size=20000, num_reads=1000):
+    #return
     params = ParameterSetManager()
     params.set_selected("SV-PacBio")
 
@@ -197,9 +198,9 @@ def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocatio
     fm_index.load(human_genome_dir + "/ma/genome")
     mm_index = MinimizerIndex(params, human_genome_dir + "/ma/genome.mmi")
 
-    with open(sv_hidden_to_aligners_data_dir + "/" + filename_out + ".tsv", "w") as file_out:
+    with open(sv_hidden_to_aligners_data_dir + "/" + str(read_size) + "-" + filename_out + ".tsv", "w") as file_out:
         # header of outfile
-        print_n_write("gap_size\ttest_set", file_out)
+        print_n_write("read_size\ttest_set", file_out)
         for sv_size in sv_sizes:
             print_n_write("\t", file_out)
             print_n_write(str(sv_size), file_out)
@@ -208,7 +209,7 @@ def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocatio
         # body of outfile
         read_cache = {}
         for test_set in test_sets:
-            print_n_write("0", file_out)
+            print_n_write(str(read_size), file_out)
             print_n_write("\t", file_out)
             print_n_write(test_set.name(), file_out)
             for sv_size in sv_sizes:
@@ -246,14 +247,15 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
         cs = {}
 
         w = xs[1] - xs[0]
-        w_2 = w * 0.8
+        w_2 = w * 0.95
 
         for line in lines[1:]:
             cells = line.split("\t")
-            test_set = test_set_dict[cells[1]]
-            test_sets.append(test_set.display_name())
-            ys[test_set.display_name()] = [float(x) for x in cells[2:]]
-            cs[test_set.display_name()] = color_scheme(test_set.color())
+            if cells[1] in test_set_dict:
+                test_set = test_set_dict[cells[1]]
+                test_sets.append(test_set.display_name())
+                ys[test_set.display_name()] = [float(x) for x in cells[2:]]
+                cs[test_set.display_name()] = color_scheme(test_set.color())
 
         l = len(test_sets)
 
@@ -263,7 +265,7 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
         plot.yaxis.axis_label = "Recall [%]"
         plot.yaxis.formatter = NumeralTickFormatter(format='0%')
         plot.xaxis.ticker = FixedTicker(ticks=xs)
-        w_3 = w_2/l*0.9
+        w_3 = w_2/l*0.95
         plot.xgrid.ticker = FixedTicker(ticks=[x + w/2 + w_3/2 for x in [xs[0]-w]+xs])
 
         for idx, test_set in enumerate(test_sets):
@@ -273,10 +275,10 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
 
         plot.legend.location = "bottom_right"
         style_plot(plot)
+        plot.output_backend = "svg"
         if show_plots:
             show(plot)
         if save_plots:
             save(plot)
             if save_svg:
-                plot.output_backend = "svg"
                 export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".svg")

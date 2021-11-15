@@ -117,7 +117,7 @@ def render_jumps(jumps, query_genome, reference_genome):
     plot.yaxis.axis_label = "Reference Genome"
     return plot
 
-def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, min_cov=10):
+def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, name):
     parameter_set_manager = ParameterSetManager()
     parameter_set_manager.set_selected("SV-PacBio")
     min_size = parameter_set_manager.by_name("Min Size Edge").get()
@@ -127,13 +127,13 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, min
     SvCallerRunTable(db_conn)
     sv_call_table = SvCallTable(db_conn)
     #call_per_contig_table = FirstCallPerContigTable(db_conn)
-    caller_run_id = GetCallInserter(parameter_set_manager, db_conn, "Ground Truth - Large",
+    caller_run_id = GetCallInserter(parameter_set_manager, db_conn, name + " - Large",
                                    "SV's form genome assembly that are too long for Illumina reads", -1).cpp_module.id
-    contig_border_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, "Ground Truth - Contig Border",
+    contig_border_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, name + " - Contig Border",
                                    "SV's form genome assembly that are not covered by any alignments", -1).cpp_module.id
-    small_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, "Ground Truth - Small",
+    small_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, name + " - Small",
                                    "SV's form genome assembly that are too small for pacBio reads", -1).cpp_module.id
-    contig_start_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, "Ground Truth - Contig Start",
+    contig_start_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, name + " - Contig Start",
                                    "SV's form genome assembly that are not covered by any alignments", -1).cpp_module.id
 
     pack, fm_index, mm_index, query_genomes = load_genomes(query_genome_str, reference_genome, parameter_set_manager)
@@ -163,7 +163,7 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, min
                 # Hence these calls are wrong in the context of the reconstruction.
                 # since we do not (and cannot since there is no coverage at chrom ends) analyze these calls we can
                 # place them as we wish... we choose to simply mirror everything back to the original position
-                # since i do not want to do this in the cpp code i do it there in the py code.
+                # since i do not want to do this in the cpp code i do it here in the py code.
                 tmp = f
                 f = t
                 t = tmp
@@ -228,7 +228,7 @@ if True:
     seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, seq_id)
     jumps = seeds_to_jumps(seeds_n_rects, query_genome, reference_genome)
 
-    jumps_to_calls_to_db(jumps, db_name, query_genome, reference_genome)
+    jumps_to_calls_to_db(jumps, db_name, query_genome, reference_genome, "Ground Truth")
     #exit()
 
     out.append(render_seeds(seeds_n_rects, query_genome, reference_genome))

@@ -150,6 +150,7 @@ User: MSV Password: default
     mkdir -p /MAdata/sv_caller_analysis/ambiguities_of_atomic_sv/sam
     mkdir -p /MAdata/sv_caller_analysis/ambiguities_of_atomic_sv/vcf
     mkdir -p /MAdata/sv_caller_analysis/yeast_analysis
+    mkdir -p /MAdata/sv_caller_analysis/yeast_analysis/gridss
     mkdir -p /MAdata/ena/simulated/UFRJ50816/Illumina-250
     mkdir -p /MAdata/ena/simulated/UFRJ50816/pacbio_CCS
     mkdir -p /MAdata/tmp
