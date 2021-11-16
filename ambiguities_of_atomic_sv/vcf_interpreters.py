@@ -6,12 +6,12 @@ import traceback
 import os
 
 logged_errors = set()
-def log_error(call, error_file, interpreter_name, e=None):
+def log_error(call, error_file, interpreter_name, e=None, do_exit=True, force_log=False):
     # don't log an error twice
     key = interpreter_name + call["ALT"]
     if "SVTYPE" in call["INFO"]:
         key = interpreter_name + call["INFO"]["SVTYPE"]
-    if key in logged_errors:
+    if key in logged_errors and not force_log:
         return
     logged_errors.add(key)
 
@@ -24,7 +24,8 @@ def log_error(call, error_file, interpreter_name, e=None):
         error_file.write(str(e))
         error_file.write(traceback.format_exc())
     error_file.write("\n\n\n")
-    exit()
+    if do_exit:
+        exit()
 
 def sniffles_interpreter(call, pack, error_file):
     def find_confidence(call):

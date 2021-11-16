@@ -28,26 +28,15 @@ def gridss_interpreter(call, pack, error_file):
             return 0
         return int(float(call["QUAL"]))
 
-    def does_call_reverse_strand(call):
+    def get_case(call):
         if call["ALT"][-1] == "[":
-            return False
+            return 0
         if call["ALT"][-1] == "]":
-            return True
-        elif call["ALT"][0] == "[":
-            return True
+            return 1
         elif call["ALT"][0] == "]":
-            return False
-        else:
-            raise Exception("could not classify call")
-    def does_call_come_from_reverse_strand(call):
-        if call["ALT"][-1] == "[":
-            return True
-        if call["ALT"][-1] == "]":
-            return False
+            return 2
         elif call["ALT"][0] == "[":
-            return True
-        elif call["ALT"][0] == "]":
-            return False
+            return 3
         else:
             raise Exception("could not classify call")
 
@@ -73,19 +62,32 @@ def gridss_interpreter(call, pack, error_file):
                     mate = bnd_mate_dict_gridss[call["INFO"]["MATEID"]]
                     from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"])
                     to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                    assert does_call_reverse_strand(call) == does_call_reverse_strand(mate)
-                    assert does_call_come_from_reverse_strand(call) != does_call_come_from_reverse_strand(mate)
-                    from_forw = not does_call_come_from_reverse_strand(call)
-                    to_forw = not from_forw if does_call_reverse_strand(call) else from_forw
+                    my_case = get_case(call)
+                    mate_case = get_case(mate)
+                    # W -> Y
+                    combined_case_1 = (my_case == 1 and mate_case == 1)
+                    # U -> V
+                    combined_case_2 = (my_case == 0 and mate_case == 2) or (my_case == 2 and mate_case == 0)
+                    # X -> Z
+                    combined_case_3 = my_case == 3 and mate_case == 3
+                    cnt_cases = sum(1 if x else 0 for x in [combined_case_1, combined_case_2, combined_case_3])
+                    if cnt_cases != 1:
+                        log_error(mate, error_file, "gridss", do_exit=False, force_log=True)
+                        log_error(call, error_file, "gridss", do_exit=False, force_log=True)
+                        exit()
+                    reverses = combined_case_1 or combined_case_3
+                    starts_on_reverse = combined_case_3
+                    from_forw = not starts_on_reverse
+                    to_forw = not from_forw if reverses else from_forw
+                    del bnd_mate_dict_gridss[call["INFO"]["MATEID"]]
                     return SvJump(from_pos, to_pos, 0, len(ins), from_forw, to_forw, find_confidence(call), \
                                   call["line_idx"], -1), ins
-                    del bnd_mate_dict_gridss[call["INFO"]["MATEID"]]
                 else:
                     bnd_mate_dict_gridss[call["ID"]] = call
                     return None, ""
             else:
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                ins = get_insertion(call)
+                ins = call["ALT"][:-1]
                 return SvJump(from_pos, from_pos, 0, len(ins), True, True, find_confidence(call), \
                               call["line_idx"], -1), ins
         else:
