@@ -178,7 +178,7 @@ def print_n_write(s, f):
     f.write(s)
 
 default_test_set = [GraphAligner(), MM2TestSet(), SeedsTestSet(False, True), MATestSet(),  NWTestSet(),
-                    MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), 
+                    #MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), 
                     NgmlrTestSet()
                     ]
 #default_test_set = [MATestSet(), MM2TestSet(), SeedsTestSet(False, False)]
@@ -230,55 +230,59 @@ def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocatio
             print_n_write("\n", file_out)
 
 def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scattered read", 
-                            test_sets=default_test_set, x_label="SV Size [nt]", save_svg=False):
-    with open(sv_hidden_to_aligners_data_dir + "/" + file_name_in + ".tsv", "r") as file_in:
-        output_file(sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".html")
-        lines = file_in.readlines()
-        header = lines[0]
+                            test_sets_1=default_test_set, x_label="SV Size [nt]", save_svg=False):
+    for inv in [False, True]:
+        with open(sv_hidden_to_aligners_data_dir + "/" + file_name_in + ".tsv", "r") as file_in:
+            output_file(sv_hidden_to_aligners_data_dir + "/bokeh_out_" + ("inv-" if inv else "") + \
+                        file_name_in + ".html")
+            lines = file_in.readlines()
+            header = lines[0]
 
-        test_set_dict = {}
-        for test_set in test_sets:
-            test_set_dict[test_set.name()] = test_set
+            test_set_dict = {}
+            for test_set in test_sets_1:
+                test_set_dict[test_set.name()] = test_set
 
-        res = 4
-        xs = [int(x) for x in lines[0].split("\t")[2:]]
-        test_sets = []
-        ys = {}
-        cs = {}
+            res = 4
+            xs = [int(x) for x in lines[0].split("\t")[2:]]
+            test_sets = []
+            ys = {}
+            cs = {}
 
-        w = xs[1] - xs[0]
-        w_2 = w * 0.95
+            w = xs[1] - xs[0]
+            w_2 = w * 0.95
 
-        for line in lines[1:]:
-            cells = line.split("\t")
-            if cells[1] in test_set_dict:
-                test_set = test_set_dict[cells[1]]
-                test_sets.append(test_set.display_name())
-                ys[test_set.display_name()] = [float(x) for x in cells[2:]]
-                cs[test_set.display_name()] = color_scheme(test_set.color())
+            for line in lines[1:]:
+                cells = line.split("\t")
+                if cells[1] in test_set_dict:
+                    test_set = test_set_dict[cells[1]]
+                    test_sets.append(test_set.display_name())
+                    ys[test_set.display_name()] = [float(x) for x in cells[2:]]
+                    cs[test_set.display_name()] = color_scheme(test_set.color())
 
-        l = len(test_sets)
+            l = len(test_sets)
 
-        x_range = [(str(x) , test_set) for test_set in test_sets for x in xs]
-        plot = figure(title=title, plot_height=450, plot_width=600, y_range=(-0.05, 1.1))
-        plot.xaxis.axis_label = x_label
-        plot.yaxis.axis_label = "Recall [%]"
-        plot.yaxis.formatter = NumeralTickFormatter(format='0%')
-        plot.xaxis.ticker = FixedTicker(ticks=xs)
-        w_3 = w_2/l*0.95
-        plot.xgrid.ticker = FixedTicker(ticks=[x + w/2 + w_3/2 for x in [xs[0]-w]+xs])
+            x_range = [(str(x) , test_set) for test_set in test_sets for x in xs]
+            plot = figure(title=title, plot_height=450, plot_width=600, y_range=(-0.05, 1.1))
+            plot.xaxis.axis_label = x_label
+            plot.yaxis.axis_label = "Recall [%]"
+            plot.yaxis.formatter = NumeralTickFormatter(format='0%')
+            plot.xaxis.ticker = FixedTicker(ticks=xs)
+            w_3 = w_2/l*0.95
+            plot.xgrid.ticker = FixedTicker(ticks=[x + w/2 + w_3/2 for x in [xs[0]-w]+xs])
 
-        for idx, test_set in enumerate(test_sets):
-            plot.vbar(x=[w_3/2 + x - w_2/2 + idx * w_2 / l for x in xs],
-                      top=ys[test_set], fill_color=cs[test_set], line_color=None,
-                      legend_label=test_set, width=w_3)
+            for idx, test_set in enumerate(test_sets):
+                plot.vbar(x=[w_3/2 + x - w_2/2 + idx * w_2 / l for x in xs],
+                        top=ys[test_set] if not inv else 100,
+                        bottom=ys[test_set] if inv else 0,
+                        fill_color=cs[test_set], line_color=None,
+                        legend_label=test_set, width=w_3)
 
-        plot.legend.location = "bottom_right"
-        style_plot(plot)
-        plot.output_backend = "svg"
-        if show_plots:
-            show(plot)
-        if save_plots:
-            save(plot)
-            if save_svg:
-                export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".svg")
+            plot.legend.location = "bottom_right"
+            style_plot(plot)
+            plot.output_backend = "svg"
+            if show_plots:
+                show(plot)
+            if save_plots:
+                save(plot)
+                if save_svg:
+                    export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".svg")

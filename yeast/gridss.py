@@ -4,11 +4,11 @@ from MSV import *
 import math
 import traceback
 import os
-from create_ground_truth import jumps_to_calls_to_db
 import fnmatch
-from os_aligners import bwa, sam_to_bam
+from sv_util.os_aligners import bwa, sam_to_bam
 from sv_util.settings import *
 from ambiguities_of_atomic_sv.os_sv_callers import gridss
+from ambiguities_of_atomic_sv.vcf_interpreters import log_error
 
 #genome_dir = global_prefix + "genome/human/GRCh38.p12/"
 genome_dir = main_data_folder + "/genome/yeasts/YPS138/"
@@ -29,9 +29,9 @@ def gridss_interpreter(call, pack, error_file):
         return int(float(call["QUAL"]))
 
     def does_call_reverse_strand(call):
-        if call["ALT"][1] == "[":
+        if call["ALT"][-1] == "[":
             return False
-        if call["ALT"][1] == "]":
+        if call["ALT"][-1] == "]":
             return True
         elif call["ALT"][0] == "[":
             return True
@@ -40,9 +40,9 @@ def gridss_interpreter(call, pack, error_file):
         else:
             raise Exception("could not classify call")
     def does_call_come_from_reverse_strand(call):
-        if call["ALT"][1] == "[":
+        if call["ALT"][-1] == "[":
             return True
-        if call["ALT"][1] == "]":
+        if call["ALT"][-1] == "]":
             return False
         elif call["ALT"][0] == "[":
             return True
@@ -51,30 +51,43 @@ def gridss_interpreter(call, pack, error_file):
         else:
             raise Exception("could not classify call")
 
-    def indel_len(call):
-        return sum(1 if c in "ACGTNacgtn" else 0 for c in call["ALT"])
+    def get_insertion(call):
+        if call["ALT"][0] in "[":
+            return call["ALT"][call["ALT"].rfind("["):]
+        elif call["ALT"][0] in "]":
+            return call["ALT"][call["ALT"].rfind("]"):]
+        elif call["ALT"][-1] in "[":
+            return call["ALT"][:call["ALT"].find("[")]
+        elif call["ALT"][-1] in "]":
+            return call["ALT"][:call["ALT"].find("]")]
+        else:
+            raise Exception("could not classify call")
 
     try:
+        if call["FILTER"] != "PASS":
+            return None, ""
         if call["INFO"]["SVTYPE"] == "BND":
             if "MATEID" in call["INFO"]:
                 if call["INFO"]["MATEID"] in bnd_mate_dict_gridss:
+                    ins = get_insertion(call)
                     mate = bnd_mate_dict_gridss[call["INFO"]["MATEID"]]
                     from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"])
                     to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
                     assert does_call_reverse_strand(call) == does_call_reverse_strand(mate)
-                    assert does_call_come_from_reverse_strand(call) == does_call_come_from_reverse_strand(mate)
+                    assert does_call_come_from_reverse_strand(call) != does_call_come_from_reverse_strand(mate)
                     from_forw = not does_call_come_from_reverse_strand(call)
                     to_forw = not from_forw if does_call_reverse_strand(call) else from_forw
-                    return SvJump(from_pos, to_pos, 0, 0, from_forw, to_forw, find_confidence(call), \
-                                  call["line_idx"], -1), ""
+                    return SvJump(from_pos, to_pos, 0, len(ins), from_forw, to_forw, find_confidence(call), \
+                                  call["line_idx"], -1), ins
                     del bnd_mate_dict_gridss[call["INFO"]["MATEID"]]
                 else:
                     bnd_mate_dict_gridss[call["ID"]] = call
                     return None, ""
             else:
                 from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
-                return SvJump(from_pos, from_pos, 0, indel_len(call), True, True, find_confidence(call), \
-                              call["line_idx"], -1), "indellll"
+                ins = get_insertion(call)
+                return SvJump(from_pos, from_pos, 0, len(ins), True, True, find_confidence(call), \
+                              call["line_idx"], -1), ins
         else:
             raise Exception("could not classify call")
 
@@ -174,7 +187,7 @@ def parse_and_insert(file_name, db_name, reference_genome, caller_name="gridss")
     cnt_contig_border = 0
     with open(file_name + ".vcf_errors.log", "w") as error_file:
         for vcf_call in vcf_parser(file_name):
-            jump = gridss_interpreter(vcf_call, pack, error_file)
+            jump, ins = gridss_interpreter(vcf_call, pack, error_file)
             if not jump is None:
                 f = jump.from_pos
                 t = jump.to_pos
@@ -197,7 +210,7 @@ def parse_and_insert(file_name, db_name, reference_genome, caller_name="gridss")
                 call.inserted_sequence.check()
                 call.id = jump.id
                 call.mirrored = jump.was_mirrored
-                elif contig_filter.cpp_module.by_contig_border(jump, pack):
+                if contig_filter.cpp_module.by_contig_border(jump, pack):
                     cnt_contig_border += 1
                     sv_call_table.insert_call(contig_border_caller_run_id, call)
                 elif max(abs(f - t), len(ins)) < min_size:
@@ -213,17 +226,21 @@ def parse_and_insert(file_name, db_name, reference_genome, caller_name="gridss")
 
     return caller_run_id
 
+db_name = "UFRJ50816"
+
 def main():
-    reads = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-250/", "*.bwa.read*.fastq.gz")
-    
+    reads = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-250/", "*.bwa.read1.fastq.gz")
+    reads_mates = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-250/", "*.bwa.read2.fastq.gz")
+
     json_dict = {"reference_path":genome_dir}
-    read_json = {"technology":"illumina", "name":"n/a", "fasta_file":sum(str(r) + ", " for r in reads)[:-2]}
-    path_sam = gridss_data_dir + "bwa_alignment.sam"
-    bwa(read_json, path_sam, json_dict)
-    sam_to_bam(path_sam)
-    gridss(path_sam + ".sorted.bam", gridss_data_dir+".gridss.vcf", genome_dir)
-    
-    run_id = parse_and_insert(gridss_data_dir+".gridss.vcf", genome_dir+"genome")
+    read_json = {"technology":"illumina", "name":"n/a", "fasta_file":", ".join(reads),
+                 "fasta_file_mate":", ".join(reads_mates)}
+    path_sam = gridss_data_dir + ".bwa_alignment"
+    #bwa(read_json, path_sam + ".sam", json_dict)
+    #sam_to_bam(path_sam)
+    #gridss(path_sam + ".sorted.bam", gridss_data_dir+".gridss.vcf", genome_dir+"fasta/genome.fna")
+
+    run_id = parse_and_insert(gridss_data_dir+".gridss.vcf", db_name, genome_dir+"ma/genome")
     print("run_id", run_id)
 
 main()

@@ -98,12 +98,13 @@ def graph_aligner(read_set, sam_file_path, json_dict):
     os.system(s)
 
 def sam_to_bam(sam_file_path):
+    dev_null = "" #" 2> /dev/null "
     # create sorted and indexed bam files
     to_bam_cmd = sam_tools_pref + "view -Sb " + sam_file_path + ".sam > " + sam_file_path + ".bam"
     os.system(to_bam_cmd)
     sort_cmd = sam_tools_pref + "sort -@ 7 -m 1G " + sam_file_path + ".bam > " \
                 + sam_file_path + ".sorted.bam"
-    os.system(sort_cmd + " 2> /dev/null")
+    os.system(sort_cmd + dev_null)
     index_cmd = sam_tools_pref + "index " + sam_file_path + ".sorted.bam > " \
                 + sam_file_path + ".sorted.bam.bai"
     os.system(index_cmd)
