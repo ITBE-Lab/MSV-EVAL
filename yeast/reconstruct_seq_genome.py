@@ -1,6 +1,7 @@
 from sv_util.settings import *
 from MSV import *
 from yeast.load_genomes import *
+from bokeh.plotting import figure, show, save
 
 genome_dir = main_data_folder + "/genome/yeasts/"
 #query_genome = "knowlesiStrain"
@@ -83,132 +84,145 @@ def nw_comparison(reconstructed_query_genome, ret_query_genome,
     plot.line(x=xs, y=ys, line_width=4)
     return plot
 
+ground_throuth_small = 8
+ground_throuth_large = 6
+to_analyze = [
+    #(5, 3, "Gridss"), # Gridss: small, large ## DEFAULT
+    (15, 13, "Gridss"), # Gridss: small, large
+    (1, 2, "MA") # MA: small, large
+]
+
 if True:
-    db_name = "UFRJ50816"
-    #run_ids = [3, 4, 5, 6]
-    run_ids = [1, 2]
+    for small_id, large_id, name in to_analyze:
+        print("Analyzing:", name)
+        db_name = "UFRJ50816"
+        #run_ids = [3, 4, 5, 6]
+        run_ids = [small_id, large_id]
 
-    db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
-    call_table = SvCallTable(db_conn)
+        db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
+        call_table = SvCallTable(db_conn)
 
-    print("copying path information... (may take a while)")
-    # copy order from 5 to 1 (Illumina)
-    call_table.copy_path(5, 1, 0)
-    # copy order from 3 to 2 (pacBio)
-    call_table.copy_path(3, 2, 100)
-    print("done")
+        print("copying path information... (may take a while)")
+        call_table.copy_path(ground_throuth_small, small_id, 0)
+        call_table.copy_path(ground_throuth_large, large_id, 100)
+        print("done")
 
-    jump_table = SvJumpTable(db_conn) # initialize jump table
-    param = ParameterSetManager()
-    param.set_selected("SV-PacBio")
-    pack, _, _, ret_query_genome = load_genomes(query_genome, reference_genome, param)
+        jump_table = SvJumpTable(db_conn) # initialize jump table
+        param = ParameterSetManager()
+        param.set_selected("SV-PacBio")
+        pack, _, _, ret_query_genome = load_genomes(query_genome, reference_genome, param)
 
 
-    print("reconstructing...")
-    seeds_list = call_table.calls_to_seeds_by_id(pack, run_ids, True, True)
+        print("reconstructing...")
+        seeds_list = call_table.calls_to_seeds_by_id(pack, run_ids, True, True)
 
-    reconstructed_query_genome = reconstruct_sequenced_genome(seeds_list, pack)
-    print("done")
-    reconstructed_query_genome.store(reconstructed_query_genome_path + "/ma/genome")
+        reconstructed_query_genome = reconstruct_sequenced_genome(seeds_list, pack)
+        print("done")
+        reconstructed_query_genome.store(reconstructed_query_genome_path + "/ma/genome")
 
-    out = []
-    print("contig_name", "nt in seeds", "nt in insertions", "nt in ends", "sequenced len", "reconstr len", sep="\t")
-    buckets = {}
-    nt_insertion_total = 0
-    nt_seeds_total = 0
-    nt_ends_total = 0
-    req_len_total = 0
-    num_insertions = 0
-    num_insertions_size_one = 0
-    num_insertions_larger_eq_hundred = 0
-    for idx, ((contig_name, seeds, insertions), reconstr_contig, (y_start, assembly)) in enumerate(zip(seeds_list,
-                                                  reconstructed_query_genome.contigNucSeqs(),
-                                                  ret_query_genome)):
-        nt_in_seeds = 0
-        nt_in_ins = 0
-        if len(insertions[0]) > 0:
-            num_insertions += 1
-        if len(insertions[0]) == 1:
-            num_insertions_size_one += 1
-        if len(insertions[0]) >= 100:
-            num_insertions_larger_eq_hundred += 1
-        if len(insertions[-1]) > 0:
-            num_insertions += 1
-        if len(insertions[-1]) == 1:
-            num_insertions_size_one += 1
-        if len(insertions[-1]) >= 100:
-            num_insertions_larger_eq_hundred += 1
-        nt_in_ends = len(insertions[0]) + len(insertions[-1])
-        nt_ends_total += nt_in_ends
-        ins_len = []
-        for seed in seeds:
-            nt_in_seeds += seed.size
-            nt_seeds_total += seed.size
-        for nuc_seq in insertions[1:-1]:
-            nt_in_ins += len(nuc_seq)
-            ins_len.append(len(nuc_seq))
-            nt_insertion_total += len(nuc_seq)
-            if len(nuc_seq) > 0:
+        out = []
+        print("caller", "contig_name", "nt in seeds", "nt in insertions", "nt in ends", "sequenced len",
+              "reconstr len", sep="\t")
+        buckets = {}
+        nt_insertion_total = 0
+        nt_seeds_total = 0
+        nt_ends_total = 0
+        req_len_total = 0
+        num_insertions = 0
+        num_insertions_size_one = 0
+        num_insertions_larger_eq_hundred = 0
+        for idx, ((contig_name, seeds, insertions), reconstr_contig, (y_start, assembly)) in enumerate(zip(seeds_list,
+                                                    reconstructed_query_genome.contigNucSeqs(),
+                                                    ret_query_genome)):
+            nt_in_seeds = 0
+            nt_in_ins = 0
+            if len(insertions[0]) > 0:
                 num_insertions += 1
-            if len(nuc_seq) == 1:
+            if len(insertions[0]) == 1:
                 num_insertions_size_one += 1
-            if len(nuc_seq) >= 100:
+            if len(insertions[0]) >= 100:
                 num_insertions_larger_eq_hundred += 1
-        req_len_total += len(reconstr_contig)
-        print(contig_name, nt_in_seeds, nt_in_ins, nt_in_ends, len(assembly), len(reconstr_contig), sep="\t")
-        for l in ins_len:
-            if not l in buckets:
-                buckets[l] = 0
-            buckets[l] += 1
-    print("nt in insertion total:", nt_insertion_total)
-    print("nt in seeds total:", nt_seeds_total)
-    print("nt in ends total:", nt_ends_total)
-    print("reconstr len total:", req_len_total)
-    if nt_insertion_total + nt_seeds_total + nt_ends_total != req_len_total:
-        print("WARNING: lengths do not match up:", nt_insertion_total + nt_seeds_total)
-    print("there are", num_insertions, "insertions in total,", num_insertions_size_one, "are of size 1 nt and",
-          num_insertions_larger_eq_hundred, "are of size >= 100 nt.")
-    MS.util.ksw_file_system_min_gb_size = ksw_file_system_min_gb_size
-    if False:
-        indel_distrib = figure(title="Insertion distrib", y_axis_type="log", plot_width=1000, plot_height=1000)
-        indel_distrib.vbar(x=[key for key, _ in buckets.items()],
-                            width=4/5,
-                            top=[val for _, val in buckets.items()],
-                            bottom=0.1,
-                            color="blue")
-        indel_distrib.xaxis.axis_label = "Amount"
-        indel_distrib.yaxis.axis_label = "Insertion length"
-        out.append(indel_distrib)
+            if len(insertions[-1]) > 0:
+                num_insertions += 1
+            if len(insertions[-1]) == 1:
+                num_insertions_size_one += 1
+            if len(insertions[-1]) >= 100:
+                num_insertions_larger_eq_hundred += 1
+            nt_in_ends = len(insertions[0]) + len(insertions[-1])
+            nt_ends_total += nt_in_ends
+            ins_len = []
+            for seed in seeds:
+                nt_in_seeds += seed.size
+                nt_seeds_total += seed.size
+            for nuc_seq in insertions[1:-1]:
+                nt_in_ins += len(nuc_seq)
+                ins_len.append(len(nuc_seq))
+                nt_insertion_total += len(nuc_seq)
+                if len(nuc_seq) > 0:
+                    num_insertions += 1
+                if len(nuc_seq) == 1:
+                    num_insertions_size_one += 1
+                if len(nuc_seq) >= 100:
+                    num_insertions_larger_eq_hundred += 1
+            req_len_total += len(reconstr_contig)
+            print(name, contig_name, nt_in_seeds, nt_in_ins, nt_in_ends, len(assembly), len(reconstr_contig), sep="\t")
+            for l in ins_len:
+                if not l in buckets:
+                    buckets[l] = 0
+                buckets[l] += 1
+        print(name, "nt in insertion total:", nt_insertion_total)
+        print(name, "nt in seeds total:", nt_seeds_total)
+        print(name, "nt in ends total:", nt_ends_total)
+        print(name, "reconstr len total:", req_len_total)
+        if nt_insertion_total + nt_seeds_total + nt_ends_total != req_len_total:
+            print("WARNING: lengths do not match up:", nt_insertion_total + nt_seeds_total)
+        print(name, "there are", num_insertions, "insertions in total,", num_insertions_size_one,
+             "are of size 1 nt and", num_insertions_larger_eq_hundred, "are of size >= 100 nt.")
+        MS.util.ksw_file_system_min_gb_size = ksw_file_system_min_gb_size
+        if False:
+            indel_distrib = figure(title="Insertion distrib", y_axis_type="log", plot_width=1000, plot_height=1000)
+            indel_distrib.vbar(x=[key for key, _ in buckets.items()],
+                                width=4/5,
+                                top=[val for _, val in buckets.items()],
+                                bottom=0.1,
+                                color="blue")
+            indel_distrib.xaxis.axis_label = "Amount"
+            indel_distrib.yaxis.axis_label = "Insertion length"
+            out.append(indel_distrib)
 
 
-    if True:
-        seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, 1)
-        out.append(render_seeds(seeds_n_rects, query_genome, reference_genome, "assembly on reference",
-                                "Sequenced Genome", "Reference Genome"))
+        if True:
+            seeds_n_rects = compute_seeds(query_genome, reference_genome, db_name, 1)
+            out.append(render_seeds(seeds_n_rects, query_genome, reference_genome, "assembly on reference",
+                                    "Sequenced Genome", "Reference Genome"))
 
-    if True:
-        seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, [], []) for name, seeds, _ in seeds_list]
-        out.append(render_seeds(seeds_list_display, reconstructed_query_genome_path, reference_genome,
-                                "reconstructed on reference", "Reconstructed Genome", "Reference Genome"))
-    if False:
-        out.append(render_seeds(seeds_list_display, reconstructed_query_genome_path, reference_genome,
-                                "reconstructed on reference (x & y squeezed)", "Reconstructed Genome",
-                                "Reference Genome", True))
+        if True:
+            seeds_list_display = [(reconstructed_query_genome.start_of_sequence(name), seeds, [], []) for name, seeds, _ in seeds_list]
+            out.append(render_seeds(seeds_list_display, reconstructed_query_genome_path, reference_genome,
+                                    "reconstructed on reference", "Reconstructed Genome", "Reference Genome"))
+        if False:
+            out.append(render_seeds(seeds_list_display, reconstructed_query_genome_path, reference_genome,
+                                    "reconstructed on reference (x & y squeezed)", "Reconstructed Genome",
+                                    "Reference Genome", True))
 
-    if True:
-        seeds_n_rects_reconstr = compute_seeds(reconstructed_query_genome_path, query_genome, db_name, 1)
-        out.append(render_seeds(seeds_n_rects_reconstr, reconstructed_query_genome_path, query_genome,
-                                "reconstructed on sequenced genome", "Reconstructed Genome", "Sequenced Genome"))
+        if True:
+            seeds_n_rects_reconstr = compute_seeds(reconstructed_query_genome_path, query_genome, db_name, 1)
+            out.append(render_seeds(seeds_n_rects_reconstr, reconstructed_query_genome_path, query_genome,
+                                    "reconstructed on sequenced genome", "Reconstructed Genome", "Sequenced Genome"))
 
-    if run_ksw:
-        print("NW comparison for reconstruction & sequenced genome")
-        plot = nw_comparison(reconstructed_query_genome, ret_query_genome)
-        out.append(plot)
+        if run_ksw:
+            print("NW comparison for reconstruction & sequenced genome")
+            plot = nw_comparison(reconstructed_query_genome, ret_query_genome)
+            out.append(plot)
 
-    if run_ksw:
-        print("NW comparison for reference & sequenced genome")
-        plot = nw_comparison(pack, ret_query_genome, title="alignments reference on assembly",
-                             y_axis_label="Reference Genome")
-        out.append(plot)
+        if run_ksw:
+            print("NW comparison for reference & sequenced genome")
+            plot = nw_comparison(pack, ret_query_genome, title="alignments reference on assembly",
+                                y_axis_label="Reference Genome")
+            out.append(plot)
 
-    show(row(out))
+        output_file(accuracy_recall_data_dir + "/" + name + ".reconstruction.html")
+        if show_plots:
+            show(row(out))
+        if save_plots:
+            save(row(out))

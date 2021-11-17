@@ -53,15 +53,15 @@ def gridss_interpreter(call, pack, error_file):
             raise Exception("could not classify call")
 
     try:
-        if call["FILTER"] != "PASS":
-            return None, ""
+        #if call["FILTER"] != "PASS":
+        #    return None, ""
         if call["INFO"]["SVTYPE"] == "BND":
             if "MATEID" in call["INFO"]:
                 if call["INFO"]["MATEID"] in bnd_mate_dict_gridss:
                     ins = get_insertion(call)
                     mate = bnd_mate_dict_gridss[call["INFO"]["MATEID"]]
-                    from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"])
-                    to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+                    from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"]) - 1
+                    to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - 1
                     my_case = get_case(call)
                     mate_case = get_case(mate)
                     # W -> Y
@@ -81,15 +81,16 @@ def gridss_interpreter(call, pack, error_file):
                     to_forw = not from_forw if reverses else from_forw
                     del bnd_mate_dict_gridss[call["INFO"]["MATEID"]]
                     return SvJump(from_pos, to_pos, 0, len(ins), from_forw, to_forw, find_confidence(call), \
-                                  call["line_idx"], -1), ins
+                                  -1, -1), ins, call["ID"] + "/" + mate["ID"] + ", line: " + str(call["line_idx"]) + \
+                                  "/" + str(mate["line_idx"])
                 else:
                     bnd_mate_dict_gridss[call["ID"]] = call
-                    return None, ""
+                    return None, "", ""
             else:
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - 1
                 ins = call["ALT"][:-1]
                 return SvJump(from_pos, from_pos, 0, len(ins), True, True, find_confidence(call), \
-                              call["line_idx"], -1), ins
+                              -1, -1), ins, call["ID"] + ", line: " + str(call["line_idx"])
         else:
             raise Exception("could not classify call")
 
@@ -174,6 +175,7 @@ def parse_and_insert(file_name, db_name, reference_genome, caller_name="gridss")
     JumpRunTable(db_conn)
     SvCallerRunTable(db_conn)
     sv_call_table = SvCallTable(db_conn)
+    sv_call_desc_table = CallDescTable(db_conn)
     #call_per_contig_table = FirstCallPerContigTable(db_conn)
     caller_run_id = GetCallInserter(parameter_set_manager, db_conn, caller_name + " - Large",
                                    "SV's form genome assembly that are too long for Illumina reads", -1).cpp_module.id
@@ -189,7 +191,7 @@ def parse_and_insert(file_name, db_name, reference_genome, caller_name="gridss")
     cnt_contig_border = 0
     with open(file_name + ".vcf_errors.log", "w") as error_file:
         for vcf_call in vcf_parser(file_name):
-            jump, ins = gridss_interpreter(vcf_call, pack, error_file)
+            jump, ins, call_desc = gridss_interpreter(vcf_call, pack, error_file)
             if not jump is None:
                 f = jump.from_pos
                 t = jump.to_pos
@@ -207,20 +209,21 @@ def parse_and_insert(file_name, db_name, reference_genome, caller_name="gridss")
                     f = t
                     t = tmp
 
-                call = SvCall(f, t, 0, 0, jump.from_forward, jump.to_forward, 1, jump.num_supp_nt())
+                call = SvCall(f, t, 0, 0, jump.from_forward, jump.to_forward, jump.num_supp_nt(), jump.num_supp_nt())
                 call.inserted_sequence = NucSeq(ins)
                 call.inserted_sequence.check()
-                call.id = jump.id
                 call.mirrored = jump.was_mirrored
+                call_id = 0 # no-op
                 if contig_filter.cpp_module.by_contig_border(jump, pack):
                     cnt_contig_border += 1
-                    sv_call_table.insert_call(contig_border_caller_run_id, call)
+                    call_id = sv_call_table.insert_call(contig_border_caller_run_id, call)
                 elif max(abs(f - t), len(ins)) < min_size:
                     cnt_small += 1
-                    sv_call_table.insert_call(small_caller_run_id, call)
+                    call_id = sv_call_table.insert_call(small_caller_run_id, call)
                 else:
                     cnt_large += 1
-                    sv_call_table.insert_call(caller_run_id, call)
+                    call_id = sv_call_table.insert_call(caller_run_id, call)
+                sv_call_desc_table.insert(call_id, call_desc)
 
 
     print("Inserted into DB. There are", cnt_small, "small and", cnt_large, "large entries.", cnt_contig_border,

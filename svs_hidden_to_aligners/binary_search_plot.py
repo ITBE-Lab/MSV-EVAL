@@ -79,7 +79,7 @@ class NWTestSet:
     def __init__(self, name="SW"):
         self.sw = lambda x,y,z: sw(x,y,z)
         self._name = name
-        self.c = "purple"
+        self.c = "grey"#"purple"
         self.c2 = "pink"
 
         self._display_name = "NW Alignment"
@@ -146,7 +146,7 @@ class SeedsTestSet:
                     size=point_to_px(7), line_width=point_to_px(2))
 
     def color(self):
-        return "blue"
+        return "black"#"blue"
     def color_light(self):
         return "lightblue"
 
@@ -169,17 +169,22 @@ class GraphAligner:
                     size=point_to_px(7), line_width=point_to_px(2))
 
     def color(self):
-        return "black"#"teal"
+        return "blue"
     def color_light(self):
-        return "lightteal"
+        return "lightblue"
 
 def print_n_write(s, f):
     print(s, end="")
     f.write(s)
 
-default_test_set = [GraphAligner(), MM2TestSet(), SeedsTestSet(False, True), MATestSet(),  NWTestSet(),
+default_test_set = [
+                    NWTestSet(),
+                    SeedsTestSet(False, True), 
+                    MATestSet(),  
+                    MM2TestSet(), 
+                    NgmlrTestSet(),
+                    GraphAligner(), 
                     #MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), 
-                    NgmlrTestSet()
                     ]
 #default_test_set = [MATestSet(), MM2TestSet(), SeedsTestSet(False, False)]
 
@@ -188,7 +193,7 @@ default_range = range(50, 500, 50)
 
 def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocation_overlap",
                     test_sets=default_test_set, sv_sizes=default_range, read_size=20000, num_reads=1000):
-    #return
+    return
     params = ParameterSetManager()
     params.set_selected("SV-PacBio")
 
@@ -231,7 +236,7 @@ def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocatio
 
 def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scattered read", 
                             test_sets_1=default_test_set, x_label="SV Size [nt]", save_svg=False):
-    for inv in [False, True]:
+    for inv in [False]: #, True]:
         with open(sv_hidden_to_aligners_data_dir + "/" + file_name_in + ".tsv", "r") as file_in:
             output_file(sv_hidden_to_aligners_data_dir + "/bokeh_out_" + ("inv-" if inv else "") + \
                         file_name_in + ".html")
