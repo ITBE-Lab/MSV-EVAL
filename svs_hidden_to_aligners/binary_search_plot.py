@@ -179,11 +179,11 @@ def print_n_write(s, f):
 
 default_test_set = [
                     NWTestSet(),
-                    SeedsTestSet(False, True), 
-                    MATestSet(),  
-                    MM2TestSet(), 
+                    SeedsTestSet(False, True),
+                    MATestSet(),
+                    MM2TestSet(),
                     NgmlrTestSet(),
-                    GraphAligner(), 
+                    GraphAligner(),
                     #MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), 
                     ]
 #default_test_set = [MATestSet(), MM2TestSet(), SeedsTestSet(False, False)]

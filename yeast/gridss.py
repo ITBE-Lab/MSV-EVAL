@@ -87,10 +87,12 @@ def gridss_interpreter(call, pack, error_file):
                     bnd_mate_dict_gridss[call["ID"]] = call
                     return None, "", ""
             else:
-                from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - 1
-                ins = call["ALT"][:-1]
-                return SvJump(from_pos, from_pos, 0, len(ins), True, True, find_confidence(call), \
-                              -1, -1), ins, call["ID"] + ", line: " + str(call["line_idx"])
+                return None, "", ""
+                # These calls indicate that a breakpoint was found at this location but the partner location could not be unambiguously determined. -> cannot evaluate this
+                #from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - 1
+                #ins = call["ALT"][:-1]
+                #return SvJump(from_pos, from_pos, 0, len(ins), True, True, find_confidence(call), \
+                #              -1, -1), ins, call["ID"] + ", line: " + str(call["line_idx"])
         else:
             raise Exception("could not classify call")
 

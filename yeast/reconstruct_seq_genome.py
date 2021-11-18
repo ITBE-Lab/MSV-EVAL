@@ -89,7 +89,7 @@ ground_throuth_large = 6
 to_analyze = [
     #(5, 3, "Gridss"), # Gridss: small, large ## DEFAULT
     (15, 13, "Gridss"), # Gridss: small, large
-    (1, 2, "MA") # MA: small, large
+    #(1, 2, "MA") # MA: small, large
 ]
 
 if True:
