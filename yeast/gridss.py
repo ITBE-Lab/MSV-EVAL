@@ -104,13 +104,13 @@ def gridss_interpreter(call, pack, error_file):
         else:
             from_pos, to_pos = find_from_and_to_pos(call)
             if call["ALT"] == "<DUP:TANDEM>":
-                return SvJump(to_pos, from_pos, 0, 0, True, True, find_confidence(call), -1, -1), \
+                return SvJump(to_pos, from_pos-1, 0, 0, True, True, find_confidence(call), -1, -1), \
                                   "", call["ID"] + ", line: " + str(call["line_idx"])
             elif call["ALT"] == "<DUP>":
                 print("WARNING: non-tandem dup ignored")
                 return None, "", ""
             elif call["INFO"]["SVTYPE"] == "DEL":
-                return SvJump(from_pos, to_pos, 0, 0, True, True, find_confidence(call), -1, -1), \
+                return SvJump(from_pos-1, to_pos, 0, 0, True, True, find_confidence(call), -1, -1), \
                                   "", call["ID"] + ", line: " + str(call["line_idx"])
             elif call["INFO"]["SVTYPE"] == "INS":
                 return SvJump(from_pos, from_pos, 0, calls["INFO"]["SVINSLEN"], True, True, find_confidence(call),
@@ -284,11 +284,11 @@ def main():
     #bwa(read_json, path_sam + ".sam", json_dict)
     #sam_to_bam(path_sam)
     #gridss(path_sam + ".sorted.bam", gridss_data_dir+".gridss.vcf", genome_dir+"fasta/genome.fna")
-    #manta(path_sam + ".sorted.bam", gridss_data_dir+".manta.vcf", genome_dir+"fasta/genome.fna")
+    manta(path_sam + ".sorted.bam", gridss_data_dir+".manta.vcf", genome_dir+"fasta/genome.fna")
 
-    run_id = parse_and_insert(gridss_data_dir+".gridss.vcf", db_name, genome_dir+"ma/genome")
+    #run_id = parse_and_insert(gridss_data_dir+".gridss.vcf", db_name, genome_dir+"ma/genome")
     print("run_id gridss", run_id)
-    #run_id = parse_and_insert(gridss_data_dir+".manta.vcf", db_name, genome_dir+"ma/genome", "manta")
+    run_id = parse_and_insert(gridss_data_dir+".manta.vcf", db_name, genome_dir+"ma/genome", "manta")
     print("run_id manta", run_id)
 
 main()

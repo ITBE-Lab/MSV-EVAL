@@ -347,6 +347,12 @@ def insertion(l, j):
         Seed((j+2)*l, (j+1)*l, (j+1)*l, True),      # 1
     ], "insertion", [random_nuc_seq(l), ""])
 
+def deletion(l, j):
+    return ([
+        Seed(0, (j+1)*l, 0, True),                  # 0
+        Seed((j+1)*l, (j+1)*l, (j+2)*l, True),      # 1
+    ], "deletion", ["", ""])
+
 def check_insertion(seq, ref, insertions, j, l):
     assert seq[:(j+1)*l] == ref[:(j+1)*l]
     assert seq[(j+1)*l:(j+2)*l] == insertions[0]
@@ -358,6 +364,14 @@ def duplication(l, j):
         Seed(0, (j+1)*l, 0, True),                  # 0
         Seed((j+1)*l, (j+1)*l, (j+0)*l, True),      # 1
     ], "duplication", ["", ""])
+
+def duplication_non_tandem(l, j):
+    add = 5
+    return ([
+        Seed(0, (j+2+add)*l, 0, True),                      # 0
+        Seed((j+2+add)*l, l, (j+0)*l, True),                # 1
+        Seed((j+3+add)*l, (j+1)*l, (j+3+add)*l, True),      # 2
+    ], "duplication_non_tandem", ["", "", ""])
 
 def duplication_and_insertion(l, j):
     return ([
@@ -374,16 +388,16 @@ def inversion_after_inversion(l, j):
         Seed((j+4)*l, (j+1)*l, (j+4)*l, True),      # 4
     ], "inversion_after_inversion", ["", "", "", "", ""])
 
-#l = 1000
-l = 100
+l = 1000
+#l = 100
 j = 10
 coverage = 100
 read_size = 2*l-1
 callers = [
-    (sniffles, "sniffles", sniffles_interpreter, "single"),
-    #(manta, "manta", manta_interpreter, "paired"),
-    (delly, "delly", delly_interpreter, "paired"),
-    (gridss, "gridss", gridss_interpreter, "paired"),
+    #(sniffles, "sniffles", sniffles_interpreter, "single"),
+    (manta, "manta", manta_interpreter, "paired"),
+    #(delly, "delly", delly_interpreter, "paired"),
+    #(gridss, "gridss", gridss_interpreter, "paired"),
     #(pbSv, "pbSv", pb_sv_interpreter),
 ]
 paired_dist = 100
@@ -442,10 +456,10 @@ if __name__ == "__main__":
 
     svs = [
         #(negative_control, get_ref_section, None),
-        #(inversion, get_ref_section, None),
+        (inversion, get_ref_section, None),
         #(four_nested_svs_calls, get_ref_section, None),
         #(inversion_in_inversion, get_ref_section, None),
-        (inversion_in_inversion_2, get_ref_section, None), # selected
+        #(inversion_in_inversion_2, get_ref_section, None), # selected
         #(insertion_in_inversion, get_ref_section, None),
         #(inversion_in_translocation, get_ref_section, None),
         #(inversion_in_translocation_separate_breakends, get_ref_section, None),
@@ -455,9 +469,9 @@ if __name__ == "__main__":
         #(translocation_in_duplication, get_ref_section, None),
         #(duplication_of_inversion, get_ref_section, None),
         #(overlapping_inversions_in_duplication, get_ref_section, None), # selected
-        (inverted_duplication, get_ref_section, None), # selected
-        (duplicated_inversion, get_ref_section, None), # selected
-        (inversion_after_duplication, get_ref_section, None), # selected
+        #(inverted_duplication, get_ref_section, None), # selected
+        #(duplicated_inversion, get_ref_section, None), # selected
+        #(inversion_after_duplication, get_ref_section, None), # selected
         #(triple_inversion, get_ref_section, None),
         #(overlapping_inversions, get_ref_section, None),
         #(overlapping_inversions_2, get_ref_section, None),
@@ -479,10 +493,12 @@ if __name__ == "__main__":
         #(double_insertion_diff, get_ref_section, None),
         #(insertion_and_deletion, get_ref_section, None),
         #(insertion_and_inversion, get_ref_section, None),
-        #(insertion, get_ref_section, check_insertion),
-        #(duplication, get_ref_section, None),
+        (insertion, get_ref_section, check_insertion),
+        (deletion, get_ref_section, None),
+        (duplication, get_ref_section, None),
+        (duplication_non_tandem, get_ref_section, None),
         #(duplication_and_insertion, get_ref_section, None),
-        (inversion_after_inversion, get_ref_section, None),
+        #(inversion_after_inversion, get_ref_section, None),
     ]
 
     output_file(ambiguities_of_atomic_sv_data_dir + "/bokeh_out_perfect_alignments_experiment.html")

@@ -163,7 +163,7 @@ def manta_interpreter(call, pack, error_file):
         elif call["ALT"] == "<DUP>":
             to_insert.append((from_pos, to_pos, str(manta_id), call["ALT"] + "-conf:" + str(find_confidence(call))))
         elif call["INFO"]["SVTYPE"] == "DEL":
-            to_insert.append((from_pos, to_pos, str(manta_id), call["ALT"] + "-conf:" + str(find_confidence(call))))
+            to_insert.append((from_pos-1, to_pos, str(manta_id), call["ALT"] + "-conf:" + str(find_confidence(call))))
         elif call["INFO"]["SVTYPE"] == "INS":
             to_insert.append((from_pos, to_pos, str(manta_id), call["ALT"] + "-conf:" + str(find_confidence(call))))
         elif call["INFO"]["SVTYPE"] == "BND":
