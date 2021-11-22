@@ -184,7 +184,7 @@ default_test_set = [
                     MM2TestSet(),
                     NgmlrTestSet(),
                     GraphAligner(),
-                    #MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), 
+                    MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), 
                     ]
 #default_test_set = [MATestSet(), MM2TestSet(), SeedsTestSet(False, False)]
 
@@ -193,7 +193,7 @@ default_range = range(50, 500, 50)
 
 def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocation_overlap",
                     test_sets=default_test_set, sv_sizes=default_range, read_size=20000, num_reads=1000):
-    return
+    #return
     params = ParameterSetManager()
     params.set_selected("SV-PacBio")
 

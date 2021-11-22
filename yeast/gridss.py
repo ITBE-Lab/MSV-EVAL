@@ -7,7 +7,7 @@ import os
 import fnmatch
 from sv_util.os_aligners import bwa, sam_to_bam
 from sv_util.settings import *
-from ambiguities_of_atomic_sv.os_sv_callers import gridss
+from ambiguities_of_atomic_sv.os_sv_callers import gridss, manta
 from ambiguities_of_atomic_sv.vcf_interpreters import log_error
 
 #genome_dir = global_prefix + "genome/human/GRCh38.p12/"
@@ -21,7 +21,7 @@ def regex_match(folder, regex):
             l.append(folder + str(file))
     return l
 
-bnd_mate_dict_gridss = {}
+bnd_mate_dict = {}
 def gridss_interpreter(call, pack, error_file):
     def find_confidence(call):
         if call["FILTER"] != "PASS":
@@ -52,14 +52,22 @@ def gridss_interpreter(call, pack, error_file):
         else:
             raise Exception("could not classify call")
 
+    def find_from_and_to_pos(call):
+        from_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"])
+        if "END" in call["INFO"]:
+            to_pos = int(call["INFO"]["END"]) + pack.start_of_sequence(call["CHROM"])
+        else:
+            to_pos = 0
+        return from_pos, to_pos
+
     try:
         #if call["FILTER"] != "PASS":
         #    return None, ""
         if call["INFO"]["SVTYPE"] == "BND":
             if "MATEID" in call["INFO"]:
-                if call["INFO"]["MATEID"] in bnd_mate_dict_gridss:
+                if call["INFO"]["MATEID"] in bnd_mate_dict:
                     ins = get_insertion(call)
-                    mate = bnd_mate_dict_gridss[call["INFO"]["MATEID"]]
+                    mate = bnd_mate_dict[call["INFO"]["MATEID"]]
                     from_pos = int(mate["POS"]) + pack.start_of_sequence(mate["CHROM"]) - 1
                     to_pos = int(call["POS"]) + pack.start_of_sequence(call["CHROM"]) - 1
                     my_case = get_case(call)
@@ -79,12 +87,12 @@ def gridss_interpreter(call, pack, error_file):
                     starts_on_reverse = combined_case_3
                     from_forw = not starts_on_reverse
                     to_forw = not from_forw if reverses else from_forw
-                    del bnd_mate_dict_gridss[call["INFO"]["MATEID"]]
+                    del bnd_mate_dict[call["INFO"]["MATEID"]]
                     return SvJump(from_pos, to_pos, 0, len(ins), from_forw, to_forw, find_confidence(call), \
                                   -1, -1), ins, call["ID"] + "/" + mate["ID"] + ", line: " + str(call["line_idx"]) + \
                                   "/" + str(mate["line_idx"])
                 else:
-                    bnd_mate_dict_gridss[call["ID"]] = call
+                    bnd_mate_dict[call["ID"]] = call
                     return None, "", ""
             else:
                 return None, "", ""
@@ -94,7 +102,22 @@ def gridss_interpreter(call, pack, error_file):
                 #return SvJump(from_pos, from_pos, 0, len(ins), True, True, find_confidence(call), \
                 #              -1, -1), ins, call["ID"] + ", line: " + str(call["line_idx"])
         else:
-            raise Exception("could not classify call")
+            from_pos, to_pos = find_from_and_to_pos(call)
+            if call["ALT"] == "<DUP:TANDEM>":
+                return SvJump(to_pos, from_pos, 0, 0, True, True, find_confidence(call), -1, -1), \
+                                  "", call["ID"] + ", line: " + str(call["line_idx"])
+            elif call["ALT"] == "<DUP>":
+                print("WARNING: non-tandem dup ignored")
+                return None, "", ""
+            elif call["INFO"]["SVTYPE"] == "DEL":
+                return SvJump(from_pos, to_pos, 0, 0, True, True, find_confidence(call), -1, -1), \
+                                  "", call["ID"] + ", line: " + str(call["line_idx"])
+            elif call["INFO"]["SVTYPE"] == "INS":
+                return SvJump(from_pos, from_pos, 0, calls["INFO"]["SVINSLEN"], True, True, find_confidence(call),
+                              -1, -1), \
+                                  "", call["ID"] + ", line: " + str(call["line_idx"])
+            else:
+                raise Exception("could not classify call")
 
     except Exception as e:
         log_error(call, error_file, "gridss", e)
@@ -185,12 +208,17 @@ def parse_and_insert(file_name, db_name, reference_genome, caller_name="gridss")
                                    "SV's form genome assembly that are not covered by any alignments", -1).cpp_module.id
     small_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, caller_name + " - Small",
                                    "SV's form genome assembly that are too small for pacBio reads", -1).cpp_module.id
+    small_lt_ten_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, caller_name + " - Small < 10",
+                                   "SV's form genome assembly that are too small for pacBio reads", -1).cpp_module.id
 
     contig_filter = JumpsFilterContigBorder(parameter_set_manager)
 
+    cnt_lt_ten = 0
     cnt_small = 0
     cnt_large = 0
     cnt_contig_border = 0
+    global bnd_mate_dict
+    bnd_mate_dict = {}
     with open(file_name + ".vcf_errors.log", "w") as error_file:
         for vcf_call in vcf_parser(file_name):
             jump, ins, call_desc = gridss_interpreter(vcf_call, pack, error_file)
@@ -221,15 +249,25 @@ def parse_and_insert(file_name, db_name, reference_genome, caller_name="gridss")
                     call_id = sv_call_table.insert_call(contig_border_caller_run_id, call)
                 elif max(abs(f - t), len(ins)) < min_size:
                     cnt_small += 1
-                    call_id = sv_call_table.insert_call(small_caller_run_id, call)
+                    if max(abs(f - t), len(ins)) < 10:
+                        cnt_lt_ten += 1
+                        call_id = sv_call_table.insert_call(small_lt_ten_caller_run_id, call)
+                    else:
+                        call_id = sv_call_table.insert_call(small_caller_run_id, call)
                 else:
                     cnt_large += 1
                     call_id = sv_call_table.insert_call(caller_run_id, call)
                 sv_call_desc_table.insert(call_id, call_desc)
+    
+    print("generating indices...")
+    sv_call_table.gen_indices(caller_run_id)
+    sv_call_table.gen_indices(contig_border_caller_run_id)
+    sv_call_table.gen_indices(small_lt_ten_caller_run_id)
+    sv_call_table.gen_indices(small_caller_run_id)
 
 
     print("Inserted into DB. There are", cnt_small, "small and", cnt_large, "large entries.", cnt_contig_border,
-          "entries are too close to contig borders and are filtered out.")
+          "entries are too close to contig borders and are filtered out.", cnt_lt_ten, "entries were ignored as they are smaller than 10.")
 
     return caller_run_id
 
@@ -246,8 +284,11 @@ def main():
     #bwa(read_json, path_sam + ".sam", json_dict)
     #sam_to_bam(path_sam)
     #gridss(path_sam + ".sorted.bam", gridss_data_dir+".gridss.vcf", genome_dir+"fasta/genome.fna")
+    #manta(path_sam + ".sorted.bam", gridss_data_dir+".manta.vcf", genome_dir+"fasta/genome.fna")
 
     run_id = parse_and_insert(gridss_data_dir+".gridss.vcf", db_name, genome_dir+"ma/genome")
-    print("run_id", run_id)
+    print("run_id gridss", run_id)
+    #run_id = parse_and_insert(gridss_data_dir+".manta.vcf", db_name, genome_dir+"ma/genome", "manta")
+    print("run_id manta", run_id)
 
 main()

@@ -35,6 +35,7 @@ def run_ma(pack, read_datasets, individual="HG002", parameter_set="SV-PacBio"):
     seq_ids = load_reads(individual, param, read_datasets)
     sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index)
     print("caller_id", sv_caller_run_id)
+    return sv_caller_run_id
 
 
 def simulate_reads():
@@ -45,7 +46,7 @@ def simulate_reads():
     os.system(dwgsim_path + " -r 0 -1 250 -2 250 /MAdata/genome/yeasts/UFRJ50816/fasta/genome.fna /MAdata/ena/simulated/UFRJ50816/Illumina-250/")
 
 if True:
-    simulate_reads()
+    #simulate_reads()
 
     pack = Pack()
     pack.load(genome_dir + "ma/genome")
@@ -70,19 +71,25 @@ if True:
     #       parameter_set="SV-PacBio")
 
     ## simulated reads
-    run_ma(pack,
-           [("SimulatedIllumina",
-             regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-250/", "*.bwa.read*.fastq.gz"),
-             None,
-             100),],
-           individual="UFRJ50816",
-           parameter_set="SV-Illumina")
-    run_ma(pack,
-           [("SimulatedPacBio",
-             regex_match(read_data_dir + "simulated/UFRJ50816/pacbio_CCS/", "*.fasta"),
-             None,
-             100)],
-           individual="UFRJ50816", 
-           parameter_set="SV-PacBio")
+    if False:
+        run_id = run_ma(pack,
+                        [("SimulatedIllumina",
+                            regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-250/", "*.bwa.read*.fastq.gz"),
+                            None,
+                            100),],
+                        individual="UFRJ50816",
+                        parameter_set="SV-Illumina")
+    else:
+        run_id = 1
+    SvCallTable(DbConn("UFRJ50816")).extract_small_calls(run_id, 10, "MA < 10nt",
+                                                          "Illumina based MA calls smaller than 10nt")
+    if False:
+        run_ma(pack,
+            [("SimulatedPacBio",
+                regex_match(read_data_dir + "simulated/UFRJ50816/pacbio_CCS/", "*.fasta"),
+                None,
+                100)],
+            individual="UFRJ50816", 
+            parameter_set="SV-PacBio")
 
 

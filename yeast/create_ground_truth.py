@@ -131,7 +131,9 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, nam
                                    "SV's form genome assembly that are too long for Illumina reads", -1).cpp_module.id
     contig_border_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, name + " - Contig Border",
                                    "SV's form genome assembly that are not covered by any alignments", -1).cpp_module.id
-    small_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, name + " - Small",
+    small_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, name + " - Small >=10",
+                                   "SV's form genome assembly that are too small for pacBio reads", -1).cpp_module.id
+    small_lt_ten_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, name + " - Small <10 ",
                                    "SV's form genome assembly that are too small for pacBio reads", -1).cpp_module.id
     contig_start_caller_run_id = GetCallInserter(parameter_set_manager, db_conn, name + " - Contig Start",
                                    "SV's form genome assembly that are not covered by any alignments", -1).cpp_module.id
@@ -142,6 +144,7 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, nam
     contig_filter = JumpsFilterContigBorder(parameter_set_manager)
 
     cnt_small = 0
+    cnt_small_lt_10 = 0
     cnt_large = 0
     cnt_contig_border = 0
 
@@ -183,7 +186,11 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, nam
                 sv_call_table.insert_call(contig_border_caller_run_id, call)
             elif max(abs(f - t), abs(jump.query_from - jump.query_to)) < min_size:
                 cnt_small += 1
-                sv_call_table.insert_call(small_caller_run_id, call)
+                if max(abs(f - t), abs(jump.query_from - jump.query_to)) < 10:
+                    sv_call_table.insert_call(small_lt_ten_caller_run_id, call)
+                    cnt_small_lt_10 += 1
+                else:
+                    sv_call_table.insert_call(small_caller_run_id, call)
             else:
                 cnt_large += 1
                 sv_call_table.insert_call(caller_run_id, call)
@@ -192,7 +199,7 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, nam
             #    call_per_contig_table.insert(call.id, query_genome.name, from_forward)
 
     print("Inserted into DB. There are", cnt_small, "small and", cnt_large, "large entries.", cnt_contig_border,
-          "entries are too close to contig borders and are filtered out.")
+          "entries are too close to contig borders and are filtered out.", cnt_small_ge_10, "small entries are < 10.")
 
     return caller_run_id, None
 

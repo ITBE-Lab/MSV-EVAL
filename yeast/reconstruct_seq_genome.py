@@ -84,27 +84,29 @@ def nw_comparison(reconstructed_query_genome, ret_query_genome,
     plot.line(x=xs, y=ys, line_width=4)
     return plot
 
-ground_throuth_small = 8
-ground_throuth_large = 6
+ground_throuth_lt_ten = 18
+ground_throuth_ge_ten = 17
+ground_throuth_large = 9
 to_analyze = [
     #(5, 3, "Gridss"), # Gridss: small, large ## DEFAULT
-    (15, 13, "Gridss"), # Gridss: small, large
+    (32, 31, 29, 25, 25, "Gridss"), # Gridss: small, large
     #(1, 2, "MA") # MA: small, large
 ]
 
 if True:
-    for small_id, large_id, name in to_analyze:
+    for lt_ten_id, ge_ten_id, large_id, blur_small, blur_large, name in to_analyze:
         print("Analyzing:", name)
         db_name = "UFRJ50816"
         #run_ids = [3, 4, 5, 6]
-        run_ids = [small_id, large_id]
+        run_ids = [lt_ten_id, ge_ten_id, large_id]
 
         db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
         call_table = SvCallTable(db_conn)
 
         print("copying path information... (may take a while)")
-        call_table.copy_path(ground_throuth_small, small_id, 0)
-        call_table.copy_path(ground_throuth_large, large_id, 100)
+        call_table.copy_path(ground_throuth_lt_ten, lt_ten_id, blur_small)
+        call_table.copy_path(ground_throuth_ge_ten, ge_ten_id, blur_small)
+        call_table.copy_path(ground_throuth_large, large_id, blur_large)
         print("done")
 
         jump_table = SvJumpTable(db_conn) # initialize jump table
