@@ -117,8 +117,8 @@ if __name__ == "__main__":
         gt_ge_ten = 35
         gt_large = 33
         run_ids = {
-            gt_lt_ten: [83],#[20, 32, 73, 65],
-            gt_ge_ten: [82],#[1, 5, 72, 64],
+            gt_lt_ten: [90],#[20, 32, 73, 65],
+            gt_ge_ten: [89],#[1, 5, 72, 64],
             gt_large:  [],#[2, 3, 70, 62],
         }
         compute_accuracy_recall("ufrj50816", [0, 25], [gt_lt_ten, gt_ge_ten, gt_large], run_ids,
@@ -128,8 +128,8 @@ if __name__ == "__main__":
         [
             ("/ufrj50816-20-0.tsv", "MSV 0nt", "blue", "solid"),
             ("/ufrj50816-20-25.tsv", "MSV 25nt", "blue", "dotted"),
-            ("/ufrj50816-83-0.tsv", "MSV 0nt 100nt reads", "black", "solid"),
-            ("/ufrj50816-83-25.tsv", "MSV 25nt 100nt reads", "black", "dotted"),
+            ("/ufrj50816-90-0.tsv", "MSV 0nt 100nt reads", "black", "solid"),
+            ("/ufrj50816-90-25.tsv", "MSV 25nt 100nt reads", "black", "dotted"),
             ("/ufrj50816-32-0.tsv", "Gridss 0nt", "orange", "solid"),
             ("/ufrj50816-32-25.tsv", "Gridss 25nt", "orange", "dotted"),
             ("/ufrj50816-65-0.tsv", "Gridss 0nt 100nt reads", "red", "solid"),
@@ -143,8 +143,8 @@ if __name__ == "__main__":
         [
             ("/ufrj50816-1-0.tsv", "MSV 0nt", "blue", "solid"),
             ("/ufrj50816-1-25.tsv", "MSV 25nt", "blue", "dotted"),
-            ("/ufrj50816-82-0.tsv", "MSV 0nt 100nt reads", "black", "solid"),
-            ("/ufrj50816-82-25.tsv", "MSV 25nt 100nt reads", "black", "dotted"),
+            ("/ufrj50816-89-0.tsv", "MSV 0nt 100nt reads", "black", "solid"),
+            ("/ufrj50816-89-25.tsv", "MSV 25nt 100nt reads", "black", "dotted"),
             ("/ufrj50816-5-0.tsv", "Gridss 0nt", "orange", "solid"),
             ("/ufrj50816-5-25.tsv", "Gridss 25nt", "orange", "dotted"),
             ("/ufrj50816-64-0.tsv", "Gridss 0nt 100nt reads", "red", "solid"),

@@ -4,7 +4,7 @@ from MA import *
 from bokeh.models import FactorRange
 from bokeh.models import PrintfTickFormatter
 from bokeh.transform import dodge
-from bokeh.layouts import column
+from bokeh.layouts import column, gridplot
 from bokeh.plotting import save
 from bokeh.io import output_file, export_svgs
 from sv_util.bokeh_style_helper import *
@@ -195,7 +195,7 @@ default_range = range(50, 250, 50)
 def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocation_overlap",
                     test_sets=default_test_set, sv_sizes=default_range, read_sizes=[1000],#[20000, 2000, 1000], 
                     num_reads=1000):
-    #return
+    return
     params = ParameterSetManager()
     params.set_selected("SV-PacBio")
 
@@ -238,13 +238,10 @@ def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocatio
 
 def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scattered read", 
                             test_sets_1=default_test_set, x_label="SV Size [nt]", save_svg=False,
-                            read_sizes=[1000]#[20000, 2000, 1000]
+                            read_sizes=[20000, 2000, 1000]
                             ):
     for read_size in read_sizes:
-        for inv in [False]: #, True]:
             with open(sv_hidden_to_aligners_data_dir + "/" + str(read_size)+"-"+ file_name_in + ".tsv", "r") as file_in:
-                output_file(sv_hidden_to_aligners_data_dir + "/bokeh_out_"+ str(read_size) + ("inv-" if inv else "") + \
-                            file_name_in + ".html")
                 lines = file_in.readlines()
                 header = lines[0]
 
@@ -254,45 +251,45 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
 
                 res = 4
                 xs = [int(x) for x in lines[0].split("\t")[2:]]
-                test_sets = []
-                ys = {}
-                cs = {}
+                xs = [xs[0]] + xs + [xs[-1]]
 
-                w = xs[1] - xs[0]
-                w_2 = w * 0.95
 
                 for line in lines[1:]:
                     cells = line.split("\t")
                     if cells[1] in test_set_dict:
                         test_set = test_set_dict[cells[1]]
-                        test_sets.append(test_set.display_name())
-                        ys[test_set.display_name()] = [float(x) for x in cells[2:]]
-                        cs[test_set.display_name()] = color_scheme(test_set.color())
+                        output_file(sv_hidden_to_aligners_data_dir + "/bokeh_out_"+ str(read_size) + \
+                                    file_name_in + "_" + test_set.name() + ".html")
 
-                l = len(test_sets)
+                        ys = [0] + [float(x) for x in cells[2:]] + [0]
 
-                x_range = [(str(x) , test_set) for test_set in test_sets for x in xs]
-                plot = figure(title=title, plot_height=450, plot_width=600, y_range=(-0.05, 1.1))
-                plot.xaxis.axis_label = x_label
-                plot.yaxis.axis_label = "Recall [%]"
-                plot.yaxis.formatter = NumeralTickFormatter(format='0%')
-                plot.xaxis.ticker = FixedTicker(ticks=xs)
-                w_3 = w_2/l*0.95
-                plot.xgrid.ticker = FixedTicker(ticks=[x + w/2 + w_3/2 for x in [xs[0]-w]+xs])
+                        plot = figure(title=title + " " + test_set.display_name(), plot_height=600, plot_width=600,
+                                      y_range=(0,1), x_range=(xs[0],xs[-1]))
+                        plot.xaxis.axis_label = x_label
+                        plot.yaxis.axis_label = "Recall [%]"
+                        plot.yaxis.formatter = NumeralTickFormatter(format='0%')
+                        plot.yaxis.bounds = (0,1)
+                        plot.xaxis.bounds = (xs[0],xs[-1])
+                        
+                        plot.xaxis.ticker = FixedTicker(ticks=xs[1:-1])
+                        plot.xgrid.ticker = FixedTicker(ticks=xs[1:-1])
+                        yts = [0, .25, .5, .75, 1]
+                        plot.yaxis.ticker = FixedTicker(ticks=yts)
+                        plot.ygrid.ticker = FixedTicker(ticks=yts)
 
-                for idx, test_set in enumerate(test_sets):
-                    plot.vbar(x=[w_3/2 + x - w_2/2 + idx * w_2 / l for x in xs],
-                            top=ys[test_set] if not inv else 100,
-                            bottom=ys[test_set] if inv else 0,
-                            fill_color=cs[test_set], line_color=None,
-                            legend_label=test_set, width=w_3)
 
-                plot.legend.location = "bottom_right"
-                style_plot(plot)
-                plot.output_backend = "svg"
-                if show_plots:
-                    show(plot)
-                if save_plots:
-                    save(plot)
-                    if save_svg:
-                        export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".svg")
+                        plot.patch(
+                            x=xs,
+                            y=ys,
+                            fill_color=color_scheme(test_set.color()),
+                            line_color=color_scheme(test_set.color()),
+                        )
+
+                        style_plot(plot)
+                        plot.output_backend = "svg"
+                        if show_plots:
+                            show(plot)
+                        if save_plots:
+                            save(plot)
+                            if save_svg:
+                                export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".svg")
