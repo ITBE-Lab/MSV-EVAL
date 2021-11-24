@@ -89,8 +89,8 @@ ground_throuth_ge_ten = 17
 ground_throuth_large = 9
 to_analyze = [
     #(5, 3, "Gridss"), # Gridss: small, large ## DEFAULT
-    (32, 31, 29, 25, 25, "Gridss"), # Gridss: small, large
-    #(1, 2, "MA") # MA: small, large
+    #(32, 31, 29, 25, 25, "Gridss"), # Gridss: small, large
+    (20, 1, 2, 0, 25, "MA") # MA: small, large
 ]
 
 if True:
@@ -213,12 +213,12 @@ if True:
                                     "reconstructed on sequenced genome", "Reconstructed Genome", "Sequenced Genome"))
 
         if run_ksw:
-            print("NW comparison for reconstruction & sequenced genome")
+            print("NW comparison for reconstruction & sequenced genome", name)
             plot = nw_comparison(reconstructed_query_genome, ret_query_genome)
             out.append(plot)
 
         if run_ksw:
-            print("NW comparison for reference & sequenced genome")
+            print("NW comparison for reference & sequenced genome", name)
             plot = nw_comparison(pack, ret_query_genome, title="alignments reference on assembly",
                                 y_axis_label="Reference Genome")
             out.append(plot)

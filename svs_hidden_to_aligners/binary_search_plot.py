@@ -49,11 +49,11 @@ class MM2TestSet:
         self._name = name
         self.c = "red"
         if len(mm_extra) > 0:
-            self.c = "black"
+            self.c = "purple"
 
         self.c2 = "lightred"
         if len(mm_extra) > 0:
-            self.c2 = "grey"
+            self.c2 = "purple"
 
         self._display_name = "Minimap 2 Alignment"
         if len(mm_extra) > 0:
@@ -188,11 +188,13 @@ default_test_set = [
                     ]
 #default_test_set = [MATestSet(), MM2TestSet(), SeedsTestSet(False, False)]
 
-default_range = range(50, 500, 50)
+#default_range = range(50, 500, 50)
+default_range = range(50, 250, 50)
 #default_range = range(50, 500, 100)
 
 def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocation_overlap",
-                    test_sets=default_test_set, sv_sizes=default_range, read_size=20000, num_reads=1000):
+                    test_sets=default_test_set, sv_sizes=default_range, read_sizes=[1000],#[20000, 2000, 1000], 
+                    num_reads=1000):
     #return
     params = ParameterSetManager()
     params.set_selected("SV-PacBio")
@@ -202,92 +204,95 @@ def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocatio
     fm_index = FMIndex()
     fm_index.load(human_genome_dir + "/ma/genome")
     mm_index = MinimizerIndex(params, human_genome_dir + "/ma/genome.mmi")
-
-    with open(sv_hidden_to_aligners_data_dir + "/" + str(read_size) + "-" + filename_out + ".tsv", "w") as file_out:
-        # header of outfile
-        print_n_write("read_size\ttest_set", file_out)
-        for sv_size in sv_sizes:
-            print_n_write("\t", file_out)
-            print_n_write(str(sv_size), file_out)
-        print_n_write("\n", file_out)
-
-        # body of outfile
-        read_cache = {}
-        for test_set in test_sets:
-            print_n_write(str(read_size), file_out)
-            print_n_write("\t", file_out)
-            print_n_write(test_set.name(), file_out)
+    for read_size in read_sizes:
+        with open(sv_hidden_to_aligners_data_dir + "/" + str(read_size) + "-" + filename_out + ".tsv", "w") as file_out:
+            # header of outfile
+            print_n_write("read_size\ttest_set", file_out)
             for sv_size in sv_sizes:
                 print_n_write("\t", file_out)
-                if not sv_func is None:
-                    seeds_by_name, read_by_name, genome_section_by_name = \
-                                create_reads(pack, size_func(read_size, sv_size, 0),
-                                                    num_reads,
-                                                    lambda x,y: sv_func(sv_size, 0, x,y))
-                else:
-                    seeds_by_name, read_by_name, genome_section_by_name = \
-                                        create_scattered_read(pack, num_reads,
-                                                                0, sv_size)
-                suffix = filename_out + "-sv_size=" + str(sv_size)
-                acc = test_set.test(params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix,
-                                    genome_section_by_name)
-                print_n_write(str(acc), file_out)
+                print_n_write(str(sv_size), file_out)
             print_n_write("\n", file_out)
 
+            # body of outfile
+            read_cache = {}
+            for test_set in test_sets:
+                print_n_write(str(read_size), file_out)
+                print_n_write("\t", file_out)
+                print_n_write(test_set.name(), file_out)
+                for sv_size in sv_sizes:
+                    print_n_write("\t", file_out)
+                    if not sv_func is None:
+                        seeds_by_name, read_by_name, genome_section_by_name = \
+                                    create_reads(pack, size_func(read_size, sv_size, 0),
+                                                        num_reads,
+                                                        lambda x,y: sv_func(sv_size, 0, x,y))
+                    else:
+                        seeds_by_name, read_by_name, genome_section_by_name = \
+                                            create_scattered_read(pack, num_reads,
+                                                                    0, sv_size)
+                    suffix = filename_out + "-sv_size=" + str(sv_size)
+                    acc = test_set.test(params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix,
+                                        genome_section_by_name)
+                    print_n_write(str(acc), file_out)
+                print_n_write("\n", file_out)
+
 def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scattered read", 
-                            test_sets_1=default_test_set, x_label="SV Size [nt]", save_svg=False):
-    for inv in [False]: #, True]:
-        with open(sv_hidden_to_aligners_data_dir + "/" + file_name_in + ".tsv", "r") as file_in:
-            output_file(sv_hidden_to_aligners_data_dir + "/bokeh_out_" + ("inv-" if inv else "") + \
-                        file_name_in + ".html")
-            lines = file_in.readlines()
-            header = lines[0]
+                            test_sets_1=default_test_set, x_label="SV Size [nt]", save_svg=False,
+                            read_sizes=[1000]#[20000, 2000, 1000]
+                            ):
+    for read_size in read_sizes:
+        for inv in [False]: #, True]:
+            with open(sv_hidden_to_aligners_data_dir + "/" + str(read_size)+"-"+ file_name_in + ".tsv", "r") as file_in:
+                output_file(sv_hidden_to_aligners_data_dir + "/bokeh_out_"+ str(read_size) + ("inv-" if inv else "") + \
+                            file_name_in + ".html")
+                lines = file_in.readlines()
+                header = lines[0]
 
-            test_set_dict = {}
-            for test_set in test_sets_1:
-                test_set_dict[test_set.name()] = test_set
+                test_set_dict = {}
+                for test_set in test_sets_1:
+                    test_set_dict[test_set.name()] = test_set
 
-            res = 4
-            xs = [int(x) for x in lines[0].split("\t")[2:]]
-            test_sets = []
-            ys = {}
-            cs = {}
+                res = 4
+                xs = [int(x) for x in lines[0].split("\t")[2:]]
+                test_sets = []
+                ys = {}
+                cs = {}
 
-            w = xs[1] - xs[0]
-            w_2 = w * 0.95
+                w = xs[1] - xs[0]
+                w_2 = w * 0.95
 
-            for line in lines[1:]:
-                cells = line.split("\t")
-                if cells[1] in test_set_dict:
-                    test_set = test_set_dict[cells[1]]
-                    test_sets.append(test_set.display_name())
-                    ys[test_set.display_name()] = [float(x) for x in cells[2:]]
-                    cs[test_set.display_name()] = color_scheme(test_set.color())
+                for line in lines[1:]:
+                    cells = line.split("\t")
+                    if cells[1] in test_set_dict:
+                        test_set = test_set_dict[cells[1]]
+                        test_sets.append(test_set.display_name())
+                        ys[test_set.display_name()] = [float(x) for x in cells[2:]]
+                        cs[test_set.display_name()] = color_scheme(test_set.color())
 
-            l = len(test_sets)
+                l = len(test_sets)
 
-            x_range = [(str(x) , test_set) for test_set in test_sets for x in xs]
-            plot = figure(title=title, plot_height=450, plot_width=600, y_range=(-0.05, 1.1))
-            plot.xaxis.axis_label = x_label
-            plot.yaxis.axis_label = "Recall [%]"
-            plot.yaxis.formatter = NumeralTickFormatter(format='0%')
-            plot.xaxis.ticker = FixedTicker(ticks=xs)
-            w_3 = w_2/l*0.95
-            plot.xgrid.ticker = FixedTicker(ticks=[x + w/2 + w_3/2 for x in [xs[0]-w]+xs])
+                x_range = [(str(x) , test_set) for test_set in test_sets for x in xs]
+                plot = figure(title=title, plot_height=450, plot_width=600, y_range=(-0.05, 1.1))
+                plot.xaxis.axis_label = x_label
+                plot.yaxis.axis_label = "Recall [%]"
+                plot.yaxis.formatter = NumeralTickFormatter(format='0%')
+                plot.xaxis.ticker = FixedTicker(ticks=xs)
+                w_3 = w_2/l*0.95
+                plot.xgrid.ticker = FixedTicker(ticks=[x + w/2 + w_3/2 for x in [xs[0]-w]+xs])
 
-            for idx, test_set in enumerate(test_sets):
-                plot.vbar(x=[w_3/2 + x - w_2/2 + idx * w_2 / l for x in xs],
-                        top=ys[test_set] if not inv else 100,
-                        bottom=ys[test_set] if inv else 0,
-                        fill_color=cs[test_set], line_color=None,
-                        legend_label=test_set, width=w_3)
+                for idx, test_set in enumerate(test_sets):
+                    plot.vbar(x=[w_3/2 + x - w_2/2 + idx * w_2 / l for x in xs],
+                            top=ys[test_set] if not inv else 100,
+                            bottom=ys[test_set] if inv else 0,
+                            fill_color=cs[test_set], line_color=None,
+                            legend_label=test_set, width=w_3)
 
-            plot.legend.location = "bottom_right"
-            style_plot(plot)
-            plot.output_backend = "svg"
-            if show_plots:
-                show(plot)
-            if save_plots:
-                save(plot)
-                if save_svg:
-                    export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".svg")
+                plot.legend.location = "bottom_right"
+                style_plot(plot)
+                plot.output_backend = "svg"
+                if show_plots:
+                    show(plot)
+                if save_plots:
+                    save(plot)
+                    if save_svg:
+                        export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".svg")

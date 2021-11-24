@@ -22,6 +22,7 @@ def regex_match(folder, regex):
     return l
 
 bnd_mate_dict = {}
+dup_check = {}
 def gridss_interpreter(call, pack, error_file):
     def find_confidence(call):
         if call["FILTER"] != "PASS":
@@ -102,6 +103,10 @@ def gridss_interpreter(call, pack, error_file):
                 #return SvJump(from_pos, from_pos, 0, len(ins), True, True, find_confidence(call), \
                 #              -1, -1), ins, call["ID"] + ", line: " + str(call["line_idx"])
         else:
+            if call["ID"] in dup_check:
+                return None, "", ""
+            else:
+                dup_check[call["ID"]] = call
             from_pos, to_pos = find_from_and_to_pos(call)
             if call["ALT"] == "<DUP:TANDEM>":
                 return SvJump(to_pos, from_pos-1, 0, 0, True, True, find_confidence(call), -1, -1), \
@@ -113,7 +118,7 @@ def gridss_interpreter(call, pack, error_file):
                 return SvJump(from_pos-1, to_pos, 0, 0, True, True, find_confidence(call), -1, -1), \
                                   "", call["ID"] + ", line: " + str(call["line_idx"])
             elif call["INFO"]["SVTYPE"] == "INS":
-                return SvJump(from_pos, from_pos, 0, calls["INFO"]["SVINSLEN"], True, True, find_confidence(call),
+                return SvJump(from_pos, from_pos, 0, int(call["INFO"]["SVLEN"]), True, True, find_confidence(call),
                               -1, -1), \
                                   "", call["ID"] + ", line: " + str(call["line_idx"])
             else:
@@ -267,28 +272,30 @@ def parse_and_insert(file_name, db_name, reference_genome, caller_name="gridss")
 
 
     print("Inserted into DB. There are", cnt_small, "small and", cnt_large, "large entries.", cnt_contig_border,
-          "entries are too close to contig borders and are filtered out.", cnt_lt_ten, "entries were ignored as they are smaller than 10.")
+          "entries are too close to contig borders and are filtered out.", cnt_lt_ten, "entries are smaller than 10.")
 
     return caller_run_id
 
 db_name = "UFRJ50816"
 
 def main():
-    reads = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-250/", "*.bwa.read1.fastq.gz")
-    reads_mates = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-250/", "*.bwa.read2.fastq.gz")
+    for l in [100]:
+        reads = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-"+str(l)+"/", "*.bwa.read1.fastq.gz")
+        reads_mates = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-"+str(l)+"/", "*.bwa.read2.fastq.gz")
 
-    json_dict = {"reference_path":genome_dir}
-    read_json = {"technology":"illumina", "name":"n/a", "fasta_file":", ".join(reads),
-                 "fasta_file_mate":", ".join(reads_mates)}
-    path_sam = gridss_data_dir + ".bwa_alignment"
-    #bwa(read_json, path_sam + ".sam", json_dict)
-    #sam_to_bam(path_sam)
-    #gridss(path_sam + ".sorted.bam", gridss_data_dir+".gridss.vcf", genome_dir+"fasta/genome.fna")
-    manta(path_sam + ".sorted.bam", gridss_data_dir+".manta.vcf", genome_dir+"fasta/genome.fna")
+        json_dict = {"reference_path":genome_dir}
+        read_json = {"technology":"illumina", "name":"n/a", "fasta_file":", ".join(reads),
+                    "fasta_file_mate":", ".join(reads_mates)}
+        path_sam = gridss_data_dir + ".bwa_alignment"
+        if False:
+            bwa(read_json, path_sam + ".sam", json_dict)
+            sam_to_bam(path_sam)
+            gridss(path_sam + ".sorted.bam", gridss_data_dir+".gridss.vcf", genome_dir+"fasta/genome.fna")
+            manta(path_sam + ".sorted.bam", gridss_data_dir+".manta.vcf", genome_dir+"fasta/genome.fna", all_vcf=True)
 
-    #run_id = parse_and_insert(gridss_data_dir+".gridss.vcf", db_name, genome_dir+"ma/genome")
-    print("run_id gridss", run_id)
-    run_id = parse_and_insert(gridss_data_dir+".manta.vcf", db_name, genome_dir+"ma/genome", "manta")
-    print("run_id manta", run_id)
+            run_id = parse_and_insert(gridss_data_dir+".gridss.vcf", db_name, genome_dir+"ma/genome", "gridss-"+str(l))
+            print("run_id gridss", run_id)
+        run_id = parse_and_insert(gridss_data_dir+".manta.vcf", db_name, genome_dir+"ma/genome", "manta-"+str(l))
+        print("run_id manta", run_id)
 
 main()

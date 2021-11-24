@@ -26,7 +26,7 @@ def gridss(bam_file, vcf_file, reference_path):
               " >/dev/null 2>&1")
     os.chdir(curr)
 
-def manta(bam_file, vcf_file, reference_path):
+def manta(bam_file, vcf_file, reference_path, all_vcf=False):
     # prepare manta
     if os.path.exists(vcf_file + ".manta"):
         os.system('rm -rf ' + vcf_file + ".manta")
@@ -37,5 +37,12 @@ def manta(bam_file, vcf_file, reference_path):
     # actually run manta
     os.system("python2 " + vcf_file + ".manta/runWorkflow.py -j 32 -m local >" + vcf_file + ".manta/workflow.stdout.log.txt 2>" + vcf_file + ".manta/workflow.stderr.log.txt" )
 
-    os.system("cp " + vcf_file + ".manta/results/variants/diploidSV.vcf.gz" + " " + vcf_file + ".gz")
-    os.system("gunzip -f " + vcf_file + ".gz")
+    if all_vcf:
+        pre = vcf_file + ".manta/results/variants/"
+        os.system("zcat " + pre + "diploidSV.vcf.gz " +\
+                            pre + "candidateSmallIndels.vcf.gz " +\
+                            pre + "candidateSV.vcf.gz " +\
+                            " > " + vcf_file)
+    else:
+        os.system("cp " + vcf_file + ".manta/results/variants/diploidSV.vcf.gz" + " " + vcf_file + ".gz")
+        os.system("gunzip -f " + vcf_file + ".gz")
