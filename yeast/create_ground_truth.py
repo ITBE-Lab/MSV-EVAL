@@ -199,7 +199,7 @@ def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, nam
             #    call_per_contig_table.insert(call.id, query_genome.name, from_forward)
 
     print("Inserted into DB. There are", cnt_small, "small and", cnt_large, "large entries.", cnt_contig_border,
-          "entries are too close to contig borders and are filtered out.", cnt_small_ge_10, "small entries are < 10.")
+          "entries are too close to contig borders and are filtered out.", cnt_small_lt_10, "small entries are < 10.")
 
     return caller_run_id, None
 

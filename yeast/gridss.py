@@ -279,7 +279,7 @@ def parse_and_insert(file_name, db_name, reference_genome, caller_name="gridss")
 db_name = "UFRJ50816"
 
 def main():
-    for l in [100]:
+    for l in [150]:
         reads = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-"+str(l)+"/", "*.bwa.read1.fastq.gz")
         reads_mates = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-"+str(l)+"/", "*.bwa.read2.fastq.gz")
 
@@ -287,7 +287,7 @@ def main():
         read_json = {"technology":"illumina", "name":"n/a", "fasta_file":", ".join(reads),
                     "fasta_file_mate":", ".join(reads_mates)}
         path_sam = gridss_data_dir + ".bwa_alignment"
-        if False:
+        if True:
             bwa(read_json, path_sam + ".sam", json_dict)
             sam_to_bam(path_sam)
             gridss(path_sam + ".sorted.bam", gridss_data_dir+".gridss.vcf", genome_dir+"fasta/genome.fna")

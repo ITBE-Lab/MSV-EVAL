@@ -43,7 +43,8 @@ def simulate_reads():
                 survivor_error_profile_path + " 100 " + read_data_dir +
                 "simulated/UFRJ50816/pacbio_CCS/survivor_reads.fasta")
     #os.system(dwgsim_path + " -r 0 -1 250 -2 250 /MAdata/genome/yeasts/UFRJ50816/fasta/genome.fna /MAdata/ena/simulated/UFRJ50816/Illumina-250/")
-    os.system(dwgsim_path + " -r 0 -1 100 -2 100 /MAdata/genome/yeasts/UFRJ50816/fasta/genome.fna /MAdata/ena/simulated/UFRJ50816/Illumina-100/")
+    #os.system(dwgsim_path + " -r 0 -1 100 -2 100 /MAdata/genome/yeasts/UFRJ50816/fasta/genome.fna /MAdata/ena/simulated/UFRJ50816/Illumina-100/")
+    #os.system(dwgsim_path + " -r 0 -1 150 -2 150 /MAdata/genome/yeasts/UFRJ50816/fasta/genome.fna /MAdata/ena/simulated/UFRJ50816/Illumina-150/")
 
 if True:
     #simulate_reads()
@@ -78,9 +79,11 @@ if True:
         param.by_name("Min NT in SoC").set(10)
         param.by_name("Minimal Harmonization Score").set(10)
         param.by_name("Min NT after reseeding").set(40)
-        #param.by_name("Min Reads in call").set(5)
-        #param.by_name("Minimizers - k").set(14)
-        #param.by_name("Minimizers - w").set(5)
+        param.by_name("Min Reads in call").set(5)
+        param.by_name("Minimal Seed Size SV").set(13)
+        param.by_name("Max Occ MM Filter").set(400)
+        param.by_name("Minimizers - k").set(12)
+        param.by_name("Minimizers - w").set(8)
         run_id = run_ma(pack,
                         [("SimulatedIllumina",
                             regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-" + ill_size + "/",
