@@ -279,7 +279,7 @@ def parse_and_insert(file_name, db_name, reference_genome, caller_name="gridss")
 db_name = "UFRJ50816"
 
 def main():
-    for l in [150]:
+    for l in [100, 250]:
         reads = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-"+str(l)+"/", "*.bwa.read1.fastq.gz")
         reads_mates = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-"+str(l)+"/", "*.bwa.read2.fastq.gz")
 

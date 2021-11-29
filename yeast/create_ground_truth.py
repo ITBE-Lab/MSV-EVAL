@@ -238,7 +238,7 @@ if True:
     jumps_to_calls_to_db(jumps, db_name, query_genome, reference_genome, "Ground Truth")
     #exit()
 
-    out.append(render_seeds(seeds_n_rects, query_genome, reference_genome))
-    out.append(render_jumps(jumps, query_genome, reference_genome))
-    show(row(out))
+    #out.append(render_seeds(seeds_n_rects, query_genome, reference_genome))
+    #out.append(render_jumps(jumps, query_genome, reference_genome))
+    #show(row(out))
 

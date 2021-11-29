@@ -22,16 +22,16 @@ def load_reads(individual, param, read_datasets):
                                                     f_path_vec_2, coverage=coverage))
     return seq_ids
 
-def compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index):
+def compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index, caller_name):
     jump_id = compute_sv_jumps(param, mm_index, pack, individual, seq_ids)
-    sv_caller_run_id = sweep_sv_jumps(param, individual, jump_id, "MA", "", [0], pack)
+    sv_caller_run_id = sweep_sv_jumps(param, individual, jump_id, caller_name, "", [0], pack)
     return sv_caller_run_id
 
-def run_ma(pack, read_datasets, individual="HG002", param=ParameterSetManager()):
+def run_ma(pack, read_datasets, caller_name, individual="HG002", param=ParameterSetManager()):
     #param.by_name("Do Dummy Jumps").set(False) # required for real world reads
     mm_index = MinimizerIndex(param, pack.contigSeqs(), pack.contigNames())
     seq_ids = load_reads(individual, param, read_datasets)
-    sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index)
+    sv_caller_run_id = compute_jumps_n_calls(individual, param, seq_ids, pack, mm_index, caller_name)
     print("caller_id", sv_caller_run_id)
     return sv_caller_run_id
 
@@ -73,28 +73,34 @@ if True:
 
     ## simulated reads
     if True:
-        ill_size = "100"#"250"
         param = ParameterSetManager()
         param.set_selected("SV-Illumina")
-        param.by_name("Min NT in SoC").set(10)
-        param.by_name("Minimal Harmonization Score").set(10)
-        param.by_name("Min NT after reseeding").set(40)
-        param.by_name("Min Reads in call").set(5)
-        param.by_name("Minimal Seed Size SV").set(13)
-        param.by_name("Max Occ MM Filter").set(400)
-        param.by_name("Minimizers - k").set(12)
-        param.by_name("Minimizers - w").set(8)
         run_id = run_ma(pack,
                         [("SimulatedIllumina",
-                            regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-" + ill_size + "/",
+                            regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-100/",
                                         "*.bwa.read*.fastq.gz"),
                             None,
                             100),],
+                        "MA [10,200)nt 100nt",
                         individual="UFRJ50816",
                         param=param)
-        SvCallTable(DbConn("UFRJ50816")).extract_small_calls(run_id, 10, "MA < 10nt",
+        SvCallTable(DbConn("UFRJ50816")).extract_small_calls(run_id, 10, "MA < 10nt 100nt",
                                                             "Illumina based MA calls smaller than 10nt")
-    if False:
+    if True:
+        param = ParameterSetManager()
+        param.set_selected("SV-Illumina")
+        run_id = run_ma(pack,
+                        [("SimulatedIllumina",
+                            regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-250/",
+                                        "*.bwa.read*.fastq.gz"),
+                            None,
+                            100),],
+                        "MA [10,200)nt 250nt",
+                        individual="UFRJ50816",
+                        param=param)
+        SvCallTable(DbConn("UFRJ50816")).extract_small_calls(run_id, 10, "MA < 10nt 250nt",
+                                                            "Illumina based MA calls smaller than 10nt")
+    if True:
         param = ParameterSetManager()
         param.set_selected("SV-PacBio")
         run_ma(pack,
@@ -102,6 +108,7 @@ if True:
                 regex_match(read_data_dir + "simulated/UFRJ50816/pacbio_CCS/", "*.fasta"),
                 None,
                 100)],
+            "MA >=200nt 250nt",
             individual="UFRJ50816", 
             param=param)
 
