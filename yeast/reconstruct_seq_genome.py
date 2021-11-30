@@ -84,13 +84,13 @@ def nw_comparison(reconstructed_query_genome, ret_query_genome,
     plot.line(x=xs, y=ys, line_width=4)
     return plot
 
-ground_throuth_lt_ten = 18
-ground_throuth_ge_ten = 17
-ground_throuth_large = 9
+ground_throuth_lt_ten = 25
+ground_throuth_ge_ten = 24
+ground_throuth_large = 22
 to_analyze = [
-    #(5, 3, "Gridss"), # Gridss: small, large ## DEFAULT
-    #(32, 31, 29, 25, 25, "Gridss"), # Gridss: small, large
-    (20, 1, 2, 0, 25, "MA") # MA: small, large
+    (9, 8, 6, 25, 25, "Gridss"), # Gridss: small, large
+    (13, 12, 10, 25, 25, "Manta"), # Manta: small, large
+    (4, 3, 5, 0, 25, "MA") # MA: small, large
 ]
 
 if True:

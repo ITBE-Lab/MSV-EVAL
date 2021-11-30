@@ -34,7 +34,7 @@ gridss_data_dir = main_data_folder + "/sv_caller_analysis/yeast_analysis/caller"
 
 # Warning: enabling the NW alignments will cause the machine to use large
 # amounts of Disk & RAM space 
-run_ksw = False
+run_ksw = True
 ksw_file_system_min_gb_size = 8
 
 show_plots = False

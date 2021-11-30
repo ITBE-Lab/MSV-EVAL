@@ -114,13 +114,14 @@ if __name__ == "__main__":
     #                             "ufrj50816-Gridss-Illumina-ge-10")
     dataset = "ufrj50816"
     prefix = "100nt-"
-    gt_lt_ten = 35
-    gt_ge_ten = 34
-    gt_large = 32
-    if True:
+    gt_lt_ten = 25
+    gt_ge_ten = 24
+    gt_large = 22
+    recompute = False
+    if recompute:
         run_ids = {
-            gt_lt_ten: [38, 9, 13],
-            gt_ge_ten: [37, 8, 12],
+            gt_lt_ten: [2, 9, 13],
+            gt_ge_ten: [1, 8, 12],
             gt_large:  [6, 10],
         }
         compute_accuracy_recall("ufrj50816", [0, 25], [gt_lt_ten, gt_ge_ten, gt_large], run_ids,
@@ -128,8 +129,8 @@ if __name__ == "__main__":
 
     render_multi_acc_recall_pic(
         [
-            ("/" + prefix + dataset + "-38-0.tsv", "MSV 0nt", "blue", "solid"),
-            ("/" + prefix + dataset + "-38-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-2-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-2-25.tsv", "MSV 25nt", "blue", "dotted"),
             ("/" + prefix + dataset + "-9-0.tsv", "Gridss 0nt", "orange", "solid"),
             ("/" + prefix + dataset + "-9-25.tsv", "Gridss 25nt", "orange", "dotted"),
             ("/" + prefix + dataset + "-13-0.tsv", "Manta 0nt", "green", "solid"),
@@ -139,8 +140,8 @@ if __name__ == "__main__":
     )
     render_multi_acc_recall_pic(
         [
-            ("/" + prefix + dataset + "-37-0.tsv", "MSV 0nt", "blue", "solid"),
-            ("/" + prefix + dataset + "-37-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-1-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-1-25.tsv", "MSV 25nt", "blue", "dotted"),
             ("/" + prefix + dataset + "-8-0.tsv", "Gridss 0nt", "orange", "solid"),
             ("/" + prefix + dataset + "-8-25.tsv", "Gridss 25nt", "orange", "dotted"),
             ("/" + prefix + dataset + "-12-0.tsv", "Manta 0nt", "green", "solid"),
@@ -156,14 +157,15 @@ if __name__ == "__main__":
             ("/" + prefix + dataset + "-10-0.tsv", "Manta 0nt", "green", "solid"),
             ("/" + prefix + dataset + "-10-25.tsv", "Manta 25nt", "green", "dotted"),
         ],
-        "ufrj50816 [200,inf) 100nt"
+        "ufrj50816 [200,inf) 100nt",
+        x_range=(-0.005,0.055)
     )
 
     prefix = "250nt-"
-    if True:
+    if recompute:
         run_ids = {
-            gt_lt_ten: [40, 17, 21],
-            gt_ge_ten: [39, 16, 20],
+            gt_lt_ten: [4, 17, 21],
+            gt_ge_ten: [3, 16, 20],
             gt_large:  [14, 18],
         }
         compute_accuracy_recall("ufrj50816", [0, 25], [gt_lt_ten, gt_ge_ten, gt_large], run_ids,
@@ -171,8 +173,8 @@ if __name__ == "__main__":
 
     render_multi_acc_recall_pic(
         [
-            ("/" + prefix + dataset + "-40-0.tsv", "MSV 0nt", "blue", "solid"),
-            ("/" + prefix + dataset + "-40-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-4-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-4-25.tsv", "MSV 25nt", "blue", "dotted"),
             ("/" + prefix + dataset + "-17-0.tsv", "Gridss 0nt", "orange", "solid"),
             ("/" + prefix + dataset + "-17-25.tsv", "Gridss 25nt", "orange", "dotted"),
             ("/" + prefix + dataset + "-21-0.tsv", "Manta 0nt", "green", "solid"),
@@ -182,8 +184,8 @@ if __name__ == "__main__":
     )
     render_multi_acc_recall_pic(
         [
-            ("/" + prefix + dataset + "-39-0.tsv", "MSV 0nt", "blue", "solid"),
-            ("/" + prefix + dataset + "-39-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-3-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-3-25.tsv", "MSV 25nt", "blue", "dotted"),
             ("/" + prefix + dataset + "-16-0.tsv", "Gridss 0nt", "orange", "solid"),
             ("/" + prefix + dataset + "-16-25.tsv", "Gridss 25nt", "orange", "dotted"),
             ("/" + prefix + dataset + "-20-0.tsv", "Manta 0nt", "green", "solid"),
@@ -199,20 +201,21 @@ if __name__ == "__main__":
             ("/" + prefix + dataset + "-18-0.tsv", "Manta 0nt", "green", "solid"),
             ("/" + prefix + dataset + "-18-25.tsv", "Manta 25nt", "green", "dotted"),
         ],
-        "ufrj50816 [200,inf) 250nt"
+        "ufrj50816 [200,inf) 250nt",
+        x_range=(-0.005,0.055)
     )
 
     prefix = "pacb-"
-    if True:
+    if recompute:
         run_ids = {
-            gt_large:  [41],
+            gt_large:  [5],
         }
         compute_accuracy_recall("ufrj50816", [0, 25], [gt_large], run_ids,
                                 accuracy_recall_data_dir + "/" + prefix)
     render_multi_acc_recall_pic(
         [
-            ("/" + prefix + dataset + "-41-0.tsv", "MSV 0nt", "blue", "solid"),
-            ("/" + prefix + dataset + "-41-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-5-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-5-25.tsv", "MSV 25nt", "blue", "dotted"),
         ],
         "ufrj50816 [200,inf) pacb"
     )
