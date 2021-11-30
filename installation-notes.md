@@ -103,7 +103,20 @@ if you intend to install MSV permanently, you should add the above export statem
 
 ## Install GraphAligner and VG
 
-    @todo
+    conda install -c bioconda graphaligner
+    wget https://github.com/vgteam/vg/releases/download/v1.36.0/vg
+    chmod +x vg
+
+
+## Install Gridss
+
+    conda create -n gridss gridss
+    conda activate gridss
+
+
+## Install Manta
+
+    conda install manta
 
 
 ## Install Bcftools
