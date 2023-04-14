@@ -42,6 +42,9 @@ using the editor, replace the line "local all postgres peer" with "local all pos
     # restart service
     sudo service postgresql restart
 
+## (Optional) Install pgAdmin4
+
+    pip install pgadmin4
 
 ## Install MSV as a Python Module
 

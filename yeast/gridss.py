@@ -195,10 +195,9 @@ def vcf_parser(file_name):
 def parse_and_insert(file_name, db_name, reference_genome, caller_name="gridss"):
     parameter_set_manager = ParameterSetManager()
     parameter_set_manager.set_selected("SV-PacBio")
-    min_size = parameter_set_manager.by_name("Min Size Edge").get()
+    min_size = 200
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
 
-    
     pack = Pack()
     pack.load(reference_genome)
 

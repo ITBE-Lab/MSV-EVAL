@@ -133,12 +133,15 @@ class SeedsTestSet:
         else:
             return compare_seeds(params, read_by_name, seeds_by_name, fm_index, pack, False, self.reseeding)
     def name(self):
-        return "seeds"
+        if self.reseeding:
+            return "remems"
+        else:
+            return "mems"
     def display_name(self):
         if self.reseeding:
             return "Reseeding"
         if self.mems:
-            return "MEMS"
+            return "MEMs"
         return "Max. Spanning Seeding"
 
     def bokeh_func(self, plot, x, y, c, l):
@@ -179,23 +182,25 @@ def print_n_write(s, f):
 
 default_test_set = [
                     NWTestSet(),
-                    SeedsTestSet(False, True),
+                    SeedsTestSet(False),
                     MATestSet(),
                     MM2TestSet(),
                     NgmlrTestSet(),
                     GraphAligner(),
                     MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), 
                     ]
-#default_test_set = [MATestSet(), MM2TestSet(), SeedsTestSet(False, False)]
+#default_test_set = [ SeedsTestSet(False), MATestSet(),  MM2TestSet(),  ]
 
-#default_range = range(50, 500, 50)
-default_range = range(50, 250, 50)
+default_range = range(50, 500, 50)
+#default_range = range(50, 250, 50)
 #default_range = range(50, 500, 100)
 
 def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocation_overlap",
-                    test_sets=default_test_set, sv_sizes=default_range, read_sizes=[1000],#[20000, 2000, 1000], 
-                    num_reads=1000):
-    return
+                    test_sets=default_test_set, sv_sizes=default_range, read_sizes=[20000, 2000, 1000], 
+                    do_disfigures=[True, False],
+                    num_reads=1000
+                    ):
+    #return
     params = ParameterSetManager()
     params.set_selected("SV-PacBio")
 
@@ -205,43 +210,49 @@ def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocatio
     fm_index.load(human_genome_dir + "/ma/genome")
     mm_index = MinimizerIndex(params, human_genome_dir + "/ma/genome.mmi")
     for read_size in read_sizes:
-        with open(sv_hidden_to_aligners_data_dir + "/" + str(read_size) + "-" + filename_out + ".tsv", "w") as file_out:
-            # header of outfile
-            print_n_write("read_size\ttest_set", file_out)
-            for sv_size in sv_sizes:
-                print_n_write("\t", file_out)
-                print_n_write(str(sv_size), file_out)
-            print_n_write("\n", file_out)
-
-            # body of outfile
-            read_cache = {}
-            for test_set in test_sets:
-                print_n_write(str(read_size), file_out)
-                print_n_write("\t", file_out)
-                print_n_write(test_set.name(), file_out)
+        for do_disfigure in do_disfigures:
+            with open(sv_hidden_to_aligners_data_dir + "/" + str(read_size) + "-" 
+                      + ("w_err" if do_disfigure else "err_free") + "-" + filename_out + ".tsv", "w") as file_out:
+                # header of outfile
+                print_n_write("read_size\ttest_set", file_out)
                 for sv_size in sv_sizes:
                     print_n_write("\t", file_out)
-                    if not sv_func is None:
-                        seeds_by_name, read_by_name, genome_section_by_name = \
-                                    create_reads(pack, size_func(read_size, sv_size, 0),
-                                                        num_reads,
-                                                        lambda x,y: sv_func(sv_size, 0, x,y))
-                    else:
-                        seeds_by_name, read_by_name, genome_section_by_name = \
-                                            create_scattered_read(pack, num_reads,
-                                                                    0, sv_size)
-                    suffix = filename_out + "-sv_size=" + str(sv_size)
-                    acc = test_set.test(params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix,
-                                        genome_section_by_name)
-                    print_n_write(str(acc), file_out)
+                    print_n_write(str(sv_size), file_out)
                 print_n_write("\n", file_out)
 
+                # body of outfile
+                read_cache = {}
+                for test_set in test_sets:
+                    print_n_write(str(read_size), file_out)
+                    print_n_write("\t", file_out)
+                    print_n_write(test_set.name(), file_out)
+                    for sv_size in sv_sizes:
+                        print_n_write("\t", file_out)
+                        if not sv_func is None:
+                            seeds_by_name, read_by_name, genome_section_by_name = \
+                                        create_reads(pack, size_func(read_size, sv_size, 0),
+                                                            num_reads,
+                                                            lambda x,y: sv_func(sv_size, 0, x,y),
+                                                    do_disfigure)
+                        else:
+                            seeds_by_name, read_by_name, genome_section_by_name = \
+                                                create_scattered_read(pack, num_reads,
+                                                                        0, sv_size, do_disfigure)
+                        suffix = filename_out + "-sv_size=" + str(sv_size)
+                        acc = test_set.test(params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix,
+                                            genome_section_by_name)
+                        print_n_write(str(acc), file_out)
+                    print_n_write("\n", file_out)
+
 def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scattered read", 
-                            test_sets_1=default_test_set, x_label="SV Size [nt]", save_svg=False,
-                            read_sizes=[20000, 2000, 1000]
+                            test_sets_1=default_test_set, x_label="SV Size [nt]", save_svg=True,
+                            read_sizes=[20000, 2000, 1000],
+                            do_disfigures=[True, False],
                             ):
     for read_size in read_sizes:
-            with open(sv_hidden_to_aligners_data_dir + "/" + str(read_size)+"-"+ file_name_in + ".tsv", "r") as file_in:
+        for do_disfigure in do_disfigures:
+            with open(sv_hidden_to_aligners_data_dir + "/" + str(read_size)+"-"
+                      + ("w_err" if do_disfigure else "err_free") + "-" + file_name_in + ".tsv", "r") as file_in:
                 lines = file_in.readlines()
                 header = lines[0]
 
@@ -259,7 +270,7 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
                     if cells[1] in test_set_dict:
                         test_set = test_set_dict[cells[1]]
                         output_file(sv_hidden_to_aligners_data_dir + "/bokeh_out_"+ str(read_size) + \
-                                    file_name_in + "_" + test_set.name() + ".html")
+                                    ("w_err" if do_disfigure else "err_free") + "_" + file_name_in + "_" + test_set.name() + ".html")
 
                         ys = [0] + [float(x) for x in cells[2:]] + [0]
 
@@ -292,4 +303,4 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
                         if save_plots:
                             save(plot)
                             if save_svg:
-                                export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + file_name_in + ".svg")
+                                export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + str(read_size) + ("w_err" if do_disfigure else "err_free") + file_name_in + ".svg")

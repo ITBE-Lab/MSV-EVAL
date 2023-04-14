@@ -84,23 +84,25 @@ def nw_comparison(reconstructed_query_genome, ret_query_genome,
     plot.line(x=xs, y=ys, line_width=4)
     return plot
 
-ground_throuth_lt_ten = 25
-ground_throuth_ge_ten = 24
-ground_throuth_large = 22
-to_analyze = [
-    (9, 8, 6, 25, 25, "Gridss"), # Gridss: small, large
-    (13, 12, 10, 25, 25, "Manta"), # Manta: small, large
-    (4, 3, 5, 0, 25, "MA") # MA: small, large
-]
 
 if True:
+    db_name = "UFRJ50816"
+    db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
+    run_table = SvCallerRunTable(db_conn)
+    ground_throuth_lt_ten = run_table.getId("Ground Truth - Small <10 ")
+    ground_throuth_ge_ten = run_table.getId("Ground Truth - Small >=10")
+    ground_throuth_large = run_table.getId("Ground Truth - Large")
+    to_analyze = [
+        #(15, 14, 12, 25, 25, "Gridss"), # Gridss: small, large
+        #(19, 18, 16, 25, 25, "Manta"), # Manta: small, large
+        (run_table.getId("MA < 10nt PacBio"), run_table.getId("MA [10,200)nt PacBio"), 
+         run_table.getId("MA >= 200nt PacBio"), 0, 25, "MA") # MA: small, large
+    ]
     for lt_ten_id, ge_ten_id, large_id, blur_small, blur_large, name in to_analyze:
         print("Analyzing:", name)
-        db_name = "UFRJ50816"
         #run_ids = [3, 4, 5, 6]
         run_ids = [lt_ten_id, ge_ten_id, large_id]
 
-        db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
         call_table = SvCallTable(db_conn)
 
         print("copying path information... (may take a while)")

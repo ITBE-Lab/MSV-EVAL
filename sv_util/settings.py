@@ -4,8 +4,8 @@ main_data_folder = "/MAdata"
 
 human_genome_dir = main_data_folder + "/genome/human/GRCh38.p12"
 
-
 sv_hidden_to_aligners_data_dir = main_data_folder + "/sv_caller_analysis/svs_hidden_to_aligners"
+sv_hidden_err_distrib = sv_hidden_to_aligners_data_dir + "/pacBio_ccs_sampled_distrib.json"
 
 ambiguities_of_atomic_sv_data_dir = main_data_folder + "/sv_caller_analysis/ambiguities_of_atomic_sv/"
 sam_folder = ambiguities_of_atomic_sv_data_dir + "sam/"

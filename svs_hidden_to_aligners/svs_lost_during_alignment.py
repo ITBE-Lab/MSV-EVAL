@@ -8,7 +8,7 @@ from sv_util.settings import *
 from bokeh.plotting import ColumnDataSource
 from bokeh.layouts import column, row, grid
 from bokeh.models.tools import HoverTool
-
+from svs_hidden_to_aligners.read_simulator import disfigure, load_sampled_from_file
 
 def choice_adj_size(l, total_len):
     x = random.randrange(total_len)
@@ -18,7 +18,7 @@ def choice_adj_size(l, total_len):
         idx += 1
     return l[idx]
 
-def create_reads(pack, size, amount, func_get_seeds_and_read):
+def create_reads(pack, size, amount, func_get_seeds_and_read, do_disfigure=False):
     lumper = SeedLumping(ParameterSetManager())
     read_by_name = ReadByName()
     genome_section_by_name = ReadByName()
@@ -30,10 +30,25 @@ def create_reads(pack, size, amount, func_get_seeds_and_read):
         start = random.randrange(contig_len - size)
         genome_section = pack.extract_from_to(start+contig_start, start+size+contig_start)
         return func_get_seeds_and_read(genome_section, start + contig_start), genome_section, start + contig_start
+    i, d, m, il, dl, _ = load_sampled_from_file(sv_hidden_err_distrib)
     for idx in range(amount):
         read = NucSeq("N")
         while 'n' in str(read) or 'N' in str(read):
             (points, read), genome_section, sec_offset = read_and_seeds()
+        if do_disfigure:
+            s, up_shifts, right_shifts = disfigure(str(read), 1, d, m, i, il, dl)
+            read = NucSeq(s)
+            points_2 = []
+            for p in points:
+                p = list(p)
+                for sp, sl in right_shifts:
+                    if p[0] >= sp:
+                        p[1] += sl
+                for sp, sl in up_shifts:
+                    if p[0] >= sp:
+                        p[0] += sl
+                points_2.append(p)
+            points = points_2
         read.name = "read" + str(idx)
         genome_section.name = "read" + str(idx)
         read_by_name.append(read)
@@ -42,13 +57,14 @@ def create_reads(pack, size, amount, func_get_seeds_and_read):
     return points_by_name, read_by_name, genome_section_by_name
 
 
-def create_scattered_read(pack, amount, num_pieces, size_pieces):
+def create_scattered_read(pack, amount, num_pieces, size_pieces, do_disfigure=False):
     lumper = SeedLumping(ParameterSetManager())
     read_by_name = ReadByName()
     genome_section_by_name = ReadByName()
     points_by_name = {}
     contigs = [(x, y) for x, y in zip(pack.contigLengths(), pack.contigStarts()) if x > size_pieces]
     total_len = sum(x for x, _ in contigs)
+    i, d, m, il, dl, _ = load_sampled_from_file(sv_hidden_err_distrib)
     def read_and_points():
         points = []
         read = ""
@@ -64,6 +80,20 @@ def create_scattered_read(pack, amount, num_pieces, size_pieces):
         read = NucSeq("N")
         while 'n' in str(read) or 'N' in str(read):
             points, read = read_and_points()
+        if do_disfigure:
+            s, up_shifts, right_shifts = disfigure(str(read), 1, d, m, i, il, dl)
+            read = NucSeq(s)
+            points_2 = []
+            for p in points:
+                p = list(p)
+                for sp, sl in right_shifts:
+                    if p[0] >= sp:
+                        p[1] += sl
+                for sp, sl in up_shifts:
+                    if p[0] >= sp:
+                        p[0] += sl
+                points_2.append(p)
+            points = points_2
         read.name = "read" + str(idx)
         read_by_name.append(read)
         genome_section = NucSeq()
@@ -94,7 +124,7 @@ def compare(params, data, points_by_name, reads, pack_pledge, fm_index_pledge,
                 #else:
                 if True:
                     printer = SeedPointPrinter(params)
-                    printer.execute( lumped_data, points_by_name[read.name] )
+                    printer.execute( lumped_data, points_by_name[read.name][0] )
                     exit()
                 UnLock(params, unlock_targets[idx]).execute( Container() )
                 read = reads[idx].get()
@@ -116,9 +146,9 @@ def compare(params, data, points_by_name, reads, pack_pledge, fm_index_pledge,
         q,r,f = point
         if ignore_genome_offset:
             r -= sec_offset
-        def nearby_start(max_diff=5):
+        def nearby_start(max_diff=25):
             return abs(q-seed.start) <= max_diff and abs(r-seed.start_ref) <= max_diff
-        def nearby_end(max_diff=5):
+        def nearby_end(max_diff=25):
             if seed.on_forward_strand:
                 return abs(q-(seed.start+seed.size)) <= max_diff and abs(r-(seed.start_ref+seed.size)) <= max_diff
             else:

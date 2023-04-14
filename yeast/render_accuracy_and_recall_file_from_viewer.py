@@ -100,6 +100,14 @@ def render_multi_acc_recall_pic(tsv_and_name_file, out_file, x_range=(-0.05,1.05
     if save_plots:
         save(plot)
 
+class NoneForNonExistant:
+    def __init__(self, run_table):
+        self.run_table = run_table
+    
+    def getId(self, name):
+        if not self.run_table.hasName(name):
+            return None
+        return self.run_table.getId(name)
 
 if __name__ == "__main__":
     #render_accuracy_n_recall_pic(accuracy_recall_data_dir + "/ufrj50816-1.tsv",
@@ -114,108 +122,137 @@ if __name__ == "__main__":
     #                             "ufrj50816-Gridss-Illumina-ge-10")
     dataset = "ufrj50816"
     prefix = "100nt-"
-    gt_lt_ten = 25
-    gt_ge_ten = 24
-    gt_large = 22
-    recompute = False
+    run_table = NoneForNonExistant(SvCallerRunTable(DbConn({"SCHEMA": {"NAME": dataset}})))
+    gt_lt_ten = run_table.getId("Ground Truth - Small <10 ")
+    gt_ge_ten = run_table.getId("Ground Truth - Small >=10")
+    gt_large = run_table.getId("Ground Truth - Large")
+    recompute = False 
+    run_ids = {
+        gt_lt_ten: [run_table.getId("MA < 10nt 100nt"), 
+                    run_table.getId("gridss-100 - Small < 10"), 
+                    run_table.getId("manta-100 - Small < 10")],
+        gt_ge_ten: [run_table.getId("MA [10,200)nt 100nt"), 
+                    run_table.getId("gridss-100 - Small"), 
+                    run_table.getId("manta-100 - Small")],
+        gt_large:  [run_table.getId("MA >= 200nt 100nt"), 
+                    run_table.getId("gridss-100 - Large"), 
+                    run_table.getId("manta-100 - Large")],
+    }
     if recompute:
-        run_ids = {
-            gt_lt_ten: [2, 9, 13],
-            gt_ge_ten: [1, 8, 12],
-            gt_large:  [6, 10],
-        }
         compute_accuracy_recall("ufrj50816", [0, 25], [gt_lt_ten, gt_ge_ten, gt_large], run_ids,
                                 accuracy_recall_data_dir + "/" + prefix)
 
     render_multi_acc_recall_pic(
         [
-            ("/" + prefix + dataset + "-2-0.tsv", "MSV 0nt", "blue", "solid"),
-            ("/" + prefix + dataset + "-2-25.tsv", "MSV 25nt", "blue", "dotted"),
-            ("/" + prefix + dataset + "-9-0.tsv", "Gridss 0nt", "orange", "solid"),
-            ("/" + prefix + dataset + "-9-25.tsv", "Gridss 25nt", "orange", "dotted"),
-            ("/" + prefix + dataset + "-13-0.tsv", "Manta 0nt", "green", "solid"),
-            ("/" + prefix + dataset + "-13-25.tsv", "Manta 25nt", "green", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][1]) + "-0.tsv", "Gridss 0nt", "orange", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][1]) + "-25.tsv", "Gridss 25nt", "orange", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][2]) + "-0.tsv", "Manta 0nt", "green", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][2]) + "-25.tsv", "Manta 25nt", "green", "dotted"),
         ],
         "ufrj50816 [0,10) 100nt"
     )
     render_multi_acc_recall_pic(
         [
-            ("/" + prefix + dataset + "-1-0.tsv", "MSV 0nt", "blue", "solid"),
-            ("/" + prefix + dataset + "-1-25.tsv", "MSV 25nt", "blue", "dotted"),
-            ("/" + prefix + dataset + "-8-0.tsv", "Gridss 0nt", "orange", "solid"),
-            ("/" + prefix + dataset + "-8-25.tsv", "Gridss 25nt", "orange", "dotted"),
-            ("/" + prefix + dataset + "-12-0.tsv", "Manta 0nt", "green", "solid"),
-            ("/" + prefix + dataset + "-12-25.tsv", "Manta 25nt", "green", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][1]) + "-0.tsv", "Gridss 0nt", "orange", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][1]) + "-25.tsv", "Gridss 25nt", "orange", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][2]) + "-0.tsv", "Manta 0nt", "green", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][2]) + "-25.tsv", "Manta 25nt", "green", "dotted"),
         ],
-        "ufrj50816 [10,200) 100nt",
-        x_range=(-0.05,0.55)
+        "ufrj50816 [10,200) 100nt"
     )
     render_multi_acc_recall_pic(
         [
-            ("/" + prefix + dataset + "-6-0.tsv", "Gridss 0nt", "orange", "solid"),
-            ("/" + prefix + dataset + "-6-25.tsv", "Gridss 25nt", "orange", "dotted"),
-            ("/" + prefix + dataset + "-10-0.tsv", "Manta 0nt", "green", "solid"),
-            ("/" + prefix + dataset + "-10-25.tsv", "Manta 25nt", "green", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][1]) + "-0.tsv", "Gridss 0nt", "orange", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][1]) + "-25.tsv", "Gridss 25nt", "orange", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][2]) + "-0.tsv", "Manta 0nt", "green", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][2]) + "-25.tsv", "Manta 25nt", "green", "dotted"),
         ],
-        "ufrj50816 [200,inf) 100nt",
-        x_range=(-0.005,0.055)
+        "ufrj50816 [200,inf) 100nt"
     )
 
     prefix = "250nt-"
+    run_ids = {
+        gt_lt_ten: [run_table.getId("MA < 10nt 250nt"), 
+                    run_table.getId("gridss-250 - Small < 10"), 
+                    run_table.getId("manta-250 - Small < 10")],
+        gt_ge_ten: [run_table.getId("MA [10,200)nt 250nt"), 
+                    run_table.getId("gridss-250 - Small"), 
+                    run_table.getId("manta-250 - Small")],
+        gt_large:  [run_table.getId("MA >= 200nt 250nt"), 
+                    run_table.getId("gridss-250 - Large"), 
+                    run_table.getId("manta-250 - Large")],
+    }
     if recompute:
-        run_ids = {
-            gt_lt_ten: [4, 17, 21],
-            gt_ge_ten: [3, 16, 20],
-            gt_large:  [14, 18],
-        }
         compute_accuracy_recall("ufrj50816", [0, 25], [gt_lt_ten, gt_ge_ten, gt_large], run_ids,
                                 accuracy_recall_data_dir + "/" + prefix)
 
     render_multi_acc_recall_pic(
         [
-            ("/" + prefix + dataset + "-4-0.tsv", "MSV 0nt", "blue", "solid"),
-            ("/" + prefix + dataset + "-4-25.tsv", "MSV 25nt", "blue", "dotted"),
-            ("/" + prefix + dataset + "-17-0.tsv", "Gridss 0nt", "orange", "solid"),
-            ("/" + prefix + dataset + "-17-25.tsv", "Gridss 25nt", "orange", "dotted"),
-            ("/" + prefix + dataset + "-21-0.tsv", "Manta 0nt", "green", "solid"),
-            ("/" + prefix + dataset + "-21-25.tsv", "Manta 25nt", "green", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][1]) + "-0.tsv", "Gridss 0nt", "orange", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][1]) + "-25.tsv", "Gridss 25nt", "orange", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][2]) + "-0.tsv", "Manta 0nt", "green", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][2]) + "-25.tsv", "Manta 25nt", "green", "dotted"),
         ],
         "ufrj50816 [0,10) 250nt"
     )
     render_multi_acc_recall_pic(
         [
-            ("/" + prefix + dataset + "-3-0.tsv", "MSV 0nt", "blue", "solid"),
-            ("/" + prefix + dataset + "-3-25.tsv", "MSV 25nt", "blue", "dotted"),
-            ("/" + prefix + dataset + "-16-0.tsv", "Gridss 0nt", "orange", "solid"),
-            ("/" + prefix + dataset + "-16-25.tsv", "Gridss 25nt", "orange", "dotted"),
-            ("/" + prefix + dataset + "-20-0.tsv", "Manta 0nt", "green", "solid"),
-            ("/" + prefix + dataset + "-20-25.tsv", "Manta 25nt", "green", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][1]) + "-0.tsv", "Gridss 0nt", "orange", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][1]) + "-25.tsv", "Gridss 25nt", "orange", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][2]) + "-0.tsv", "Manta 0nt", "green", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][2]) + "-25.tsv", "Manta 25nt", "green", "dotted"),
         ],
-        "ufrj50816 [10,200) 250nt",
-        x_range=(-0.05,0.55)
+        "ufrj50816 [10,200) 250nt"
     )
     render_multi_acc_recall_pic(
         [
-            ("/" + prefix + dataset + "-14-0.tsv", "Gridss 0nt", "orange", "solid"),
-            ("/" + prefix + dataset + "-14-25.tsv", "Gridss 25nt", "orange", "dotted"),
-            ("/" + prefix + dataset + "-18-0.tsv", "Manta 0nt", "green", "solid"),
-            ("/" + prefix + dataset + "-18-25.tsv", "Manta 25nt", "green", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][1]) + "-0.tsv", "Gridss 0nt", "orange", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][1]) + "-25.tsv", "Gridss 25nt", "orange", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][2]) + "-0.tsv", "Manta 0nt", "green", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][2]) + "-25.tsv", "Manta 25nt", "green", "dotted"),
         ],
-        "ufrj50816 [200,inf) 250nt",
-        x_range=(-0.005,0.055)
+        "ufrj50816 [200,inf) 250nt"
     )
 
     prefix = "pacb-"
+    run_ids = {
+        gt_lt_ten: [run_table.getId("MA < 10nt PacBio")],
+        gt_ge_ten: [run_table.getId("MA [10,200)nt PacBio")],
+        gt_large:  [run_table.getId("MA >=200nt PacBio")],
+    }
     if recompute:
-        run_ids = {
-            gt_large:  [5],
-        }
-        compute_accuracy_recall("ufrj50816", [0, 25], [gt_large], run_ids,
+        compute_accuracy_recall("ufrj50816", [0, 25], [gt_lt_ten, gt_ge_ten, gt_large], run_ids,
                                 accuracy_recall_data_dir + "/" + prefix)
     render_multi_acc_recall_pic(
         [
-            ("/" + prefix + dataset + "-5-0.tsv", "MSV 0nt", "blue", "solid"),
-            ("/" + prefix + dataset + "-5-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+        ],
+        "ufrj50816 [0,10) pacb"
+    )
+    render_multi_acc_recall_pic(
+        [
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+        ],
+        "ufrj50816 [10,200) pacb"
+    )
+    render_multi_acc_recall_pic(
+        [
+            ("/" + prefix + dataset + str(run_ids[gt_large][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + str(run_ids[gt_large][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
         ],
         "ufrj50816 [200,inf) pacb"
     )

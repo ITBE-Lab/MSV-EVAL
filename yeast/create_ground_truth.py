@@ -120,7 +120,7 @@ def render_jumps(jumps, query_genome, reference_genome):
 def jumps_to_calls_to_db(jumps, db_name, query_genome_str, reference_genome, name):
     parameter_set_manager = ParameterSetManager()
     parameter_set_manager.set_selected("SV-PacBio")
-    min_size = parameter_set_manager.by_name("Min Size Edge").get()
+    min_size = 200
     db_conn = DbConn({"SCHEMA": {"NAME": db_name}})
 
     JumpRunTable(db_conn)

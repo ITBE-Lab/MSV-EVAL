@@ -84,8 +84,8 @@ if True:
                         "MA [10,200)nt 100nt",
                         individual="UFRJ50816",
                         param=param)
-        SvCallTable(DbConn("UFRJ50816")).extract_small_calls(run_id, 10, "MA < 10nt 100nt",
-                                                            "Illumina based MA calls smaller than 10nt")
+        SvCallTable(DbConn("UFRJ50816")).extract_small_calls(run_id, 10, "MA < 10nt 100nt", "n/a")
+        SvCallTable(DbConn("UFRJ50816")).extract_large_calls(run_id, 200, "MA >= 200nt 100nt", "n/a")
     if True:
         param = ParameterSetManager()
         param.set_selected("SV-Illumina")
@@ -98,18 +98,20 @@ if True:
                         "MA [10,200)nt 250nt",
                         individual="UFRJ50816",
                         param=param)
-        SvCallTable(DbConn("UFRJ50816")).extract_small_calls(run_id, 10, "MA < 10nt 250nt",
-                                                            "Illumina based MA calls smaller than 10nt")
-    if True:
+        SvCallTable(DbConn("UFRJ50816")).extract_small_calls(run_id, 10, "MA < 10nt 250nt", "n/a")
+        SvCallTable(DbConn("UFRJ50816")).extract_large_calls(run_id, 200, "MA >= 200nt 250nt", "n/a")
+    if False:
         param = ParameterSetManager()
         param.set_selected("SV-PacBio")
-        run_ma(pack,
+        run_id = run_ma(pack,
             [("SimulatedPacBio",
                 regex_match(read_data_dir + "simulated/UFRJ50816/pacbio_CCS/", "*.fasta"),
                 None,
                 100)],
-            "MA >=200nt 250nt",
+            "MA >=200nt PacBio",
             individual="UFRJ50816", 
             param=param)
+        extract_id = SvCallTable(DbConn("UFRJ50816")).extract_small_calls(run_id, 200, "MA [10,200)nt PacBio", "n/a")
+        SvCallTable(DbConn("UFRJ50816")).extract_small_calls(extract_id, 10, "MA < 10nt PacBio", "n/a")
 
 
