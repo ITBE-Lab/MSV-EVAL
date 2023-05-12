@@ -42,18 +42,25 @@ def create_reads(pack, size, amount, func_get_seeds_and_read, do_disfigure=False
             for p in points:
                 p = list(p)
                 for sp, sl in right_shifts:
-                    if p[0] >= sp:
-                        p[1] += sl
-                for sp, sl in up_shifts:
-                    if p[0] >= sp:
-                        p[0] += sl
-                points_2.append(p)
-            points = points_2
+                    if p[0] >= sp + sl:
+                        p[0] -= sl
+                        pass
+                    elif p[0] >= sp and p[0] < sp + sl:
+                        # this point is deleted
+                        p = None
+                        break
+                if not p is None:
+                    for sp, sl in up_shifts:
+                        if p[0] >= sp:
+                            p[0] += sl
+                    points_2.append(p)
+        else:
+            points_2 = points
         read.name = "read" + str(idx)
         genome_section.name = "read" + str(idx)
         read_by_name.append(read)
         genome_section_by_name.append(genome_section)
-        points_by_name[read.name] = (points, sec_offset)
+        points_by_name[read.name] = (points_2, sec_offset)
     return points_by_name, read_by_name, genome_section_by_name
 
 
@@ -87,19 +94,25 @@ def create_scattered_read(pack, amount, num_pieces, size_pieces, do_disfigure=Fa
             for p in points:
                 p = list(p)
                 for sp, sl in right_shifts:
-                    if p[0] >= sp:
-                        p[1] += sl
-                for sp, sl in up_shifts:
-                    if p[0] >= sp:
-                        p[0] += sl
-                points_2.append(p)
-            points = points_2
+                    if p[0] >= sp + sl:
+                        p[0] -= sl
+                    elif p[0] >= sp and p[0] < sp + sl:
+                        # this point is deleted
+                        p = None
+                        break
+                if not p is None:
+                    for sp, sl in up_shifts:
+                        if p[0] >= sp:
+                            p[0] += sl
+                    points_2.append(p)
+        else:
+            points_2 = points
         read.name = "read" + str(idx)
         read_by_name.append(read)
         genome_section = NucSeq()
         genome_section.name = "read" + str(idx)
         genome_section_by_name.append(genome_section)
-        points_by_name[read.name] = (points, 0)
+        points_by_name[read.name] = (points_2, 0)
     return points_by_name, read_by_name, genome_section_by_name
 
 
@@ -197,6 +210,7 @@ def compare_seeds(params, reads_by_name, points_by_name, fm_index, pack, mems=Tr
     if mems:
         seeding_module = MinimizerSeeding(params)
         seed_lumping = SeedLumping(params)
+        seed_extension = SeedExtender(params)
     else:
         seeding_module = BinarySeeding(params)
         extract_seeds = ExtractSeeds(params)
@@ -228,6 +242,7 @@ def compare_seeds(params, reads_by_name, points_by_name, fm_index, pack, mems=Tr
                 seeds = promise_me(recursive_reseeding, soc_filtered_seeds, pack_pledge, locked_read)
                 original_seeds_list.append(seeds)
             else:
+                seeds = promise_me(seed_extension, seeds, locked_read, pack_pledge)
                 original_seeds_list = None
         else:
             segments = promise_me(seeding_module, fm_index_pledge, locked_read)
@@ -328,8 +343,14 @@ def compare_alignment_from_file_paths(params, reads_by_name, points_by_name, pac
     if file_paths is None:
         return None
     file_queue = FileQueue()
+    tot_size = 0
     for string in file_paths:
+        if not os.path.exists(string):
+            return float("NaN")
+        tot_size += os.stat(string).st_size
         file_queue.add(FileStreamFromPath(string))
+    if tot_size == 0:
+        return 0
     queue_pledge = Pledge()
     queue_pledge.set(file_queue)
     return compare_alignment_from_file_queue(params, reads_by_name, points_by_name, pack, fm_index, queue_pledge,

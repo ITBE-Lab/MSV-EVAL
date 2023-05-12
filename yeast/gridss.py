@@ -278,23 +278,46 @@ def parse_and_insert(file_name, db_name, reference_genome, caller_name="gridss")
 db_name = "UFRJ50816"
 
 def main():
-    for l in [100, 250]:
-        reads = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-"+str(l)+"/", "*.bwa.read1.fastq.gz")
-        reads_mates = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-"+str(l)+"/", "*.bwa.read2.fastq.gz")
+    if True:
+        for l in [100, 250]:
+            reads = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-"+str(l)+"/", "*.bwa.read1.fastq.gz")
+            reads_mates = regex_match(read_data_dir + "simulated/UFRJ50816/Illumina-"+str(l)+"/", "*.bwa.read2.fastq.gz")
+
+            json_dict = {"reference_path":genome_dir}
+            read_json = {"technology":"illumina", "name":"n/a", "fasta_file":", ".join(reads),
+                        "fasta_file_mate":", ".join(reads_mates)}
+            path_sam = gridss_data_dir + ".bwa_alignment"
+            if True:
+                bwa(read_json, path_sam + ".sam", json_dict)
+                sam_to_bam(path_sam)
+                gridss(path_sam + ".sorted.bam", gridss_data_dir+".gridss.vcf", genome_dir+"fasta/genome.fna")
+                manta(path_sam + ".sorted.bam", gridss_data_dir+".manta.vcf", genome_dir+"fasta/genome.fna", all_vcf=True)
+
+                run_id = parse_and_insert(gridss_data_dir+".gridss.vcf", db_name, genome_dir+"ma/genome", "gridss-"+str(l))
+                print("run_id gridss", run_id)
+            run_id = parse_and_insert(gridss_data_dir+".manta.vcf", db_name, genome_dir+"ma/genome", "manta-"+str(l))
+            print("run_id manta", run_id)
+
+    if True:
+        reads = regex_match(read_data_dir + "PRJEB7245/UFRJ50816/illumina_hiseq_2500/", 
+                            "SRR4074412.1_1.paired.trimmed.fastq")
+        reads_mates = regex_match(read_data_dir + "PRJEB7245/UFRJ50816/illumina_hiseq_2500/", 
+                            "SRR4074412.1_2.paired.trimmed.fastq")
 
         json_dict = {"reference_path":genome_dir}
         read_json = {"technology":"illumina", "name":"n/a", "fasta_file":", ".join(reads),
                     "fasta_file_mate":", ".join(reads_mates)}
         path_sam = gridss_data_dir + ".bwa_alignment"
         if True:
-            bwa(read_json, path_sam + ".sam", json_dict)
-            sam_to_bam(path_sam)
-            gridss(path_sam + ".sorted.bam", gridss_data_dir+".gridss.vcf", genome_dir+"fasta/genome.fna")
+            #bwa(read_json, path_sam + ".sam", json_dict)
+            #sam_to_bam(path_sam)
+            #gridss(path_sam + ".sorted.bam", gridss_data_dir+".gridss.vcf", genome_dir+"fasta/genome.fna")
+            
             manta(path_sam + ".sorted.bam", gridss_data_dir+".manta.vcf", genome_dir+"fasta/genome.fna", all_vcf=True)
 
-            run_id = parse_and_insert(gridss_data_dir+".gridss.vcf", db_name, genome_dir+"ma/genome", "gridss-"+str(l))
+            run_id = parse_and_insert(gridss_data_dir+".gridss.vcf", db_name, genome_dir+"ma/genome", "gridss-real-world")
             print("run_id gridss", run_id)
-        run_id = parse_and_insert(gridss_data_dir+".manta.vcf", db_name, genome_dir+"ma/genome", "manta-"+str(l))
+        run_id = parse_and_insert(gridss_data_dir+".manta.vcf", db_name, genome_dir+"ma/genome", "manta-real-world")
         print("run_id manta", run_id)
 
 main()

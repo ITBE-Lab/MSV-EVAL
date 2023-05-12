@@ -20,7 +20,9 @@ def color_scheme(idx):
         "black": "#000000",
         "grey": "#555555",
         "teal": "#008080",
-        "lightteal": "##00ffff",
+        "lightteal": "#00ffff",
+        "turquise": "#149FA3",
+        "lightturquise": "#1BDCE3",
     }
     return colors[idx]
 

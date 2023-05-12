@@ -55,6 +55,7 @@ def render_accuracy_n_recall_pic(tsv_file, outfile, y_range=(-0.051,1.051)):
     #export_svgs(plot, filename=accuracy_recall_data_dir + "/bokeh_out_" + outfile + ".svg")
 
 def render_multi_acc_recall_pic(tsv_and_name_file, out_file, x_range=(-0.05,1.05),y_range=(-0.05,1.05)):
+    print("rendering", out_file)
     output_file(accuracy_recall_data_dir + "/bokeh_out_" + out_file + ".html")
     plot = figure(title=out_file, plot_height=600, plot_width=600,x_range=x_range,y_range=y_range)
     plot.yaxis.axis_label = "accuracy [%]"
@@ -76,8 +77,16 @@ def render_multi_acc_recall_pic(tsv_and_name_file, out_file, x_range=(-0.05,1.05
                                     legend_label=name,
                                     line_color=None,
                                     line_width=point_to_px(4))
-                    else:
+                    elif dash == "dotted":
                         plot.circle(x=table[0][3],
+                                    y=table[0][4],
+                                    size=point_to_px(10),
+                                    fill_color=color_scheme(color),
+                                    legend_label=name,
+                                    line_color=None,
+                                    line_width=point_to_px(4))
+                    elif dash == "dashed":
+                        plot.square(x=table[0][3],
                                     y=table[0][4],
                                     size=point_to_px(10),
                                     fill_color=color_scheme(color),
@@ -126,7 +135,7 @@ if __name__ == "__main__":
     gt_lt_ten = run_table.getId("Ground Truth - Small <10 ")
     gt_ge_ten = run_table.getId("Ground Truth - Small >=10")
     gt_large = run_table.getId("Ground Truth - Large")
-    recompute = False 
+    recompute = True 
     run_ids = {
         gt_lt_ten: [run_table.getId("MA < 10nt 100nt"), 
                     run_table.getId("gridss-100 - Small < 10"), 
@@ -251,19 +260,144 @@ if __name__ == "__main__":
     )
     render_multi_acc_recall_pic(
         [
-            ("/" + prefix + dataset + str(run_ids[gt_large][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
-            ("/" + prefix + dataset + str(run_ids[gt_large][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
         ],
         "ufrj50816 [200,inf) pacb"
     )
 
-    #render_accuracy_n_recall_pic("/usr/home/markus/workspace/aligner/build.zeus/MSV/sv_visualization/ufrj50816-5.tsv",
-    #                             "ufrj50816-PacBio-Simulated")
-    #render_accuracy_n_recall_pic("/usr/home/markus/workspace/aligner/build.zeus/MSV/sv_visualization/ufrj50816-5.tsv",
-    #                             "ufrj50816-PacBio-Simulated-zoom", x_range=(30, 60), y_range=(0.6,0.851))
-    #render_accuracy_n_recall_pic("/usr/home/markus/workspace/aligner/build.zeus/MSV/sv_visualization/ufrj50816-6.tsv",
-    #                             "ufrj50816-Illumina-Simulated")
-    #render_accuracy_n_recall_pic("/usr/home/markus/workspace/aligner/build.zeus/MSV/sv_visualization/ufrj50816-6.tsv",
-    #                             "ufrj50816-Illumina-Simulated-zoom", x_range=(10,70), y_range=(0.8,1))
-    #render_accuracy_n_recall_pic(accuracy_recall_data_dir + "/ufrj50816-8.tsv",
-    #                             "ufrj50816-Illumina-RealWorld")
+
+    prefix = "realillumina-"
+    run_ids = {
+        gt_lt_ten: [run_table.getId("MA < 10nt realWorldIllumina"), 
+                    run_table.getId("gridss-real-world - Small < 10"), 
+                    run_table.getId("manta-real-world - Small < 10")],
+        gt_ge_ten: [run_table.getId("MA [10,200)nt realWorldIllumina"), 
+                    run_table.getId("gridss-real-world - Small"), 
+                    run_table.getId("manta-real-world - Small")],
+        gt_large:  [run_table.getId("MA >=200nt realWorldIllumina"), 
+                    run_table.getId("gridss-real-world - Large"), 
+                    run_table.getId("manta-real-world - Large")],
+    }
+    if recompute:
+        run_ids = {
+            gt_lt_ten: [#run_table.getId("gridss-real-world - Small < 10"), 
+                        run_table.getId("manta-real-world - Small < 10")],
+            gt_ge_ten: [#run_table.getId("gridss-real-world - Small"), 
+                        run_table.getId("manta-real-world - Small")],
+            gt_large:  [#run_table.getId("gridss-real-world - Large"), 
+                        run_table.getId("manta-real-world - Large")],
+        }
+        #print(run_ids)
+        compute_accuracy_recall("ufrj50816", [0, 25], [gt_lt_ten, gt_ge_ten, gt_large], run_ids,
+                                accuracy_recall_data_dir + "/" + prefix)
+    run_ids = {
+        gt_lt_ten: [run_table.getId("MA < 10nt realWorldIllumina"), 
+                    run_table.getId("gridss-real-world - Small < 10"), 
+                    run_table.getId("manta-real-world - Small < 10")],
+        gt_ge_ten: [run_table.getId("MA [10,200)nt realWorldIllumina"), 
+                    run_table.getId("gridss-real-world - Small"), 
+                    run_table.getId("manta-real-world - Small")],
+        gt_large:  [run_table.getId("MA >=200nt realWorldIllumina"), 
+                    run_table.getId("gridss-real-world - Large"), 
+                    run_table.getId("manta-real-world - Large")],
+    }
+    render_multi_acc_recall_pic(
+        [
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][1]) + "-0.tsv", "Gridss 0nt", "orange", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][1]) + "-25.tsv", "Gridss 25nt", "orange", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][2]) + "-0.tsv", "Manta 0nt", "green", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][2]) + "-25.tsv", "Manta 25nt", "green", "dotted"),
+        ],
+        "ufrj50816 [0,10) illumina real world"
+    )
+    render_multi_acc_recall_pic(
+        [
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][1]) + "-0.tsv", "Gridss 0nt", "orange", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][1]) + "-25.tsv", "Gridss 25nt", "orange", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][2]) + "-0.tsv", "Manta 0nt", "green", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][2]) + "-25.tsv", "Manta 25nt", "green", "dotted"),
+        ],
+        "ufrj50816 [10,200) illumina real world"
+    )
+    render_multi_acc_recall_pic(
+        [
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][1]) + "-0.tsv", "Gridss 0nt", "orange", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][1]) + "-25.tsv", "Gridss 25nt", "orange", "dotted"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][2]) + "-0.tsv", "Manta 0nt", "green", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][2]) + "-25.tsv", "Manta 25nt", "green", "dotted"),
+        ],
+        "ufrj50816 [200,inf) illumina real world"
+    )
+
+    prefix = "realpacb-"
+    run_ids = {
+        gt_lt_ten: [
+                        run_table.getId("MA < 10nt realWorldPacBio")
+                    ],
+        gt_ge_ten: [run_table.getId("MA [10,200)nt realWorldPacBio")],
+        gt_large:  [run_table.getId("MA >=200nt realWorldPacBio")],
+    }
+    if recompute:
+        compute_accuracy_recall("ufrj50816", [0, 25], [gt_lt_ten, gt_ge_ten, gt_large], run_ids,
+                                accuracy_recall_data_dir + "/" + prefix)
+    render_multi_acc_recall_pic(
+        [
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+        ],
+        "ufrj50816 [0,10) pacb real world"
+    )
+    render_multi_acc_recall_pic(
+        [
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+        ],
+        "ufrj50816 [10,200) pacb real world"
+    )
+    render_multi_acc_recall_pic(
+        [
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+        ],
+        "ufrj50816 [200,inf) pacb real world"
+    )
+
+    prefix = "realoxfnano-"
+    run_ids = {
+        gt_lt_ten: [
+                        run_table.getId("MA < 10nt oxfNano")
+                    ],
+        gt_ge_ten: [run_table.getId("MA [10,200)nt oxfNano")],
+        gt_large:  [run_table.getId("MA >=200nt oxfNano")],
+    }
+    if recompute or True:
+        compute_accuracy_recall("ufrj50816", [0, 25], [gt_lt_ten, gt_ge_ten, gt_large], run_ids,
+                                accuracy_recall_data_dir + "/" + prefix)
+    render_multi_acc_recall_pic(
+        [
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_lt_ten][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+        ],
+        "ufrj50816 [0,10) oxfNano real world"
+    )
+    render_multi_acc_recall_pic(
+        [
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_ge_ten][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+        ],
+        "ufrj50816 [10,200) oxfNano real world"
+    )
+    render_multi_acc_recall_pic(
+        [
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][0]) + "-0.tsv", "MSV 0nt", "blue", "solid"),
+            ("/" + prefix + dataset + "-" + str(run_ids[gt_large][0]) + "-25.tsv", "MSV 25nt", "blue", "dotted"),
+        ],
+        "ufrj50816 [200,inf) oxfNano real world"
+    )

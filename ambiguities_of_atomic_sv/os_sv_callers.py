@@ -22,8 +22,8 @@ def gridss(bam_file, vcf_file, reference_path):
         os.system('rm -rf ' + bam_file + ".gridss.work")
     os.mkdir(bam_file + ".gridss.work")
     os.chdir(bam_file + ".gridss.work")
-    os.system(gridss_path + " -t 32 -r " + reference_path + " -o " + vcf_file + " -a assembly.bam " + bam_file + 
-              " >/dev/null 2>&1")
+    os.system(gridss_path + " -t 32 -r " + reference_path + " -o " + vcf_file + " -a assembly.bam " + bam_file)
+              #+ " >/dev/null 2>&1")
     os.chdir(curr)
 
 def manta(bam_file, vcf_file, reference_path, all_vcf=False):
@@ -32,7 +32,7 @@ def manta(bam_file, vcf_file, reference_path, all_vcf=False):
         os.system('rm -rf ' + vcf_file + ".manta")
     os.mkdir(vcf_file + ".manta")
     #manta_path = "~/miniconda3/envs/manta/share/manta-1.6.0-1/bin/configManta.py"
-    manta_path = "~/workspace/manta/install/bin/configManta.py >/dev/null 2>&1"
+    manta_path = "~/workspace/manta/install/bin/configManta.py" # >/dev/null 2>&1"
     os.system("python2 "+ manta_path + " --referenceFasta " + reference_path + " --bam " + bam_file + " --runDir " + vcf_file + ".manta" )
     # actually run manta
     os.system("python2 " + vcf_file + ".manta/runWorkflow.py -j 32 -m local >" + vcf_file + ".manta/workflow.stdout.log.txt 2>" + vcf_file + ".manta/workflow.stderr.log.txt" )

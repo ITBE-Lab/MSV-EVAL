@@ -1,58 +1,46 @@
 import os
 from sv_util.settings import *
+from subprocess import run
+
+TIMEOUT=60*30 # 30 minutes time for each alignment
 
 def bwa(read_set, sam_file_path, json_dict):
-    index_str = json_dict["reference_path"] + "/bwa/genome"
-    os.system("~/workspace/bwa/bwa mem -R \"@RG\\tID:1\\tSM:" + read_set["name"] + "\" -t 32 " + index_str + " "
-                + read_set["fasta_file"] + " " + read_set["fasta_file_mate"] + " > " + sam_file_path
-                + " 2> /dev/null")
+    run(["sv_util/bwa.sh", read_set["name"], json_dict["reference_path"] + "/bwa/genome", read_set["fasta_file"], 
+        read_set["fasta_file_mate"], sam_file_path], timeout=TIMEOUT)
 
 def bwa_single(read_set, sam_file_path, json_dict):
-    index_str = json_dict["reference_path"] + "/bwa/genome"
-    os.system("~/workspace/bwa/bwa mem -R \"@RG\\tID:1\\tSM:" + read_set["name"] + "\" -t 32 " + index_str + " "
-                + read_set["fasta_file"] + " > " + sam_file_path
-                + " 2> /dev/null")
+    run(["sv_util/bwa_single.sh", read_set["name"], json_dict["reference_path"] + "/bwa/genome", 
+         read_set["fasta_file"], 
+         sam_file_path], timeout=TIMEOUT)
 
 def bowtie(read_set, sam_file_path, json_dict):
-    index_str = json_dict["reference_path"] + "/bowtie/genome.fna"
-    os.system("~/workspace/bowtie2/bowtie2-2.3.3.1/bowtie2 --rg-id 1 --rg SM:" + read_set["name"] + " -p 32 -x " +
-                index_str + " -1 " + read_set["fasta_file"] + " -2 " + read_set["fasta_file_mate"] + " -S " + sam_file_path
-                + " 2> /dev/null")
+    run(["sv_util/bowtie.sh", read_set["name"], json_dict["reference_path"] + "/bowtie/genome.fna", 
+         read_set["fasta_file"], read_set["fasta_file_mate"], 
+         sam_file_path], timeout=TIMEOUT)
 
-def mm2(read_set, sam_file_path, json_dict, extra=""):
+def mm2(read_set, sam_file_path, json_dict, extra="", presetting_override=None):
     presetting = None # noop
     if read_set["technology"] == "pb":
         presetting = "map-pb"
     if read_set["technology"] == "ont":
         presetting = "map-ont"
+    if not presetting_override is None:
+        presetting = presetting_override
     index_str = json_dict["reference_path"] + "/minimap/genome." + presetting + ".mmi"
-    # -c output CIGAR in PAF; -a output SAM
-    s = minimap_path + " --MD -c -a -t 32 -x " + presetting + " " + extra + " -R \"@RG\\tID:1\\tSM:" \
-        + read_set["name"] + "\" " + index_str + " " \
-        + read_set["fasta_file"] + " > " + sam_file_path + " 2> /dev/null"
-    #print(s)
-    os.system(s)
+    
+    run(["sv_util/mm2.sh", minimap_path, presetting, extra, read_set["name"], index_str, 
+         read_set["fasta_file"], sam_file_path], 
+        timeout=TIMEOUT)
 
 def pbmm2(read_set, sam_file_path, json_dict):
-    presetting = None # noop
-    if read_set["technology"] == "pb":
-        presetting = "map-pb"
-    if read_set["technology"] == "ont":
-        presetting = "map-ont"
-    index_str = json_dict["reference_path"] + "/minimap/genome." + presetting + ".mmi"
-    # -c output CIGAR in PAF; -a output SAM; -Y softclip
-    os.system("~/workspace/minimap2/minimap2 --MD -Y -c -a -t 32 -x " + presetting + " -R \"@RG\\tID:1\\tSM:"
-                + read_set["name"] + "\" " + index_str + " "
-                + read_set["fasta_file"] + " > " + sam_file_path + " 2> /dev/null")
-
-    #os.system("~/miniconda2/bin/pbmm2 align " + json_dict["reference_path"] + "/fasta/genome.fna " 
-    #          + read_set["fasta_file"] + ".bam " + sam_file_path + 
-    #          ".sorted.bam --sort --preset CCS --sample sample1 --rg '@RG\tID:movie1' ")
+    run(["sv_util/pbmm2.sh", "pbmm2", json_dict["reference_path"] + "/minimap/genome.map-pb.mmi",
+         read_set["fasta_file"], sam_file_path + ".bam"], timeout=TIMEOUT)
+    s = sam_tools_pref + "view -h -o " + sam_file_path + " " + sam_file_path + ".bam"
+    run(s, shell=True)
 
 def sw(read_set, sam_file_path, json_dict):
-    ref_file = json_dict["reference_path"] + "/fasta/genome.fna"
-    os.system("~/workspace/klib/ksw -m 32 -f " + ref_file + " " + read_set["fasta_file"] + " > " +
-              sam_file_path)
+    run(["sv_util/sw.sh", json_dict["reference_path"] + "/fasta/genome.fna", read_set["fasta_file"], sam_file_path], 
+        timeout=TIMEOUT)
 
 def ngmlr(read_set, sam_file_path, json_dict):
     presetting = None # noop
@@ -61,16 +49,13 @@ def ngmlr(read_set, sam_file_path, json_dict):
     if read_set["technology"] == "ont":
         presetting = "ont"
     index_str = json_dict["reference_path"] + "/ngmlr/genome.fna"
-    # -c output CIGAR in PAF; -a output SAM
-    os.system(ngmrl_path + " -r " + index_str + " -q " + read_set["fasta_file"]
-                + " --rg-id 1, --rg-sm " + read_set["name"]
-                + " -t 32 -x " + presetting + " > " + sam_file_path + " 2> /dev/null")
+    run(["sv_util/ngmlr.sh", ngmrl_path, index_str, read_set["fasta_file"], 
+         read_set["name"], presetting, sam_file_path], timeout=TIMEOUT)
 
 def blasr(read_set, sam_file_path, json_dict):
-    s = "~/workspace/legacy_blasr/blasr " + read_set["fasta_file"] + " " + json_dict["reference_path"] \
-                + "/blasr/genome.fasta -printSAMQV -nproc 32 -sam -out " + sam_file_path + ".no_qstring > /dev/null"
     #print(s)
-    os.system(s)
+    run(["sv_util/blasr.sh", read_set["fasta_file"], json_dict["reference_path"], sam_file_path + ".no_qstring"], 
+        timeout=TIMEOUT)
     with open(sam_file_path + ".no_qstring", "r") as in_file:
         with open(sam_file_path, "w") as out_file:
             for line in in_file:
@@ -84,18 +69,30 @@ def blasr(read_set, sam_file_path, json_dict):
                     out_file.write("\n")
 
 def graph_aligner(read_set, sam_file_path, json_dict):
-    dev_null = " 2> /dev/null "
-    s = graph_aligner_path + " -t 32 -g " + json_dict["reference_path"] + "/vg/genome.vg -f " + read_set["fasta_file"] \
-                + " -a " + sam_file_path + ".gam -x vg 1>&2 " + dev_null
     #print(s)
-    os.system(s)
-    s = vg_path + " surject -t 32 -x " + json_dict["reference_path"] + "/vg/genome.vg -b " + sam_file_path + \
-            ".gam > " + sam_file_path + ".bam" + dev_null
+    run(["sv_util/graph_aligner.sh", graph_aligner_path, json_dict["reference_path"] + "/vg/genome.vg", 
+         read_set["fasta_file"], sam_file_path + ".gam"], 
+        timeout=TIMEOUT)            
+    run(["sv_util/vg.sh", vg_path, json_dict["reference_path"] + "/vg/genome.vg", 
+         sam_file_path + ".gam", sam_file_path + ".bam"], 
+        timeout=TIMEOUT)
     #print(s)
-    os.system(s)
-    s = sam_tools_pref + "view -h -o " + sam_file_path + " " + sam_file_path + ".bam" + dev_null
+    s = sam_tools_pref + "view -h -o " + sam_file_path + " " + sam_file_path + ".bam 2>/dev/null"
     #print(s)
-    os.system(s)
+    run(s, shell=True, timeout=TIMEOUT)
+
+def graph_aligner_2(read_set, sam_file_path, json_dict):
+    #print(s)
+    run(["sv_util/graph_aligner.sh", graph_aligner2_path, json_dict["reference_path"] + "/vg/genome.vg", 
+         read_set["fasta_file"], sam_file_path + ".gam"], 
+        timeout=TIMEOUT)            
+    run(["sv_util/vg.sh", vg_path, json_dict["reference_path"] + "/vg/genome.vg", 
+         sam_file_path + ".gam", sam_file_path + ".bam"], 
+        timeout=TIMEOUT)
+    #print(s)
+    s = sam_tools_pref + "view -h -o " + sam_file_path + " " + sam_file_path + ".bam 2>/dev/null"
+    #print(s)
+    run(s, shell=True, timeout=TIMEOUT)
 
 def sam_to_bam(sam_file_path):
     dev_null = "" #" 2> /dev/null "

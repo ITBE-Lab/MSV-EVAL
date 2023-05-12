@@ -9,6 +9,7 @@ from bokeh.plotting import save
 from bokeh.io import output_file, export_svgs
 from sv_util.bokeh_style_helper import *
 from bokeh.models import NumeralTickFormatter, FixedTicker
+import subprocess
 
 class MATestSet:
     def __init__(self, params=ParameterSetManager(), name="ma", render_one=False):
@@ -25,8 +26,10 @@ class MATestSet:
             for name, read in read_by_name:
                 fasta_file.write(">" + name + "\n")
                 fasta_file.write(str(read) + "\n")
+        
         # align
         quick_align_paths([reads_path], human_genome_dir + "/ma/genome", self.params, path_sam)
+        #print(reads_path)
         return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, fm_index, [path_sam],
                                                  self.render_one)
     def name(self):
@@ -44,22 +47,51 @@ class MATestSet:
         return "yellow"
 
 class MM2TestSet:
-    def __init__(self, mm_extra="", name="mm2"):
-        self.mm2 = lambda x,y,z: mm2(x,y,z,extra=mm_extra)
+    def __init__(self, mm_extra="", name="mm2", presetting_override=None):
+        self.mm2 = lambda x,y,z: mm2(x,y,z,extra=mm_extra, presetting_override=presetting_override)
         self._name = name
         self.c = "red"
         if len(mm_extra) > 0:
             self.c = "purple"
+        elif not presetting_override is None:
+            self.c = "turquise"
 
         self.c2 = "lightred"
         if len(mm_extra) > 0:
             self.c2 = "purple"
+        elif not presetting_override is None:
+            self.c = "turquise"
 
         self._display_name = "Minimap 2 Alignment"
         if len(mm_extra) > 0:
             self._display_name = "Minimap 2 Alignment extra"
     def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix, genome_section_by_name):
         path_sam = create_alignment(read_by_name, self.mm2, self._name + suffix)
+        return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, fm_index, path_sam)
+    def name(self):
+        return self._name
+    def display_name(self):
+        return self._display_name
+
+    def bokeh_func(self, plot, x, y, c, l):
+        plot.triangle(x=x, y=y, line_color=c, legend_label=l,
+                size=point_to_px(7), line_width=point_to_px(2))
+
+    def color(self):
+        return self.c
+    def color_light(self):
+        return self.c2
+
+class PBMM2TestSet:
+    def __init__(self,name="pbmm2"):
+        self.pbmm2 = lambda x,y,z: pbmm2(x,y,z)
+        self._name = name
+        self.c = "red"
+        self.c2 = "lightred"
+        self._display_name = "PB-Minimap 2 Alignment"
+
+    def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix, genome_section_by_name):
+        path_sam = create_alignment(read_by_name, self.pbmm2, self._name + suffix)
         return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, fm_index, path_sam)
     def name(self):
         return self._name
@@ -123,7 +155,7 @@ class NgmlrTestSet:
         return "lightgreen"
 
 class SeedsTestSet:
-    def __init__(self, reseeding, mems=True):
+    def __init__(self, reseeding=False, mems=True):
         self.reseeding = reseeding
         self.mems = True
 
@@ -176,24 +208,52 @@ class GraphAligner:
     def color_light(self):
         return "lightblue"
 
-def print_n_write(s, f):
+class GraphAligner2:
+    def __init__(self):
+        pass
+
+    def test(self, params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix, genome_section_by_name):
+        path_sam = create_alignment(read_by_name, graph_aligner_2, "graphaligner50-" + suffix)
+        return compare_alignment_from_file_paths(params, read_by_name, seeds_by_name, pack, fm_index, path_sam)
+
+    def name(self):
+        return "GraphAligner50"
+
+    def display_name(self):
+        return "GraphAligner50"
+
+    def bokeh_func(self, plot, x, y, c, l):
+        plot.circle(x=x, y=y, line_color=c, fill_color=None, legend_label=l,
+                    size=point_to_px(7), line_width=point_to_px(2))
+
+    def color(self):
+        return "blue"
+    def color_light(self):
+        return "lightblue"
+
+def print_n_write(s, f, fn):
     print(s, end="")
     f.write(s)
 
 default_test_set = [
-                    NWTestSet(),
-                    SeedsTestSet(False),
-                    MATestSet(),
-                    MM2TestSet(),
-                    NgmlrTestSet(),
-                    GraphAligner(),
-                    MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), 
+                        #PBMM2TestSet(),
+                        NWTestSet(),
+                        SeedsTestSet(),
+                        MATestSet(),
+                        MM2TestSet(),
+                        NgmlrTestSet(),
+                        GraphAligner(),
+                        #MM2TestSet("-z 400,1 --splice -P", "mm2_extra"), 
+                        #MM2TestSet(name="asm10", presetting_override="asm10"), 
                     ]
-#default_test_set = [ SeedsTestSet(False), MATestSet(),  MM2TestSet(),  ]
+#default_test_set = [ MM2TestSet(), SeedsTestSet() ]
+#default_test_set = [ GraphAligner2() ]
+
 
 default_range = range(50, 500, 50)
-#default_range = range(50, 250, 50)
-#default_range = range(50, 500, 100)
+#default_range = range(0, 250, 50)
+#default_range = range(50, 500, 200)
+#default_range = [450]
 
 def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocation_overlap",
                     test_sets=default_test_set, sv_sizes=default_range, read_sizes=[20000, 2000, 1000], 
@@ -214,20 +274,22 @@ def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocatio
             with open(sv_hidden_to_aligners_data_dir + "/" + str(read_size) + "-" 
                       + ("w_err" if do_disfigure else "err_free") + "-" + filename_out + ".tsv", "w") as file_out:
                 # header of outfile
-                print_n_write("read_size\ttest_set", file_out)
+                print_n_write("read_size\ttest_set", file_out, filename_out)
                 for sv_size in sv_sizes:
-                    print_n_write("\t", file_out)
-                    print_n_write(str(sv_size), file_out)
-                print_n_write("\n", file_out)
+                    print_n_write("\t", file_out, filename_out)
+                    print_n_write(str(sv_size), file_out, filename_out)
+                print_n_write("\t# " + filename_out + (" disfigured" if do_disfigure else " error-free"), 
+                              file_out, filename_out)
+                print_n_write("\n", file_out, filename_out)
 
                 # body of outfile
                 read_cache = {}
                 for test_set in test_sets:
-                    print_n_write(str(read_size), file_out)
-                    print_n_write("\t", file_out)
-                    print_n_write(test_set.name(), file_out)
+                    print_n_write(str(read_size), file_out, filename_out)
+                    print_n_write("\t", file_out, filename_out)
+                    print_n_write(test_set.name(), file_out, filename_out)
                     for sv_size in sv_sizes:
-                        print_n_write("\t", file_out)
+                        print_n_write("\t", file_out, filename_out)
                         if not sv_func is None:
                             seeds_by_name, read_by_name, genome_section_by_name = \
                                         create_reads(pack, size_func(read_size, sv_size, 0),
@@ -239,16 +301,20 @@ def accuracy_plot(sv_func, size_func=lambda x,y,z: x, filename_out="translocatio
                                                 create_scattered_read(pack, num_reads,
                                                                         0, sv_size, do_disfigure)
                         suffix = filename_out + "-sv_size=" + str(sv_size)
-                        acc = test_set.test(params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix,
-                                            genome_section_by_name)
-                        print_n_write(str(acc), file_out)
-                    print_n_write("\n", file_out)
+                        try:
+                            acc = test_set.test(params, seeds_by_name, read_by_name, fm_index, mm_index, pack, suffix,
+                                                genome_section_by_name)
+                        except subprocess.TimeoutExpired:
+                            acc = float("NaN")
+                        print_n_write(str(acc), file_out, filename_out)
+                    print_n_write("\n", file_out, filename_out)
 
 def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scattered read", 
                             test_sets_1=default_test_set, x_label="SV Size [nt]", save_svg=True,
                             read_sizes=[20000, 2000, 1000],
                             do_disfigures=[True, False],
                             ):
+    #return
     for read_size in read_sizes:
         for do_disfigure in do_disfigures:
             with open(sv_hidden_to_aligners_data_dir + "/" + str(read_size)+"-"
@@ -261,7 +327,7 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
                     test_set_dict[test_set.name()] = test_set
 
                 res = 4
-                xs = [int(x) for x in lines[0].split("\t")[2:]]
+                xs = [int(x) for x in lines[0].split("\t")[2:-1]]
                 xs = [xs[0]] + xs + [xs[-1]]
 
 
@@ -303,4 +369,4 @@ def print_accuracy_plot(file_name_in="scattered_overlap", title="Overlap - Scatt
                         if save_plots:
                             save(plot)
                             if save_svg:
-                                export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + str(read_size) + ("w_err" if do_disfigure else "err_free") + file_name_in + ".svg")
+                                export_svgs(plot, filename=sv_hidden_to_aligners_data_dir + "/bokeh_out_" + str(read_size) + "_" + test_set.name() + "_" + ("w_err" if do_disfigure else "err_free") + file_name_in + ".svg")

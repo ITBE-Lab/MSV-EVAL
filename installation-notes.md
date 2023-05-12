@@ -164,6 +164,7 @@ if you intend to install MSV permanently, you should add the above export statem
     mkdir -p /MAdata/sv_caller_analysis/yeast_analysis/gridss
     mkdir -p /MAdata/ena/simulated/UFRJ50816/Illumina-250
     mkdir -p /MAdata/ena/simulated/UFRJ50816/pacbio_CCS
+    mkdir -p /MAdata/ena/simulated/UFRJ50816/oxfNano
     mkdir -p /MAdata/tmp
 alternatively, you can reconfigure the script MS-EVAL/sv_util/settings.py 
 
@@ -200,6 +201,7 @@ The downloading and index building can take several hours.
 
     mkdir /MAdata/genome/human/GRCh38.p12/minimap
     ~/minimap2/minimap2 -x map-pb -d /MAdata/genome/human/GRCh38.p12/minimap/genome.map-pb.mmi /MAdata/genome/human/GRCh38.p12/fasta/genome.fna
+    ~/minimap2/minimap2 -x asm10 -d /MAdata/genome/human/GRCh38.p12/minimap/genome.asm10.mmi /MAdata/genome/human/GRCh38.p12/fasta/genome.fna
     mkdir /MAdata/genome/human/GRCh38.p12/ngmlr
     cp /MAdata/genome/human/GRCh38.p12/fasta/genome.fna /MAdata/genome/human/GRCh38.p12/ngmlr/genome.fna
     mkdir /MAdata/genome/human/GRCh38.p12/ma

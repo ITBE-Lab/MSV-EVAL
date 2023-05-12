@@ -96,7 +96,7 @@ if True:
         #(15, 14, 12, 25, 25, "Gridss"), # Gridss: small, large
         #(19, 18, 16, 25, 25, "Manta"), # Manta: small, large
         (run_table.getId("MA < 10nt PacBio"), run_table.getId("MA [10,200)nt PacBio"), 
-         run_table.getId("MA >= 200nt PacBio"), 0, 25, "MA") # MA: small, large
+         run_table.getId("MA >=200nt PacBio"), 0, 25, "MA") # MA: small, large
     ]
     for lt_ten_id, ge_ten_id, large_id, blur_small, blur_large, name in to_analyze:
         print("Analyzing:", name)
