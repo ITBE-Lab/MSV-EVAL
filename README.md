@@ -1,6 +1,6 @@
 # MSV: a modular structural variant caller that reveals nested and complex rearrangements by unifying breakends inferred directly from reads
 
-This repository contains the scrips for the experiments performed in the manuscript [MSV: a modular structural variant caller that reveals nested and complex rearrangements by unifying breakends inferred directly from reads](https://link.springer.com/article/10.1186/s13059-023-03009-5#Sec9 "Genome Biology paper")
+This repository contains the scrips for the experiments performed in the manuscript [MSV: a modular structural variant caller that reveals nested and complex rearrangements by unifying breakends inferred directly from reads](https://link.springer.com/article/10.1186/s13059-023-03009-5 "Genome Biology paper")
 
 ## Installation
 For conveniently performing the experiments, there is a ready-to-run [VirtualBox](https://www.virtualbox.org/ "Virtual Box Homepage") VM available for [download here](http://itbe.hanyang.ac.kr/ak/MSV/MSV-Ubuntu.7z "MSV-Ubuntu VM").
